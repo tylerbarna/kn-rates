@@ -33,7 +33,7 @@ url = f"https://fritz.science/api/observation"
 
 querystring = {"startDate":"2025-06-01","endDate":"2025-07-30","numPerPage":100}
 
-headers = {"Authorization": fritz_token}
+headers = {"Authorization": f'token {fritz_token}'}
 
 response = requests.get(url, headers=headers, params=querystring)
 
