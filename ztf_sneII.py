@@ -18,6 +18,8 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 import json
 import requests
+import dustmaps.planck
+dustmaps.planck.fetch()
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -31,7 +33,7 @@ except FileNotFoundError:
 
 url = f"https://fritz.science/api/observation"
 
-querystring = {"startDate":"2025-06-01","endDate":"2025-07-30","numPerPage":100}
+querystring = {"startDate":"2025-06-01","endDate":"2025-07-30","numPerPage":10000}
 
 headers = {"Authorization": f'token {fritz_token}'}
 
@@ -39,8 +41,8 @@ response = requests.get(url, headers=headers, params=querystring)
 
 a = response.json()
 
-# with open("obs.json",'w') as f:
-#     f.write(json.dumps(a, indent=4))
+with open("obs.json",'w') as f:
+    f.write(json.dumps(a, indent=4))
 
 mjd = []
 dt = []
@@ -100,10 +102,10 @@ sniia = SNeII.from_draw(
     tstop=tstop,
     skyarea=skyarea,
     zmin=0.0,
-    zmax=0.1,  #Note : redshift changed to 2
+    zmax=2,  #Note : redshift changed to 2
     effect=mw_extinction,
     rate= 1e5/5,
-    template = ['‘v19-2016gkg-corr’', 'v19-2011ei-corr']
+    template = ['v19-2016gkg-corr', 'v19-2011ei-corr']
     )
 
 dset = dataset.DataSet.from_targets_and_survey(sniia, mysurvey)
