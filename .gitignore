@@ -396,3 +396,8 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Custom
+*Zone.Identifier
+*.DS_Store
+secret.txt
