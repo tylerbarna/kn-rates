@@ -1,0 +1,13 @@
+(skysurvey) tbarna@Desktop:~/kn-rates$ python ztf_sneII.py 
+Checking existing file to see if MD5 sum matches ...
+File exists. Not overwriting.
+using existing obs.json file
+mjd       float32
+band       object
+limmag    float32
+ra        float32
+dec       float32
+dtype: object
+starting dataset creation attempt  1
+[710, 981, 2588, 2840, 2876]
+Number of valid detections with SNR > 5 is 5

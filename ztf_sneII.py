@@ -10,6 +10,7 @@ from shapely.ops import unary_union
 from skysurvey.effects import mw_extinction
 import matplotlib.pyplot as plt
 from skysurvey import dataset
+from shapely import geometry
 import matplotlib.pyplot as plt
 from astropy.time import Time
 from datetime import datetime
@@ -18,31 +19,41 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 import json
 import requests
+import os
 import dustmaps.planck
 dustmaps.planck.fetch()
 
 import warnings
 warnings.filterwarnings('ignore')
 
-fritz_secret = 'secret.txt'
-try:
-    with open(fritz_secret, 'r') as file:
-        fritz_token = file.read()
-except FileNotFoundError:
-    print(f"File {fritz_secret} not found.")
+debug = False
 
-url = f"https://fritz.science/api/observation"
+## Check if obs.json exists
+if not os.path.exists("obs.json"):
+    fritz_secret = 'secret.txt'
+    try:
+        with open(fritz_secret, 'r') as file:
+            fritz_token = file.read()
+    except FileNotFoundError:
+        print(f"File {fritz_secret} not found.")
 
-querystring = {"startDate":"2025-06-01","endDate":"2025-07-30","numPerPage":10000}
+    url = f"https://fritz.science/api/observation"
 
-headers = {"Authorization": f'token {fritz_token}'}
+    querystring = {"startDate":"2021-06-01","endDate":"2025-07-30","numPerPage":10000}
 
-response = requests.get(url, headers=headers, params=querystring)
+    headers = {"Authorization": f'token {fritz_token}'}
 
-a = response.json()
+    response = requests.get(url, headers=headers, params=querystring)
 
-with open("obs.json",'w') as f:
-    f.write(json.dumps(a, indent=4))
+    a = response.json()
+
+    with open("obs.json",'w') as f:
+        f.write(json.dumps(a, indent=4))
+else:
+    print('using existing obs.json file')
+    # Read existing JSON file
+    with open("obs.json", 'r') as f:
+        a = json.load(f)
 
 mjd = []
 dt = []
@@ -72,43 +83,54 @@ df["zp"] = 30
 df["gain"] = 6.0
 df["limmag"].astype("Float32")
 df["skynoise"] = df["limmag"].apply(get_skynoise_from_maglimit, zp=30).values
+#df = df[df['band'] != 'ztfg']
 
-from shapely import geometry
+
 coords = ((0., 0.), (0., 7.), (7., 7.), (7., 0.), (0., 0.))
 footprint = geometry.Polygon(coords)
+dataset_bool = False
+attempt_count = 1
+while not dataset_bool:
+    print('starting dataset creation attempt ', attempt_count)  if debug else None
+    try:
+        mysurvey = Survey.from_pointings(df, footprint=footprint)
+        print('made it past mysurvey') if debug else None
+        #mysurvey.show()
 
-mysurvey = Survey.from_pointings(df, footprint=footprint)
+        fov_deg = 40.0 / 60.0
+        half_size = fov_deg / 2.0
+        footprint = box(-half_size, -half_size, half_size, half_size)
+        print('defined footprint') if debug else None
 
-import matplotlib.pyplot as plt
+        tiles = []
+        for _, row in df.iterrows():
+            ra = row["ra"]
+            dec = row["dec"]
+            tile = box(ra - half_size, dec - half_size, ra + half_size, dec + half_size)
+            tiles.append(tile)
+        tstart, tstop = mysurvey.get_timerange()
+        skyarea = unary_union(tiles)
+        print('defined tiles and skyarea') if debug else None
 
-mysurvey.show()
-
-fov_deg = 40.0 / 60.0
-half_size = fov_deg / 2.0
-footprint = box(-half_size, -half_size, half_size, half_size)
-
-
-tiles = []
-for _, row in df.iterrows():
-    ra = row["ra"]
-    dec = row["dec"]
-    tile = box(ra - half_size, dec - half_size, ra + half_size, dec + half_size)
-    tiles.append(tile)
-tstart, tstop = mysurvey.get_timerange()
-skyarea = unary_union(tiles)
-
-sniia = SNeII.from_draw(
-    tstart=tstart,
-    tstop=tstop,
-    skyarea=skyarea,
-    zmin=0.0,
-    zmax=2,  #Note : redshift changed to 2
-    effect=mw_extinction,
-    rate= 1e5/5,
-    template = ['v19-2016gkg-corr', 'v19-2011ei-corr']
-    )
-
-dset = dataset.DataSet.from_targets_and_survey(sniia, mysurvey)
+        sniia = SNeII.from_draw(
+            tstart=tstart,
+            tstop=tstop,
+            skyarea=skyarea,
+            zmin=0.0,
+            zmax=2,  #Note : redshift changed to 2
+            effect=mw_extinction,
+            rate= 1e5/5,
+            template = ['v19-2016gkg-corr', 'v19-2011ei-corr']
+            )
+        print('defined sniia') if debug else None
+        ## where issue lies
+        dset = dataset.DataSet.from_targets_and_survey(sniia, mysurvey)
+        print('created dataset') if debug else None
+        dataset_bool = True
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        attempt_count += 1
+        print(f"Retrying dataset creation... (Attempt {attempt_count})")
 
 def change_dataset_entry(dset):
     idx =  dset.obs_index.to_numpy()
@@ -174,7 +196,7 @@ def num_of_detections_new(df, SNR):
     return valid_SNR_index, valid_light_curves
 
 df = change_dataset_entry(dset)
-valid_idx, valid_lightcurves = num_of_detections_new(df, 1)
+valid_idx, valid_lightcurves = num_of_detections_new(df, 5)
 
 def plot_lightcurve(i, df):
     coef = 10 ** (-(df["zp"] - 25) / 2.5)
@@ -203,9 +225,10 @@ def plot_lightcurve(i, df):
             ls="None", marker="None", ecolor="grey", 
             zorder=3)
         ax.set_ylabel("Flux[zp=25]")
+        ax.grid()
         plt.legend()
 
-        plt.savefig(f"LC_{i}.png")
+        plt.savefig(f"figs/LC_{i}.png")
 
 for i, index in enumerate(valid_idx):
     plot_lightcurve(i, valid_lightcurves[i])
