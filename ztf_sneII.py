@@ -117,7 +117,7 @@ while not dataset_bool:
             tstop=tstop,
             skyarea=skyarea,
             zmin=0.0,
-            zmax=2,  #Note : redshift changed to 2
+            zmax=1.2,  #Note : redshift changed to 2
             effect=mw_extinction,
             rate= 1e5/5,
             template = ['v19-2016gkg-corr', 'v19-2011ei-corr']
