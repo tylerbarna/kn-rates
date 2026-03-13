@@ -1,6 +1,10 @@
 
 import pandas as pd
 import numpy as np
+
+if not hasattr(np, "in1d"):
+    np.in1d = np.isin
+
 from shapely.geometry import box
 from skysurvey import Survey
 from skysurvey.tools.utils import get_skynoise_from_maglimit
