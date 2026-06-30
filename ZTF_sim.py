@@ -1,4 +1,4 @@
-import fiesta
+# import fiesta
 
 
 from survey_sim import FixedBu2026KilonovaPopulation, SimulationPipeline, load_ztf_survey, DetectionCriteria, Bu2026KilonovaPopulation, SurveyStore
@@ -12,7 +12,7 @@ import numpy as np
 from scipy.stats import cumfreq
 
 
-from fiesta.surrogates import download_recommended_surrogates
+# from fiesta.surrogates import download_recommended_surrogates
 # try:
 #     download_recommended_surrogates()
 # except Exception as e:
@@ -26,6 +26,7 @@ import time
 DEFAULT_OUTPUT_BASE = "results/ztf_10M_sim_result"
 DEFAULT_N_TRANSIENTS = 10_000_000
 DEFAULT_N_RUNS = 10
+DEFAULT_N_PROCESSES = DEFAULT_N_RUNS
 
 
 def parse_args():
@@ -46,6 +47,12 @@ def parse_args():
         type=int,
         default=DEFAULT_N_RUNS,
         help="Number of simulation runs to execute.",
+    )
+    parser.add_argument(
+        "--n-processes",
+        type=int,
+        default=DEFAULT_N_PROCESSES,
+        help="Number of parallel processes to use (default: same as n-runs).",
     )
     return parser.parse_args()
 
@@ -98,6 +105,7 @@ model = FiestaKNModel()
 
 # Run pipeline in parallel
 n_sims = args.n_runs
+n_processes = args.n_processes
 N = args.n_transients
 print(f"\nRunning pipeline {n_sims} times in parallel with {N} transients each (fixed incl=0.45 rad, tuned ejecta)...")
 
@@ -116,7 +124,7 @@ def _run_instance(idx: int):
     result = pipeline.run()
     run_elapsed = time.perf_counter() - run_start
     datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    fname = f"{output_base}_{idx}_{datetime_str}.json"
+    fname = f"{output_base}_{datetime_str}.json"
     save_result(result, fname)
     # return a small summary dict (picklable)
     summaries = []
@@ -154,7 +162,7 @@ if __name__ == '__main__':
     ctx = get_context('spawn')
     batch_start = time.perf_counter()
     
-    with ctx.Pool(processes=n_sims) as pool:
+    with ctx.Pool(processes=n_processes) as pool:
         results = pool.map(_run_instance, list(range(n_sims)))
     batch_elapsed = time.perf_counter() - batch_start
 

@@ -23,7 +23,7 @@ conda init bash
 conda activate /users/8/barna314/anaconda3/envs/simsurvey
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/common/software/install/spack/linux-centos7-ivybridge/gcc-7.2.0/cuda-11.8.0-xqzqlf2v77opht3bv4onsqt7uuiomqec/extras/CUPTI/lib64
 
-python ZTF_sim.py --output-base results/ztf_10M_msigpu_result --n-transients 10000000 --n-runs 10
+python ZTF_sim.py --output-base results/ztf_10M_msigpu_result --n-transients 10000000 --n-runs 10 --n-processes 1
 # > logs/output_${SLURM_JOB_ID}_$i.log 2> logs/error_${SLURM_JOB_ID}_$i.err & done
 
 wait
