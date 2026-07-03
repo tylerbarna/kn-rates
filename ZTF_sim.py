@@ -107,7 +107,7 @@ model = FiestaKNModel()
 n_sims = args.n_runs
 n_processes = args.n_processes
 N = args.n_transients
-print(f"\nRunning pipeline {n_sims} times in parallel with {N} transients each (fixed incl=0.45 rad, tuned ejecta)...")
+print(f"\nRunning pipeline {n_sims} times across {n_processes} threads with {N} transients each (fixed incl=0.45 rad, tuned ejecta)...")
 
 def _run_instance(idx: int):
     # create pipeline per process to avoid sharing non-picklable state
