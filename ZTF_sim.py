@@ -54,12 +54,18 @@ def parse_args():
         default=DEFAULT_N_PROCESSES,
         help="Number of parallel processes to use (default: same as n-runs).",
     )
+    parser.add_argument(
+        "--vary-rate",
+        action="store_true",
+        help="If set, vary the volumetric rate for each run (default: fixed rate).",
+    )  
     return parser.parse_args()
 
 
 args = parse_args()
 output_base = Path(args.output_base)
 output_base.parent.mkdir(parents=True, exist_ok=True)
+vary_rate = args.vary_rate
 
 survey = load_ztf_survey(nside=64);
 
@@ -110,6 +116,37 @@ N = args.n_transients
 print(f"\nRunning pipeline {n_sims} times across {n_processes} threads with {N} transients each (fixed incl=0.45 rad, tuned ejecta)...")
 
 def _run_instance(idx: int):
+    rate = 1000.0 if not vary_rate else np.random.uniform(100.0, 2000.0)
+    
+    pop = FixedBu2026KilonovaPopulation(
+    log10_mej_dyn=-1.8,
+    v_ej_dyn=0.2,
+    ye_dyn=0.15,
+    log10_mej_wind=-1.1,
+    v_ej_wind=0.1,
+    ye_wind=0.35,
+    inclination_em=0.45,
+    rate=rate,
+    # z_max chosen well above the AT2017gfo-bright ZTF detection horizon.
+    # compute_rate's integrand has already converged out here, so tightening
+    # further would dilute MC stats without biasing VT_eff.
+    z_max=0.15,
+)
+    
+    # ZTFReST-like detection criteria
+    det = DetectionCriteria(
+    snr_threshold=5.0,
+    snr_threshold_secondary=3.0,
+    min_detections=2,
+    min_detections_primary=1,
+    max_timespan_days=14.0,
+    min_time_separation_hours=3.0,
+    require_fast_transient=True,
+    min_rise_rate=0.0,
+    min_fade_rate=0.3,
+    min_galactic_lat=15.0,
+)
+    
     # create pipeline per process to avoid sharing non-picklable state
     seed = 42 + idx
     pipeline = SimulationPipeline(
