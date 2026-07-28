@@ -1,7 +1,7 @@
 # import fiesta
 
 
-from survey_sim import FixedBu2026KilonovaPopulation, SimulationPipeline, load_ztf_survey, DetectionCriteria, Bu2026KilonovaPopulation, SurveyStore
+from survey_sim import FixedBu2026KilonovaPopulation, FixedMetzgerKilonovaPopulation, SimulationPipeline, load_ztf_survey, DetectionCriteria, Bu2026KilonovaPopulation, SurveyStore, MetzgerKNModel
 from survey_sim.fiesta_model import FiestaKNModel
 from survey_sim.serialization import save_result, load_result
 from contextlib import redirect_stdout
@@ -23,8 +23,8 @@ import datetime
 from pathlib import Path
 import time
 
-DEFAULT_OUTPUT_BASE = "results/ztf_10M_sim_result"
-DEFAULT_N_TRANSIENTS = 10_000_000
+DEFAULT_OUTPUT_BASE = "results/ztf_10_sim_result"
+DEFAULT_N_TRANSIENTS = 1_000_000
 DEFAULT_N_RUNS = 10
 DEFAULT_N_PROCESSES = DEFAULT_N_RUNS
 
@@ -58,7 +58,15 @@ def parse_args():
         "--vary-rate",
         action="store_true",
         help="If set, vary the volumetric rate for each run (default: fixed rate).",
-    )  
+    )
+    
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="Bu2026Fixed",
+        help="Kilonova model to use (default: Bu2026Fixed).",
+        choices=["Bu2026Fixed", "Bu2026Vary", "Metzger"]
+    )
     return parser.parse_args()
 
 
@@ -66,6 +74,7 @@ args = parse_args()
 output_base = Path(args.output_base)
 output_base.parent.mkdir(parents=True, exist_ok=True)
 vary_rate = args.vary_rate
+model = args.model
 
 survey = load_ztf_survey(nside=64);
 
@@ -74,22 +83,44 @@ print(f"  MJD range: {survey.mjd_range}")
 print(f"  Duration: {survey.duration_years:.2f} years")
 print(f"  Bands: {survey.bands}")
 
+
+if model == "Bu2026Fixed":
 # Tuned AT2017gfo Bu2026 parameters (best g/r/i fit at t<4d)
 # log10_mej_dyn=-1.8 (slightly less dynamical ejecta)
 # inclination_em=0.45 rad (26 deg, consistent with GW170817 constraints)
-pop = FixedBu2026KilonovaPopulation(
-    log10_mej_dyn=-1.8,
+    pop = FixedBu2026KilonovaPopulation(
+        log10_mej_dyn=-1.8,
+        v_ej_dyn=0.2,
+        ye_dyn=0.15,
+        log10_mej_wind=-1.1,
+        v_ej_wind=0.1,
+        ye_wind=0.35,
+        inclination_em=0.45,
+        rate=1000.0,
+        # z_max chosen well above the AT2017gfo-bright ZTF detection horizon.
+        # compute_rate's integrand has already converged out here, so tightening
+        # further would dilute MC stats without biasing VT_eff.
+        z_max=0.15,
+    )
+elif model == "Bu2026Vary":
+    pop = FixedBu2026KilonovaPopulation(
+    log10_mej_dyn=-1.7,
     v_ej_dyn=0.2,
     ye_dyn=0.15,
     log10_mej_wind=-1.1,
     v_ej_wind=0.1,
     ye_wind=0.35,
-    inclination_em=0.45,
+    vary_inclination=True,  # flat in cos(iota)
     rate=1000.0,
-    # z_max chosen well above the AT2017gfo-bright ZTF detection horizon.
-    # compute_rate's integrand has already converged out here, so tightening
-    # further would dilute MC stats without biasing VT_eff.
-    z_max=0.15,
+    z_max=0.3,
+)
+elif model == "Metzger":
+    pop = FixedMetzgerKilonovaPopulation(
+    mej=0.00126,
+    vej=0.50,
+    kappa=398.0,
+    rate=1000.0,
+    z_max=0.3,
 )
 
 # ZTFReST-like detection criteria
@@ -107,7 +138,10 @@ det = DetectionCriteria(
 )
 
 # Bu2026 model
-model = FiestaKNModel()
+if model == "Bu2026Fixed" or model == "Bu2026Vary":
+    model = FiestaKNModel()
+elif model == "Metzger":
+    model = MetzgerKNModel()
 
 # Run pipeline in parallel
 n_sims = args.n_runs
