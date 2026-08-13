@@ -59,6 +59,11 @@ def parse_args():
         action="store_true",
         help="If set, vary the volumetric rate for each run (default: fixed rate).",
     )
+    parser.add_argument(
+        "--randomize-params",
+        action="store_true",
+        help="If set, randomize kilonova parameters per run from reasonable model bounds.",
+    )
     
     parser.add_argument(
         "--model",
@@ -74,7 +79,49 @@ args = parse_args()
 output_base = Path(args.output_base)
 output_base.parent.mkdir(parents=True, exist_ok=True)
 vary_rate = args.vary_rate
+randomize_params = args.randomize_params
 model = args.model
+
+def _parameter_bounds_for_model(model_name: str):
+    """Return reasonable physical bounds for kilonova parameters.
+
+    These values are broad enough to span the expected range of realistic
+    kilonova ejecta and viewing-angle configurations without going outside
+    physically plausible limits. The default behavior remains unchanged unless
+    the caller opts into randomization.
+    """
+    if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
+        return {
+            "log10_mej_dyn": (-2.0, -1.2),
+            "v_ej_dyn": (0.08, 0.35),
+            "ye_dyn": (0.05, 0.25),
+            "log10_mej_wind": (-1.8, -0.5),
+            "v_ej_wind": (0.03, 0.20),
+            "ye_wind": (0.20, 0.45),
+            "inclination_em": (0.10, 0.90),
+            "z_max": (0.15, 0.35),
+        }
+    if model_name == "Metzger":
+        return {
+            "mej": (0.0005, 0.0050),
+            "vej": (0.20, 0.80),
+            "kappa": (50.0, 1000.0),
+            "z_max": (0.15, 0.35),
+        }
+    raise ValueError(f"Unsupported model: {model_name}")
+
+
+def _randomize_population_kwargs(model_name: str, rate: float, rng=None):
+    """Sample a single realistic kilonova population from broad model bounds."""
+    if rng is None:
+        rng = np.random.default_rng()
+    bounds = _parameter_bounds_for_model(model_name)
+    kwargs = {key: float(rng.uniform(low, high)) for key, (low, high) in bounds.items() if key != "z_max"}
+    kwargs["rate"] = rate
+    kwargs["z_max"] = float(rng.uniform(*bounds["z_max"]))
+    if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
+        kwargs["vary_inclination"] = model_name == "Bu2026Vary"
+    return kwargs
 
 survey = load_ztf_survey(nside=64);
 
@@ -84,109 +131,108 @@ print(f"  Duration: {survey.duration_years:.2f} years")
 print(f"  Bands: {survey.bands}")
 
 
-if model == "Bu2026Fixed":
-# Tuned AT2017gfo Bu2026 parameters (best g/r/i fit at t<4d)
-# log10_mej_dyn=-1.8 (slightly less dynamical ejecta)
-# inclination_em=0.45 rad (26 deg, consistent with GW170817 constraints)
-    pop = FixedBu2026KilonovaPopulation(
-        log10_mej_dyn=-1.8,
-        v_ej_dyn=0.2,
-        ye_dyn=0.15,
-        log10_mej_wind=-1.1,
-        v_ej_wind=0.1,
-        ye_wind=0.35,
-        inclination_em=0.45,
-        rate=1000.0,
-        # z_max chosen well above the AT2017gfo-bright ZTF detection horizon.
-        # compute_rate's integrand has already converged out here, so tightening
-        # further would dilute MC stats without biasing VT_eff.
-        z_max=0.15,
+
+def _build_population(model_name: str, rate: float, randomize_params: bool = False, **kwargs):
+    ## all parameters are keyword arguments that can be updated by passing them in as kwargs
+    if model_name == "Bu2026Fixed":
+        # Tuned AT2017gfo Bu2026 parameters (best g/r/i fit at t<4d)
+        # log10_mej_dyn=-1.8 (slightly less dynamical ejecta)
+        # inclination_em=0.45 rad (26 deg, consistent with GW170817 constraints)
+        population_kwargs = dict(
+            log10_mej_dyn=-1.7,
+            v_ej_dyn=0.2,
+            ye_dyn=0.15,
+            log10_mej_wind=-1.1,
+            v_ej_wind=0.1,
+            ye_wind=0.35,
+            inclination_em=0.45,
+            vary_inclination=False,
+            rate=rate,
+            # z_max chosen well above the AT2017gfo-bright ZTF detection horizon.
+            # compute_rate's integrand has already converged out here, so tightening
+            # further would dilute MC stats without biasing VT_eff.
+            z_max=0.15,
+        )
+        if randomize_params:
+            population_kwargs = _randomize_population_kwargs(model_name, rate)
+        population_kwargs.update(kwargs)
+        return FixedBu2026KilonovaPopulation(**population_kwargs)
+    if model_name == "Bu2026Vary":
+        population_kwargs = dict(
+            log10_mej_dyn=-1.7,
+            v_ej_dyn=0.2,
+            ye_dyn=0.15,
+            log10_mej_wind=-1.1,
+            v_ej_wind=0.1,
+            ye_wind=0.35,
+            inclination_em=0.45,
+            vary_inclination=True,  # flat in cos(iota)
+            rate=rate,
+            z_max=0.3,
+        )
+        if randomize_params:
+            population_kwargs = _randomize_population_kwargs(model_name, rate)
+        population_kwargs.update(kwargs)
+        return FixedBu2026KilonovaPopulation(**population_kwargs)
+    if model_name == "Metzger":
+        population_kwargs = dict(
+            mej=0.00126,
+            vej=0.50,
+            kappa=398.0,
+            rate=rate,
+            z_max=0.3,
+        )
+        if randomize_params:
+            population_kwargs = _randomize_population_kwargs(model_name, rate)
+        population_kwargs.update(kwargs)
+        return FixedMetzgerKilonovaPopulation(**population_kwargs)
+    raise ValueError(f"Unsupported model: {model_name}")
+
+
+def _build_model(model_name: str):
+    if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
+        return FiestaKNModel()
+    if model_name == "Metzger":
+        return MetzgerKNModel()
+    raise ValueError(f"Unsupported model: {model_name}")
+
+
+def _make_detection_criteria():
+    return DetectionCriteria(
+        snr_threshold=5.0,
+        snr_threshold_secondary=3.0,
+        min_detections=2,
+        min_detections_primary=1,
+        max_timespan_days=14.0,
+        min_time_separation_hours=3.0,
+        require_fast_transient=True,
+        min_rise_rate=0.0,
+        min_fade_rate=0.3,
+        min_galactic_lat=15.0,
     )
-elif model == "Bu2026Vary":
-    pop = FixedBu2026KilonovaPopulation(
-    log10_mej_dyn=-1.7,
-    v_ej_dyn=0.2,
-    ye_dyn=0.15,
-    log10_mej_wind=-1.1,
-    v_ej_wind=0.1,
-    ye_wind=0.35,
-    vary_inclination=True,  # flat in cos(iota)
-    rate=1000.0,
-    z_max=0.3,
-)
-elif model == "Metzger":
-    pop = FixedMetzgerKilonovaPopulation(
-    mej=0.00126,
-    vej=0.50,
-    kappa=398.0,
-    rate=1000.0,
-    z_max=0.3,
-)
 
-# ZTFReST-like detection criteria
-det = DetectionCriteria(
-    snr_threshold=5.0,
-    snr_threshold_secondary=3.0,
-    min_detections=2,
-    min_detections_primary=1,
-    max_timespan_days=14.0,
-    min_time_separation_hours=3.0,
-    require_fast_transient=True,
-    min_rise_rate=0.0,
-    min_fade_rate=0.3,
-    min_galactic_lat=15.0,
-)
-
-# Bu2026 model
-if model == "Bu2026Fixed" or model == "Bu2026Vary":
-    model = FiestaKNModel()
-elif model == "Metzger":
-    model = MetzgerKNModel()
 
 # Run pipeline in parallel
 n_sims = args.n_runs
 n_processes = args.n_processes
 N = args.n_transients
 print(f"\nRunning pipeline {n_sims} times across {n_processes} threads with {N} transients each (fixed incl=0.45 rad, tuned ejecta)...")
+if randomize_params:
+    print("  Parameter randomization: enabled")
+
 
 def _run_instance(idx: int):
     rate = 1000.0 if not vary_rate else np.random.uniform(100.0, 2000.0)
-    
-    pop = FixedBu2026KilonovaPopulation(
-    log10_mej_dyn=-1.8,
-    v_ej_dyn=0.2,
-    ye_dyn=0.15,
-    log10_mej_wind=-1.1,
-    v_ej_wind=0.1,
-    ye_wind=0.35,
-    inclination_em=0.45,
-    rate=rate,
-    # z_max chosen well above the AT2017gfo-bright ZTF detection horizon.
-    # compute_rate's integrand has already converged out here, so tightening
-    # further would dilute MC stats without biasing VT_eff.
-    z_max=0.15,
-)
-    
-    # ZTFReST-like detection criteria
-    det = DetectionCriteria(
-    snr_threshold=5.0,
-    snr_threshold_secondary=3.0,
-    min_detections=2,
-    min_detections_primary=1,
-    max_timespan_days=14.0,
-    min_time_separation_hours=3.0,
-    require_fast_transient=True,
-    min_rise_rate=0.0,
-    min_fade_rate=0.3,
-    min_galactic_lat=15.0,
-)
-    
+    pop = _build_population(model, rate, randomize_params=randomize_params)
+    det = _make_detection_criteria()
+    model_instance = _build_model(model)
+
     # create pipeline per process to avoid sharing non-picklable state
     seed = 42 + idx
     pipeline = SimulationPipeline(
         survey=survey,
         populations=[pop],
-        models={"Kilonova": model},
+        models={"Kilonova": model_instance},
         detection=det,
         n_transients=N,
         seed=seed,
