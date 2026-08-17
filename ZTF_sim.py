@@ -221,14 +221,16 @@ if randomize_params:
     print("  Parameter randomization: enabled")
 
 
-def _run_instance(idx: int):
+def _run_instance(idx: int, seed=None):
     rate = 1000.0 if not vary_rate else np.random.uniform(100.0, 2000.0)
     pop = _build_population(model, rate, randomize_params=randomize_params)
     det = _make_detection_criteria()
     model_instance = _build_model(model)
 
-    # create pipeline per process to avoid sharing non-picklable state
-    seed = 42 + idx
+    # Ensure seed isn't set to be the same for all processes when running in parallel, but allow for a fixed seed when running single-threaded for reproducibility.
+    if seed is None:
+        seed = int(np.random.default_rng().integers(0, 2**31 - 1)) if n_processes == 1 else 42 + idx
+        print(f"  Using seed {seed} for run {idx} (rate={rate:.1f} Gpc^-3 yr^-1)")
     pipeline = SimulationPipeline(
         survey=survey,
         populations=[pop],
