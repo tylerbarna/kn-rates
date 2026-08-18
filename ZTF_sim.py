@@ -92,13 +92,13 @@ def _parameter_bounds_for_model(model_name: str):
     """
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         return {
-            "log10_mej_dyn": (-2.0, -1.2),
-            "v_ej_dyn": (0.08, 0.35),
-            "ye_dyn": (0.05, 0.25),
-            "log10_mej_wind": (-1.8, -0.5),
-            "v_ej_wind": (0.03, 0.20),
-            "ye_wind": (0.20, 0.45),
-            "inclination_em": (0.10, 0.90),
+            "log10_mej_dyn": (-4.0, -1.3010299956639813),
+            "v_ej_dyn": (0.12, 0.35),
+            "ye_dyn": (0.15, 0.35),
+            "log10_mej_wind": (-4.0, -0.5502131530142267),
+            "v_ej_wind": (0.05, 0.15),
+            "ye_wind": (0.2, 0.4),
+            "inclination_em": (0.0, 1.5707963267948966),
             "z_max": (0.15, 0.35),
         }
     if model_name == "Metzger":
