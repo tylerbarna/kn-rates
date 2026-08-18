@@ -229,8 +229,10 @@ def _run_instance(idx: int, seed=None):
 
     # Ensure seed isn't set to be the same for all processes when running in parallel, but allow for a fixed seed when running single-threaded for reproducibility.
     if seed is None:
-        seed = int(np.random.default_rng().integers(0, 2**31 - 1)) if n_processes == 1 else 42 + idx
-        print(f"  Using seed {seed} for run {idx} (rate={rate:.1f} Gpc^-3 yr^-1)")
+        seed = int(np.random.default_rng().integers(0, 2**31 - 1))
+        # print(f"  Using seed {seed} for run {idx} (rate={rate:.1f} Gpc^-3 yr^-1)")
+    else:
+        seed = int(seed) + idx
     pipeline = SimulationPipeline(
         survey=survey,
         populations=[pop],
