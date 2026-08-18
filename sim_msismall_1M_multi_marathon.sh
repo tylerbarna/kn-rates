@@ -1,8 +1,8 @@
 #!/bin/bash --login
 #SBATCH -p msismall      
-#SBATCH --time=1:59:00
-#SBATCH --ntasks=2
-#SBATCH --mem=50g
+#SBATCH --time=71:59:00
+#SBATCH --ntasks=8
+#SBATCH --mem=500g
 #SBATCH --tmp=10g
 #SBATCH --mail-type=BEGIN,END,FAIL  
 #SBATCH --mail-user=barna314@umn.edu
@@ -19,11 +19,12 @@ module load texlive
 eval "$(conda shell.bash hook)"
 conda init bash
 
+echo "Running task number $SLURM_ARRAY_TASK_ID"
 conda activate ~/.conda/envs/simsurvey_no_gpu/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/common/software/install/spack/linux-centos7-ivybridge/gcc-7.2.0/cuda-11.8.0-xqzqlf2v77opht3bv4onsqt7uuiomqec/extras/CUPTI/lib64
 
-python ZTF_sim.py --output-base results/test/Metzger/ztf_1M_msismall_result --n-transients 100000 --n-runs 1 --n-processes 1 --model Metzger
+python ZTF_sim.py --output-base results/multi_model_1M/Metzger/ztf_1M_msismall_result --n-transients 1000000 --n-runs 100 --n-processes 4 --model Metzger
 
-python ZTF_sim.py --output-base results/test/Bu2026Fixed/ztf_1M_msismall_result --n-transients 100000 --n-runs 1 --n-processes 1 --model Bu2026Fixed 
+python ZTF_sim.py --output-base results/multi_model_1M/Bu2026Fixed/ztf_1M_msismall_result --n-transients 1000000 --n-runs 100 --n-processes 4 --model Bu2026Fixed
 
-python ZTF_sim.py --output-base results/test/Bu2026Vary/ztf_1M_msismall_result --n-transients 100000 --n-runs 1 --n-processes 1 --model Bu2026Vary
+python ZTF_sim.py --output-base results/multi_model_1M/Bu2026Vary/ztf_1M_msismall_result --n-transients 1000000 --n-runs 100 --n-processes 4 --model Bu2026Vary

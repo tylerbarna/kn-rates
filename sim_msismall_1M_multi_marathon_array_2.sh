@@ -6,8 +6,8 @@
 #SBATCH --tmp=10g
 #SBATCH --mail-type=BEGIN,END,FAIL  
 #SBATCH --mail-user=barna314@umn.edu
-#SBATCH --output=logs/random_rate/output_%x_%j.log
-#SBATCH --error=logs/random_rate/error_%x_%j.err
+#SBATCH --output=logs/marathon/output_%x_%j.log
+#SBATCH --error=logs/marathon/error_%x_%j.err
 
 cd /users/8/barna314/kn-rates/
 
@@ -23,8 +23,4 @@ echo "Running task number $SLURM_ARRAY_TASK_ID"
 conda activate ~/.conda/envs/simsurvey_no_gpu/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/common/software/install/spack/linux-centos7-ivybridge/gcc-7.2.0/cuda-11.8.0-xqzqlf2v77opht3bv4onsqt7uuiomqec/extras/CUPTI/lib64
 
-python ZTF_sim.py --output-base results/rand_rate/Metzger/ztf_1M_msismall_result --n-transients 1000000 --n-runs 1 --n-processes 1 --model Metzger --vary-rate
-
-python ZTF_sim.py --output-base results/rand_rate/Bu2026Fixed/ztf_1M_msismall_result --n-transients 1000000 --n-runs 1 --n-processes 1 --model Bu2026Fixed --vary-rate
-
-python ZTF_sim.py --output-base results/rand_rate/Bu2026Vary/ztf_1M_msismall_result --n-transients 1000000 --n-runs 1 --n-processes 1 --model Bu2026Vary --vary-rate
+python ZTF_sim.py --output-base results/marathon/Bu2026Fixed/ztf_1M_msismall_result --n-transients 1000000 --n-runs 1 --n-processes 1 --model Bu2026Fixed 
