@@ -6,8 +6,8 @@
 #SBATCH --tmp=10g
 #SBATCH --mail-type=BEGIN,END,FAIL  
 #SBATCH --mail-user=barna314@umn.edu
-#SBATCH --output=logs/marathon/output_%x_%j.log
-#SBATCH --error=logs/marathon/error_%x_%j.err
+#SBATCH --output=logs/marathon/%x_%A_%a.log
+#SBATCH --error=logs/marathon/%x_%A_%a.err
 
 cd /users/8/barna314/kn-rates/
 
