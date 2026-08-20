@@ -20,13 +20,12 @@ module load hdf5
 module load cuda/12.0
 module load texlive
 
-module load gcc/8.2.0
-module load ompi/4.1.5-gcc-8.2.0-tqzywyz
-module load hdf5/1.14.1-2-openmpi-4.1.5-gcc-8.2.0-5mdsyab
-
 
 eval "$(conda shell.bash hook)"
 conda init bash
+
+which conda
+which python
 
 echo "Running task number $SLURM_ARRAY_TASK_ID"
 conda activate ~/.conda/envs/simsurvey-dev/
