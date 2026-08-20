@@ -236,8 +236,7 @@ def _run_instance(idx: int, seed=None):
     rate = 1000.0 if not vary_rate else np.random.uniform(100.0, 2000.0)
     pop_kwargs = {}
     if debug_cadence:
-        pop_kwargs['ra'] = 0.0
-        pop_kwargs['dec'] = 0.0
+        pop_kwargs['fixed_coord'] = (0.0, 0.0)
     pop = _build_population(model, rate, randomize_params=randomize_params, **pop_kwargs)
     det = _make_detection_criteria()
     model_instance = _build_model(model)
