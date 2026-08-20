@@ -1,9 +1,9 @@
 # import fiesta
-
-
 from survey_sim import FixedBu2026KilonovaPopulation, FixedMetzgerKilonovaPopulation, SimulationPipeline, load_ztf_survey, DetectionCriteria, Bu2026KilonovaPopulation, SurveyStore, MetzgerKNModel
 from survey_sim.fiesta_model import FiestaKNModel
 from survey_sim.serialization import save_result, load_result
+import os 
+import sys
 from contextlib import redirect_stdout
 import io
 import math
@@ -72,6 +72,11 @@ def parse_args():
         help="Kilonova model to use (default: Bu2026Fixed).",
         choices=["Bu2026Fixed", "Bu2026Vary", "Metzger"]
     )
+    parser.add_argument(
+        "--debug-cadence",
+        action="store_true",
+        help="Force a perfect 0.5-day cadence at RA=0, Dec=0 for debugging detection criteria.",
+    )
     return parser.parse_args()
 
 
@@ -80,7 +85,13 @@ output_base = Path(args.output_base)
 output_base.parent.mkdir(parents=True, exist_ok=True)
 vary_rate = args.vary_rate
 randomize_params = args.randomize_params
+debug_cadence = args.debug_cadence
 model = args.model
+
+if debug_cadence:
+    print("Debug cadence enabled: forcing perfect 0.5-day cadence at RA=0, Dec=0.")
+    os.environ["DEBUG_CADENCE"] = "0.5"
+    os.environ["DEBUG_MAG"] = "30.0"
 
 def _parameter_bounds_for_model(model_name: str):
     """Return reasonable physical bounds for kilonova parameters.
@@ -223,7 +234,11 @@ if randomize_params:
 
 def _run_instance(idx: int, seed=None):
     rate = 1000.0 if not vary_rate else np.random.uniform(100.0, 2000.0)
-    pop = _build_population(model, rate, randomize_params=randomize_params)
+    pop_kwargs = {}
+    if debug_cadence:
+        pop_kwargs['ra'] = 0.0
+        pop_kwargs['dec'] = 0.0
+    pop = _build_population(model, rate, randomize_params=randomize_params, **pop_kwargs)
     det = _make_detection_criteria()
     model_instance = _build_model(model)
 
