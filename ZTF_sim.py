@@ -1,16 +1,30 @@
 # import fiesta
-from survey_sim import FixedBu2026KilonovaPopulation, FixedMetzgerKilonovaPopulation, SimulationPipeline, load_ztf_survey, DetectionCriteria, Bu2026KilonovaPopulation, SurveyStore, MetzgerKNModel
-from survey_sim.fiesta_model import FiestaKNModel
-from survey_sim.serialization import save_result, load_result
-import os 
-import sys
+import argparse
 from contextlib import redirect_stdout
+import datetime
 import io
 import math
+import os
+from pathlib import Path
+import sys
+import time
+
 import matplotlib.pyplot as plt
-import numpy as np  
+import numpy as np
 from scipy.stats import cumfreq
 
+from survey_sim import (
+    Bu2026KilonovaPopulation,
+    DetectionCriteria,
+    FixedBu2026KilonovaPopulation,
+    FixedMetzgerKilonovaPopulation,
+    MetzgerKNModel,
+    SimulationPipeline,
+    SurveyStore,
+    load_ztf_survey,
+)
+from survey_sim.fiesta_model import FiestaKNModel
+from survey_sim.serialization import load_result, save_result
 
 # from fiesta.surrogates import download_recommended_surrogates
 # try:
@@ -18,19 +32,21 @@ from scipy.stats import cumfreq
 # except Exception as e:
 #     print(f"Warning: Could not download recommended surrogates:\n{e}")
 #     pass
-import argparse
-import datetime
-from pathlib import Path
-import time
 
-DEFAULT_OUTPUT_BASE = "results/ztf_10_sim_result"
+DEFAULT_OUTPUT_BASE = 'results/ztf_10_sim_result'
 DEFAULT_N_TRANSIENTS = 1_000_000
 DEFAULT_N_RUNS = 10
 DEFAULT_N_PROCESSES = DEFAULT_N_RUNS
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run the ZTF kilonova simulation.")
+    '''Parse command-line arguments for the ZTF kilonova simulation.
+
+    Returns:
+        argparse.Namespace: Parsed command-line options containing configuration
+            parameters such as output paths, model choice, and transient counts.
+    '''
+    parser = argparse.ArgumentParser(description='Run the ZTF kilonova simulation.')
     parser.add_argument(
         "--output-base",
         default=DEFAULT_OUTPUT_BASE,
@@ -94,13 +110,19 @@ if debug_cadence:
     os.environ["DEBUG_MAG"] = "30.0"
 
 def _parameter_bounds_for_model(model_name: str):
-    """Return reasonable physical bounds for kilonova parameters.
+    '''Return reasonable physical bounds for specified model parameters.
 
-    These values are broad enough to span the expected range of realistic
-    kilonova ejecta and viewing-angle configurations without going outside
-    physically plausible limits. The default behavior remains unchanged unless
-    the caller opts into randomization.
-    """
+    Args:
+        model_name (str): The identifier of the model (e.g., "Bu2026Fixed",
+            "Bu2026Vary", or "Metzger").
+
+    Returns:
+        dict[str, tuple[float, float]]: A dictionary mapping model parameter
+            names to tuple pairs representing lower and upper bounds.
+
+    Raises:
+        ValueError: If `model_name` is not supported.
+    '''
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         return {
             "log10_mej_dyn": (-4.0, -1.3010299956639813),
@@ -123,7 +145,17 @@ def _parameter_bounds_for_model(model_name: str):
 
 
 def _randomize_population_kwargs(model_name: str, rate: float, rng=None):
-    """Sample a single realistic kilonova population from broad model bounds."""
+    '''Sample realistic kilonova population parameters from model bounds.
+
+    Args:
+        model_name (str): The name of the kilonova model.
+        rate (float): The volumetric event rate.
+        rng (numpy.random.Generator, optional): Random number generator.
+            Defaults to a new default_rng instance.
+
+    Returns:
+        dict[str, Any]: Randomized parameter keyword arguments.
+    '''
     if rng is None:
         rng = np.random.default_rng()
     bounds = _parameter_bounds_for_model(model_name)
@@ -134,7 +166,7 @@ def _randomize_population_kwargs(model_name: str, rate: float, rng=None):
         kwargs["vary_inclination"] = model_name == "Bu2026Vary"
     return kwargs
 
-survey = load_ztf_survey(nside=64);
+survey = load_ztf_survey(nside=64)
 
 print(f"  Observations: {survey.n_observations}")
 print(f"  MJD range: {survey.mjd_range}")
@@ -143,12 +175,26 @@ print(f"  Bands: {survey.bands}")
 
 
 
-def _build_population(model_name: str, rate: float, randomize_params: bool = False, **kwargs):
-    ## all parameters are keyword arguments that can be updated by passing them in as kwargs
+def _build_population(
+    model_name: str, rate: float, randomize_params: bool = False, **kwargs
+):
+    '''Construct a kilonova population object configured with model settings.
+
+    Args:
+        model_name (str): Type of model ("Bu2026Fixed", "Bu2026Vary", or "Metzger").
+        rate (float): Volumetric rate for transient generation.
+        randomize_params (bool, optional): Whether to randomly sample parameters
+            from bounds. Defaults to False.
+        **kwargs: Additional parameters overriding the default configuration.
+
+    Returns:
+        FixedBu2026KilonovaPopulation | FixedMetzgerKilonovaPopulation: An
+            instantiated kilonova population object.
+
+    Raises:
+        ValueError: If `model_name` is unrecognized.
+    '''
     if model_name == "Bu2026Fixed":
-        # Tuned AT2017gfo Bu2026 parameters (best g/r/i fit at t<4d)
-        # log10_mej_dyn=-1.8 (slightly less dynamical ejecta)
-        # inclination_em=0.45 rad (26 deg, consistent with GW170817 constraints)
         population_kwargs = dict(
             log10_mej_dyn=-1.7,
             v_ej_dyn=0.2,
@@ -201,6 +247,17 @@ def _build_population(model_name: str, rate: float, randomize_params: bool = Fal
 
 
 def _build_model(model_name: str):
+    '''Instantiate light-curve model solver matching the model name.
+
+    Args:
+        model_name (str): Identifier for model algorithm.
+
+    Returns:
+        FiestaKNModel | MetzgerKNModel: Initialized model instance.
+
+    Raises:
+        ValueError: If "model_name" is unsupported.
+    '''
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         return FiestaKNModel()
     if model_name == "Metzger":
@@ -209,6 +266,11 @@ def _build_model(model_name: str):
 
 
 def _make_detection_criteria():
+    '''Create default detection criteria constraints for transient identification.
+
+    Returns:
+        DetectionCriteria: Configured detection settings object.
+    '''
     return DetectionCriteria(
         snr_threshold=5.0,
         snr_threshold_secondary=3.0,
@@ -233,24 +295,36 @@ if randomize_params:
 
 
 def _run_instance(idx: int, seed=None):
+    '''Execute a single instance of the simulation pipeline and serialize results.
+
+    Args:
+        idx (int): The index identifier of the current run.
+        seed (int | None, optional): Random seed to ensure reproducibility.
+            If None, a seed is generated dynamically. Defaults to None.
+
+    Returns:
+        dict[str, Any]: A dictionary containing run metadata and calculated rate
+            summaries.
+    '''
     rate = 1000.0 if not vary_rate else np.random.uniform(100.0, 2000.0)
     pop_kwargs = {}
     if debug_cadence:
         pop_kwargs['fixed_coord'] = (0.0, 0.0)
-    pop = _build_population(model, rate, randomize_params=randomize_params, **pop_kwargs)
+    pop = _build_population(
+        model, rate, randomize_params=randomize_params, **pop_kwargs
+    )
     det = _make_detection_criteria()
     model_instance = _build_model(model)
 
     # Ensure seed isn't set to be the same for all processes when running in parallel, but allow for a fixed seed when running single-threaded for reproducibility.
     if seed is None:
         seed = int(np.random.default_rng().integers(0, 2**31 - 1))
-        # print(f"  Using seed {seed} for run {idx} (rate={rate:.1f} Gpc^-3 yr^-1)")
     else:
         seed = int(seed) + idx
     pipeline = SimulationPipeline(
         survey=survey,
         populations=[pop],
-        models={"Kilonova": model_instance},
+        models={'Kilonova': model_instance},
         detection=det,
         n_transients=N,
         seed=seed,
@@ -258,21 +332,23 @@ def _run_instance(idx: int, seed=None):
     run_start = time.perf_counter()
     result = pipeline.run()
     run_elapsed = time.perf_counter() - run_start
-    datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    fname = f"{output_base}_{datetime_str}.json"
+    datetime_str = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+    fname = f'{output_base}_{datetime_str}.json'
     save_result(result, fname)
-    # return a small summary dict (picklable)
+
     summaries = []
     for rs in result.rate_summaries:
-        summaries.append({
-            'transient_type': rs.transient_type,
-            'volumetric_rate': rs.volumetric_rate,
-            'n_detected': rs.n_detected,
-            'n_simulated': rs.n_simulated,
-            'overall_efficiency': rs.overall_efficiency,
-            'survey_duration_years': rs.survey_duration_years,
-            'effective_vt_gpc3_yr': rs.effective_vt_gpc3_yr,
-        })
+        summaries.append(
+            {
+                'transient_type': rs.transient_type,
+                'volumetric_rate': rs.volumetric_rate,
+                'n_detected': rs.n_detected,
+                'n_simulated': rs.n_simulated,
+                'overall_efficiency': rs.overall_efficiency,
+                'survey_duration_years': rs.survey_duration_years,
+                'effective_vt_gpc3_yr': rs.effective_vt_gpc3_yr,
+            }
+        )
     return {
         'idx': idx,
         'fname': fname,
@@ -284,19 +360,29 @@ def _run_instance(idx: int, seed=None):
 
 
 def _format_elapsed(seconds: float) -> str:
+    '''Format an elapsed time interval in seconds into a human-readable string.
+
+    Args:
+        seconds (float): Execution duration in seconds.
+
+    Returns:
+        str: Formatted string specifying time formatted as hours, minutes,
+            and seconds.
+    '''
     minutes, remaining_seconds = divmod(seconds, 60.0)
     hours, minutes = divmod(minutes, 60.0)
     if hours >= 1:
-        return f"{int(hours)}h {int(minutes)}m {remaining_seconds:.1f}s"
+        return f'{int(hours)}h {int(minutes)}m {remaining_seconds:.1f}s'
     if minutes >= 1:
-        return f"{int(minutes)}m {remaining_seconds:.1f}s"
-    return f"{remaining_seconds:.1f}s"
+        return f'{int(minutes)}m {remaining_seconds:.1f}s'
+    return f'{remaining_seconds:.1f}s'
+
 
 if __name__ == '__main__':
     from multiprocessing import get_context
     ctx = get_context('spawn')
     batch_start = time.perf_counter()
-    
+
     with ctx.Pool(processes=n_processes) as pool:
         results = pool.map(_run_instance, list(range(n_sims)))
     batch_elapsed = time.perf_counter() - batch_start
@@ -308,13 +394,15 @@ if __name__ == '__main__':
         print(f"  Detected:  {res['n_detected']}")
         print(f"  Runtime:   {_format_elapsed(res['elapsed_seconds'])}")
         eff = res['n_detected'] / max(res['n_simulated'], 1)
-        print(f"  Efficiency: {eff:.4f} ({eff*100:.2f}%)")
-        print(f"\n--- Rate Summaries ---")
+        print(f'  Efficiency: {eff:.4f} ({eff*100:.2f}%)')
+        print(f'\n--- Rate Summaries ---')
         for rs in res['summaries']:
-            print(f"  {rs['transient_type']}: Vol rate={rs['volumetric_rate']:.1f} n_det={rs['n_detected']} n_sim={rs['n_simulated']} eff={rs['overall_efficiency']:.4f} VT={rs['effective_vt_gpc3_yr']:.4e}")
+            print(
+                f"  {rs['transient_type']}: Vol rate={rs['volumetric_rate']:.1f} n_det={rs['n_detected']} n_sim={rs['n_simulated']} eff={rs['overall_efficiency']:.4f} VT={rs['effective_vt_gpc3_yr']:.4e}"
+            )
 
     print(f"\nTotal batch runtime: {_format_elapsed(batch_elapsed)}")
-        
+    
 # upper_limits = [rs.upper_limit(percentile).rate_upper for percentile in np.linspace(0, 1, 100)]
 # # print(upper_limits)
 # ecdf = cumfreq(upper_limits, numbins=100)
