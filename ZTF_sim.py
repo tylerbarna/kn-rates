@@ -105,8 +105,8 @@ debug_cadence = args.debug_cadence
 model = args.model
 
 if debug_cadence:
-    print("Debug cadence enabled: forcing perfect 0.5-day cadence at RA=0, Dec=0.")
-    os.environ["DEBUG_CADENCE"] = "0.5"
+    print("Debug cadence enabled: forcing perfect 0.05-day cadence at RA=0, Dec=0.")
+    os.environ["DEBUG_CADENCE"] = "0.05"
     os.environ["DEBUG_MAG"] = "30.0"
 
 def _parameter_bounds_for_model(model_name: str):
@@ -213,6 +213,8 @@ def _build_population(
         if randomize_params:
             population_kwargs = _randomize_population_kwargs(model_name, rate)
         population_kwargs.update(kwargs)
+        if debug_cadence:
+            population_kwargs['z_max'] = 0.05
         return FixedBu2026KilonovaPopulation(**population_kwargs)
     if model_name == "Bu2026Vary":
         population_kwargs = dict(
