@@ -2,7 +2,7 @@
 #SBATCH -p msismall
 #SBATCH --time=11:59:00
 #SBATCH --ntasks=4
-#SBATCH --mem=250g
+#SBATCH --mem=500g
 #SBATCH --tmp=10g
 #SBATCH --array=0-2
 #SBATCH --mail-type=BEGIN,END,FAIL
