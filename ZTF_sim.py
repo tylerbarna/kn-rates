@@ -34,20 +34,20 @@ from survey_sim.serialization import load_result, save_result
 #     print(f"Warning: Could not download recommended surrogates:\n{e}")
 #     pass
 
-DEFAULT_OUTPUT_BASE = 'results/ztf_10_sim_result'
+DEFAULT_OUTPUT_BASE = "results/ztf_10_sim_result"
 DEFAULT_N_TRANSIENTS = 1_000_000
 DEFAULT_N_RUNS = 10
 DEFAULT_N_PROCESSES = DEFAULT_N_RUNS
 
 
 def parse_args():
-    '''Parse command-line arguments for the ZTF kilonova simulation.
+    """Parse command-line arguments for the ZTF kilonova simulation.
 
     Returns:
         argparse.Namespace: Parsed command-line options containing configuration
             parameters such as output paths, model choice, and transient counts.
-    '''
-    parser = argparse.ArgumentParser(description='Run the ZTF kilonova simulation.')
+    """
+    parser = argparse.ArgumentParser(description="Run the ZTF kilonova simulation.")
     parser.add_argument(
         "--output-base",
         default=DEFAULT_OUTPUT_BASE,
@@ -81,36 +81,31 @@ def parse_args():
         action="store_true",
         help="If set, randomize kilonova parameters per run from reasonable model bounds.",
     )
-    
+
     parser.add_argument(
         "--model",
         type=str,
         default="Bu2026Fixed",
         help="Kilonova model to use (default: Bu2026Fixed).",
-        choices=["Bu2026Fixed", "Bu2026Vary", "Metzger"]
+        choices=["Bu2026Fixed", "Bu2026Vary", "Metzger"],
     )
     parser.add_argument(
         "--debug-cadence",
         action="store_true",
         help="Force a perfect 0.5-day cadence at RA=0, Dec=0 for debugging detection criteria.",
     )
-    parser.add_argument("--seed", type=int, default=None, help="Base random seed for reproducible runs.")
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Base random seed for reproducible runs."
+    )
     parser.add_argument("--snr-threshold", type=float, default=5.0)
     parser.add_argument("--snr-threshold-secondary", type=float, default=3.0)
     parser.add_argument("--min-detections", type=int, default=2)
     parser.add_argument("--min-detections-primary", type=int, default=1)
-    parser.add_argument("--min-bands", type=int, default=1)
-    parser.add_argument("--min-per-band", type=int, default=1)
     parser.add_argument("--max-timespan-days", type=float, default=14.0)
     parser.add_argument("--min-time-separation-hours", type=float, default=3.0)
     parser.add_argument("--min-rise-rate", type=float, default=0.0)
     parser.add_argument("--min-fade-rate", type=float, default=0.3)
-    parser.add_argument("--min-pre-peak-detections", type=int, default=0)
-    parser.add_argument("--min-post-peak-detections", type=int, default=0)
-    parser.add_argument("--min-phase-range-days", type=float, default=0.0)
     parser.add_argument("--min-galactic-lat", type=float, default=15.0)
-    parser.add_argument("--early-detection-fast-days", type=float, default=0.0)
-    parser.add_argument("--rate-dedup-window-days", type=float, default=2.0 / 24.0)
     parser.add_argument(
         "--no-require-fast-transient",
         dest="require_fast_transient",
@@ -134,8 +129,9 @@ if debug_cadence:
     os.environ["DEBUG_CADENCE"] = "0.05"
     os.environ["DEBUG_MAG"] = "30.0"
 
+
 def _parameter_bounds_for_model(model_name: str):
-    '''Return reasonable physical bounds for specified model parameters.
+    """Return reasonable physical bounds for specified model parameters.
 
     Args:
         model_name (str): The identifier of the model (e.g., "Bu2026Fixed",
@@ -147,7 +143,7 @@ def _parameter_bounds_for_model(model_name: str):
 
     Raises:
         ValueError: If `model_name` is not supported.
-    '''
+    """
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         return {
             "log10_mej_dyn": (-4.0, -1.3010299956639813),
@@ -170,7 +166,7 @@ def _parameter_bounds_for_model(model_name: str):
 
 
 def _randomize_population_kwargs(model_name: str, rate: float, rng=None):
-    '''Sample realistic kilonova population parameters from model bounds.
+    """Sample realistic kilonova population parameters from model bounds.
 
     Args:
         model_name (str): The name of the kilonova model.
@@ -180,16 +176,21 @@ def _randomize_population_kwargs(model_name: str, rate: float, rng=None):
 
     Returns:
         dict[str, Any]: Randomized parameter keyword arguments.
-    '''
+    """
     if rng is None:
         rng = np.random.default_rng()
     bounds = _parameter_bounds_for_model(model_name)
-    kwargs = {key: float(rng.uniform(low, high)) for key, (low, high) in bounds.items() if key != "z_max"}
+    kwargs = {
+        key: float(rng.uniform(low, high))
+        for key, (low, high) in bounds.items()
+        if key != "z_max"
+    }
     kwargs["rate"] = rate
     kwargs["z_max"] = float(rng.uniform(*bounds["z_max"]))
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         kwargs["vary_inclination"] = model_name == "Bu2026Vary"
     return kwargs
+
 
 survey = load_ztf_survey(nside=64)
 
@@ -199,11 +200,10 @@ print(f"  Duration: {survey.duration_years:.2f} years")
 print(f"  Bands: {survey.bands}")
 
 
-
 def _build_population(
     model_name: str, rate: float, randomize_params: bool = False, **kwargs
 ):
-    '''Construct a kilonova population object configured with model settings.
+    """Construct a kilonova population object configured with model settings.
 
     Args:
         model_name (str): Type of model ("Bu2026Fixed", "Bu2026Vary", or "Metzger").
@@ -218,7 +218,7 @@ def _build_population(
 
     Raises:
         ValueError: If `model_name` is unrecognized.
-    '''
+    """
     if model_name == "Bu2026Fixed":
         population_kwargs = dict(
             log10_mej_dyn=-1.7,
@@ -239,7 +239,7 @@ def _build_population(
             population_kwargs = _randomize_population_kwargs(model_name, rate)
         population_kwargs.update(kwargs)
         if debug_cadence:
-            population_kwargs['z_max'] = 0.05
+            population_kwargs["z_max"] = 0.05
         return FixedBu2026KilonovaPopulation(**population_kwargs)
     if model_name == "Bu2026Vary":
         population_kwargs = dict(
@@ -274,7 +274,7 @@ def _build_population(
 
 
 def _build_model(model_name: str):
-    '''Instantiate light-curve model solver matching the model name.
+    """Instantiate light-curve model solver matching the model name.
 
     Args:
         model_name (str): Identifier for model algorithm.
@@ -284,7 +284,7 @@ def _build_model(model_name: str):
 
     Raises:
         ValueError: If "model_name" is unsupported.
-    '''
+    """
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         return FiestaKNModel()
     if model_name == "Metzger":
@@ -293,29 +293,22 @@ def _build_model(model_name: str):
 
 
 def _make_detection_criteria(**overrides):
-    '''Create default detection criteria constraints for transient identification.
+    """Create default detection criteria constraints for transient identification.
 
     Returns:
         DetectionCriteria: Configured detection settings object.
-    '''
+    """
     values = dict(
         snr_threshold=5.0,
         snr_threshold_secondary=3.0,
         min_detections=2,
         min_detections_primary=1,
-        min_bands=1,
-        min_per_band=1,
         max_timespan_days=14.0,
         min_time_separation_hours=3.0,
         require_fast_transient=True,
         min_rise_rate=0.0,
         min_fade_rate=0.3,
-        min_pre_peak_detections=0,
-        min_post_peak_detections=0,
-        min_phase_range_days=0.0,
         min_galactic_lat=15.0,
-        early_detection_fast_days=0.0,
-        rate_dedup_window_days=2.0 / 24.0,
     )
     values.update({key: value for key, value in overrides.items() if value is not None})
     return DetectionCriteria(**values)
@@ -327,20 +320,12 @@ def _detection_criteria_config(**overrides):
         "snr_threshold_secondary": args.snr_threshold_secondary,
         "min_detections": args.min_detections,
         "min_detections_primary": args.min_detections_primary,
-        "min_bands": args.min_bands,
-        "min_per_band": args.min_per_band,
-        "min_per_band": args.min_per_band,
         "max_timespan_days": args.max_timespan_days,
         "min_time_separation_hours": args.min_time_separation_hours,
         "min_rise_rate": args.min_rise_rate,
         "min_fade_rate": args.min_fade_rate,
-        "min_pre_peak_detections": args.min_pre_peak_detections,
-        "min_post_peak_detections": args.min_post_peak_detections,
-        "min_phase_range_days": args.min_phase_range_days,
         "require_fast_transient": args.require_fast_transient,
         "min_galactic_lat": args.min_galactic_lat,
-        "early_detection_fast_days": args.early_detection_fast_days,
-        "rate_dedup_window_days": args.rate_dedup_window_days,
     }
     config.update({key: value for key, value in overrides.items() if value is not None})
     return config
@@ -350,13 +335,15 @@ def _detection_criteria_config(**overrides):
 n_sims = args.n_runs
 n_processes = args.n_processes
 N = args.n_transients
-print(f"\nRunning pipeline {n_sims} times across {n_processes} threads with {N} transients each (fixed incl=0.45 rad, tuned ejecta)...")
+print(
+    f"\nRunning pipeline {n_sims} times across {n_processes} threads with {N} transients each (fixed incl=0.45 rad, tuned ejecta)..."
+)
 if randomize_params:
     print("  Parameter randomization: enabled")
 
 
 def _run_instance(idx: int, seed=None):
-    '''Execute a single instance of the simulation pipeline and serialize results.
+    """Execute a single instance of the simulation pipeline and serialize results.
 
     Args:
         idx (int): The index identifier of the current run.
@@ -366,11 +353,11 @@ def _run_instance(idx: int, seed=None):
     Returns:
         dict[str, Any]: A dictionary containing run metadata and calculated rate
             summaries.
-    '''
+    """
     rate = 1000.0 if not vary_rate else np.random.uniform(100.0, 2000.0)
     pop_kwargs = {}
     if debug_cadence:
-        pop_kwargs['fixed_coord'] = (0.0, 0.0)
+        pop_kwargs["fixed_coord"] = (0.0, 0.0)
     pop = _build_population(
         model, rate, randomize_params=randomize_params, **pop_kwargs
     )
@@ -387,7 +374,7 @@ def _run_instance(idx: int, seed=None):
     pipeline = SimulationPipeline(
         survey=survey,
         populations=[pop],
-        models={'Kilonova': model_instance},
+        models={"Kilonova": model_instance},
         detection=det,
         n_transients=N,
         seed=seed,
@@ -395,43 +382,49 @@ def _run_instance(idx: int, seed=None):
     run_start = time.perf_counter()
     result = pipeline.run()
     run_elapsed = time.perf_counter() - run_start
-    datetime_str = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-    fname = f'{output_base}_{datetime_str}_{idx}.json'
+    datetime_str = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    fname = f"{output_base}_{datetime_str}_{idx}.json"
     save_result(result, fname)
-    Path(f'{fname}.metadata.json').write_text(json.dumps({
-        'model': model,
-        'n_transients': N,
-        'run_index': idx,
-        'seed': seed,
-        'detection_criteria': _detection_criteria_config(),
-        'pipeline_time_window_days': 100.0,
-    }, indent=2) + '\n')
+    Path(f"{fname}.metadata.json").write_text(
+        json.dumps(
+            {
+                "model": model,
+                "n_transients": N,
+                "run_index": idx,
+                "seed": seed,
+                "detection_criteria": _detection_criteria_config(),
+                "pipeline_time_window_days": 100.0,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
 
     summaries = []
     for rs in result.rate_summaries:
         summaries.append(
             {
-                'transient_type': rs.transient_type,
-                'volumetric_rate': rs.volumetric_rate,
-                'n_detected': rs.n_detected,
-                'n_simulated': rs.n_simulated,
-                'overall_efficiency': rs.overall_efficiency,
-                'survey_duration_years': rs.survey_duration_years,
-                'effective_vt_gpc3_yr': rs.effective_vt_gpc3_yr,
+                "transient_type": rs.transient_type,
+                "volumetric_rate": rs.volumetric_rate,
+                "n_detected": rs.n_detected,
+                "n_simulated": rs.n_simulated,
+                "overall_efficiency": rs.overall_efficiency,
+                "survey_duration_years": rs.survey_duration_years,
+                "effective_vt_gpc3_yr": rs.effective_vt_gpc3_yr,
             }
         )
     return {
-        'idx': idx,
-        'fname': fname,
-        'n_simulated': result.n_simulated,
-        'n_detected': result.n_detected,
-        'elapsed_seconds': run_elapsed,
-        'summaries': summaries,
+        "idx": idx,
+        "fname": fname,
+        "n_simulated": result.n_simulated,
+        "n_detected": result.n_detected,
+        "elapsed_seconds": run_elapsed,
+        "summaries": summaries,
     }
 
 
 def _format_elapsed(seconds: float) -> str:
-    '''Format an elapsed time interval in seconds into a human-readable string.
+    """Format an elapsed time interval in seconds into a human-readable string.
 
     Args:
         seconds (float): Execution duration in seconds.
@@ -439,19 +432,20 @@ def _format_elapsed(seconds: float) -> str:
     Returns:
         str: Formatted string specifying time formatted as hours, minutes,
             and seconds.
-    '''
+    """
     minutes, remaining_seconds = divmod(seconds, 60.0)
     hours, minutes = divmod(minutes, 60.0)
     if hours >= 1:
-        return f'{int(hours)}h {int(minutes)}m {remaining_seconds:.1f}s'
+        return f"{int(hours)}h {int(minutes)}m {remaining_seconds:.1f}s"
     if minutes >= 1:
-        return f'{int(minutes)}m {remaining_seconds:.1f}s'
-    return f'{remaining_seconds:.1f}s'
+        return f"{int(minutes)}m {remaining_seconds:.1f}s"
+    return f"{remaining_seconds:.1f}s"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from multiprocessing import get_context
-    ctx = get_context('spawn')
+
+    ctx = get_context("spawn")
     batch_start = time.perf_counter()
 
     with ctx.Pool(processes=n_processes) as pool:
@@ -464,16 +458,16 @@ if __name__ == '__main__':
         print(f"  Simulated: {res['n_simulated']}")
         print(f"  Detected:  {res['n_detected']}")
         print(f"  Runtime:   {_format_elapsed(res['elapsed_seconds'])}")
-        eff = res['n_detected'] / max(res['n_simulated'], 1)
-        print(f'  Efficiency: {eff:.4f} ({eff*100:.2f}%)')
-        print(f'\n--- Rate Summaries ---')
-        for rs in res['summaries']:
+        eff = res["n_detected"] / max(res["n_simulated"], 1)
+        print(f"  Efficiency: {eff:.4f} ({eff * 100:.2f}%)")
+        print(f"\n--- Rate Summaries ---")
+        for rs in res["summaries"]:
             print(
                 f"  {rs['transient_type']}: Vol rate={rs['volumetric_rate']:.1f} n_det={rs['n_detected']} n_sim={rs['n_simulated']} eff={rs['overall_efficiency']:.4f} VT={rs['effective_vt_gpc3_yr']:.4e}"
             )
 
     print(f"\nTotal batch runtime: {_format_elapsed(batch_elapsed)}")
-    
+
 # upper_limits = [rs.upper_limit(percentile).rate_upper for percentile in np.linspace(0, 1, 100)]
 # # print(upper_limits)
 # ecdf = cumfreq(upper_limits, numbins=100)

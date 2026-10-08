@@ -3,6 +3,7 @@
 #SBATCH --time=11:59:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
+#SBATCH --array=0-2591%2592
 #SBATCH --mem=100g
 #SBATCH --tmp=10g
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -23,11 +24,8 @@ conda activate ~/.conda/envs/simsurvey_no_gpu/
 
 python detection_criteria_sweep.py \
   --output-root results/detection_criteria_sweep \
-  --n-transients 1000000 \
+  --n-transients 100000 \
   --n-runs 1 \
   --n-processes 1 \
-  --seed 20261008
-
-python lightcurve_quality_analysis.py \
-  --glob 'results/detection_criteria_sweep/**/*.json' \
-  --output results/detection_criteria_sweep/lightcurve_quality.csv
+  --seed 20261008 \
+  --array-index "$SLURM_ARRAY_TASK_ID"
