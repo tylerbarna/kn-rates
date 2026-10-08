@@ -3,6 +3,7 @@ import argparse
 from contextlib import redirect_stdout
 import datetime
 import io
+import json
 import math
 import os
 from pathlib import Path
@@ -93,6 +94,30 @@ def parse_args():
         action="store_true",
         help="Force a perfect 0.5-day cadence at RA=0, Dec=0 for debugging detection criteria.",
     )
+    parser.add_argument("--seed", type=int, default=None, help="Base random seed for reproducible runs.")
+    parser.add_argument("--snr-threshold", type=float, default=5.0)
+    parser.add_argument("--snr-threshold-secondary", type=float, default=3.0)
+    parser.add_argument("--min-detections", type=int, default=2)
+    parser.add_argument("--min-detections-primary", type=int, default=1)
+    parser.add_argument("--min-bands", type=int, default=1)
+    parser.add_argument("--min-per-band", type=int, default=1)
+    parser.add_argument("--max-timespan-days", type=float, default=14.0)
+    parser.add_argument("--min-time-separation-hours", type=float, default=3.0)
+    parser.add_argument("--min-rise-rate", type=float, default=0.0)
+    parser.add_argument("--min-fade-rate", type=float, default=0.3)
+    parser.add_argument("--min-pre-peak-detections", type=int, default=0)
+    parser.add_argument("--min-post-peak-detections", type=int, default=0)
+    parser.add_argument("--min-phase-range-days", type=float, default=0.0)
+    parser.add_argument("--min-galactic-lat", type=float, default=15.0)
+    parser.add_argument("--early-detection-fast-days", type=float, default=0.0)
+    parser.add_argument("--rate-dedup-window-days", type=float, default=2.0 / 24.0)
+    parser.add_argument(
+        "--no-require-fast-transient",
+        dest="require_fast_transient",
+        action="store_false",
+        help="Do not require the lightcurve to pass the fast-transient rate test.",
+    )
+    parser.set_defaults(require_fast_transient=True)
     return parser.parse_args()
 
 
@@ -267,24 +292,58 @@ def _build_model(model_name: str):
     raise ValueError(f"Unsupported model: {model_name}")
 
 
-def _make_detection_criteria():
+def _make_detection_criteria(**overrides):
     '''Create default detection criteria constraints for transient identification.
 
     Returns:
         DetectionCriteria: Configured detection settings object.
     '''
-    return DetectionCriteria(
+    values = dict(
         snr_threshold=5.0,
         snr_threshold_secondary=3.0,
         min_detections=2,
         min_detections_primary=1,
+        min_bands=1,
+        min_per_band=1,
         max_timespan_days=14.0,
         min_time_separation_hours=3.0,
         require_fast_transient=True,
         min_rise_rate=0.0,
         min_fade_rate=0.3,
+        min_pre_peak_detections=0,
+        min_post_peak_detections=0,
+        min_phase_range_days=0.0,
         min_galactic_lat=15.0,
+        early_detection_fast_days=0.0,
+        rate_dedup_window_days=2.0 / 24.0,
     )
+    values.update({key: value for key, value in overrides.items() if value is not None})
+    return DetectionCriteria(**values)
+
+
+def _detection_criteria_config(**overrides):
+    config = {
+        "snr_threshold": args.snr_threshold,
+        "snr_threshold_secondary": args.snr_threshold_secondary,
+        "min_detections": args.min_detections,
+        "min_detections_primary": args.min_detections_primary,
+        "min_bands": args.min_bands,
+        "min_per_band": args.min_per_band,
+        "min_per_band": args.min_per_band,
+        "max_timespan_days": args.max_timespan_days,
+        "min_time_separation_hours": args.min_time_separation_hours,
+        "min_rise_rate": args.min_rise_rate,
+        "min_fade_rate": args.min_fade_rate,
+        "min_pre_peak_detections": args.min_pre_peak_detections,
+        "min_post_peak_detections": args.min_post_peak_detections,
+        "min_phase_range_days": args.min_phase_range_days,
+        "require_fast_transient": args.require_fast_transient,
+        "min_galactic_lat": args.min_galactic_lat,
+        "early_detection_fast_days": args.early_detection_fast_days,
+        "rate_dedup_window_days": args.rate_dedup_window_days,
+    }
+    config.update({key: value for key, value in overrides.items() if value is not None})
+    return config
 
 
 # Run pipeline in parallel
@@ -315,10 +374,12 @@ def _run_instance(idx: int, seed=None):
     pop = _build_population(
         model, rate, randomize_params=randomize_params, **pop_kwargs
     )
-    det = _make_detection_criteria()
+    det = _make_detection_criteria(**_detection_criteria_config())
     model_instance = _build_model(model)
 
     # Ensure seed isn't set to be the same for all processes when running in parallel, but allow for a fixed seed when running single-threaded for reproducibility.
+    if seed is None:
+        seed = args.seed
     if seed is None:
         seed = int(np.random.default_rng().integers(0, 2**31 - 1))
     else:
@@ -335,8 +396,16 @@ def _run_instance(idx: int, seed=None):
     result = pipeline.run()
     run_elapsed = time.perf_counter() - run_start
     datetime_str = datetime.datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-    fname = f'{output_base}_{datetime_str}.json'
+    fname = f'{output_base}_{datetime_str}_{idx}.json'
     save_result(result, fname)
+    Path(f'{fname}.metadata.json').write_text(json.dumps({
+        'model': model,
+        'n_transients': N,
+        'run_index': idx,
+        'seed': seed,
+        'detection_criteria': _detection_criteria_config(),
+        'pipeline_time_window_days': 100.0,
+    }, indent=2) + '\n')
 
     summaries = []
     for rs in result.rate_summaries:

@@ -20,8 +20,17 @@ PUBLISHED_DURATION_YEARS = 23.0 / 12.0
 
 def summarize_result(path):
     data = json.loads(Path(path).read_text())
+    if isinstance(data, list):
+        summaries = data
+        metadata = {}
+    elif isinstance(data, dict):
+        summaries = data.get("rate_summaries", [])
+        metadata = data
+    else:
+        raise TypeError("result JSON must contain an object or list")
+
     rows = []
-    for summary in data.get("rate_summaries", []):
+    for summary in summaries:
         effective_vt = float(summary.get("effective_vt_gpc3_yr", float("nan")))
         if not math.isfinite(effective_vt) or effective_vt <= 0:
             continue
@@ -34,8 +43,8 @@ def summarize_result(path):
                 "file": str(path),
                 "transient_type": summary.get("transient_type"),
                 "volumetric_rate": summary.get("volumetric_rate"),
-                "n_simulated": summary.get("n_simulated", data.get("n_simulated")),
-                "n_detected": summary.get("n_detected", data.get("n_detected")),
+                "n_simulated": summary.get("n_simulated", metadata.get("n_simulated")),
+                "n_detected": summary.get("n_detected", metadata.get("n_detected")),
                 "overall_efficiency": summary.get("overall_efficiency"),
                 "z_max": summary.get("z_max"),
                 "survey_duration_years": duration,
@@ -56,8 +65,8 @@ def main():
     parser.add_argument(
         "--glob",
         dest="pattern",
-        default="**/*.json",
-        help="Recursive result-file glob.",
+        default="results/*/*/*.json",
+        help="Result-file glob for results/<run>/<model>/*.json.",
     )
     parser.add_argument("--output", default="results/rate_limit_benchmark.csv")
     args = parser.parse_args()
