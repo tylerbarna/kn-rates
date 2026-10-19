@@ -8,8 +8,8 @@
 #SBATCH --tmp=10g
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
-#SBATCH --output=logs/detection_criteria_sweep/%x_%A.log
-#SBATCH --error=logs/detection_criteria_sweep/%x_%A.err
+#SBATCH --output=logs/detection_criteria_sweep_v2/%x_%A.log
+#SBATCH --error=logs/detection_criteria_sweep_v2/%x_%A.err
 
 set -euo pipefail
 cd /users/8/barna314/kn-rates/
@@ -23,7 +23,7 @@ eval "$(conda shell.bash hook)"
 conda activate ~/.conda/envs/simsurvey_no_gpu/
 
 python detection_criteria_sweep.py \
-  --output-root results/detection_criteria_sweep \
+  --output-root results/detection_criteria_sweep_v2 \
   --n-transients 100000 \
   --n-runs 1 \
   --n-processes 1 \

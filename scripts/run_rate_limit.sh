@@ -23,4 +23,5 @@ conda activate ~/.conda/envs/simsurvey_no_gpu/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/common/software/install/spack/linux-centos7-ivybridge/gcc-7.2.0/cuda-11.8.0-xqzqlf2v77opht3bv4onsqt7uuiomqec/extras/CUPTI/lib64
 
 
-python rate_limit_benchmark.py
+python rate_limit_benchmark.py --glob 'results/detection_criteria_sweep_v2/**/*.json' \
+  --output results/rate_limit_benchmark_v2.csv
