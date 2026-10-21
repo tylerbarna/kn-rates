@@ -11,22 +11,22 @@
 #
 # MSI HPC Scheduling Alignment:
 #   - Hard cluster limit: At most 5,000 jobs submitted at one time per user.
-#   - Scheduling throughput: MSI schedules and runs tasks in chunks of 20 to 50.
+#   - Multi-Point Chunking (1M sources):
+#     With 1M transients taking ~40 min/point, running 2 points per job (~80 min)
+#     fits comfortably inside the 2-hour walltime while cutting total jobs in half.
 #   - Job Array Configuration:
-#       #SBATCH --array=0-4031%50
-#     Submits 4,032 tasks (<= 5,000) throttled to 50 concurrent tasks (%50).
-#   - Automatic Chunking:
-#     For ultra-fine or fine grids (>5,000 points), points are automatically
-#     batched into chunks per task so submitted jobs NEVER exceed 5,000.
+#       #SBATCH --array=0-2015
+#     Submits 2,016 tasks (covering all 4,032 points with chunk_size=2).
+#     No artificial concurrency throttling (%50 removed) so Slurm dispatches freely.
 # ==============================================================================
 # Resource allocations aligned with MSI msismall partition (3900 MB/core):
 #SBATCH -p msismall
-#SBATCH --time=02:00:00
+#SBATCH --time=02:30:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=32g
 #SBATCH --tmp=10g
-#SBATCH --array=0-4031%50
+#SBATCH --array=0-2015
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
 #SBATCH --job-name=kn_criteria_sweep
@@ -65,11 +65,11 @@ echo "Date/Time:        $(date)"
 echo "=============================================================================="
 
 MODEL="${MODEL:-Bu2026Fixed}"
-N_TRANSIENTS="${N_TRANSIENTS:-100000}"
+N_TRANSIENTS="${N_TRANSIENTS:-1000000}"
 SLICE_PARAM="${SLICE_PARAM:-}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-results/02_granular_criteria_sweep}"
 GRID_PRESET="${GRID_PRESET:-broad}"
-CHUNK_SIZE="${CHUNK_SIZE:-}"
+CHUNK_SIZE="${CHUNK_SIZE:-2}"
 MAX_TASKS="${MAX_TASKS:-5000}"
 FORCE_RERUN="${FORCE_RERUN:-0}"
 

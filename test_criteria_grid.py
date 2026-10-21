@@ -130,14 +130,12 @@ class TestGranularCriteriaGrid(unittest.TestCase):
         self.assertTrue(script_path.exists())
         content = script_path.read_text()
 
-        # Check array directive
-        match = re.search(r"#SBATCH\s+--array=0-(\d+)%(\d+)", content)
+        # Check array directive (supports unthrottled 0-N or throttled 0-N%M)
+        match = re.search(r"#SBATCH\s+--array=0-(\d+)(?:%(\d+))?", content)
         self.assertIsNotNone(match, "Could not find #SBATCH --array directive in script!")
         max_idx = int(match.group(1))
-        concurrency = int(match.group(2))
 
         self.assertLessEqual(max_idx + 1, 5000, "Slurm array tasks must be <= 5,000 for MSI compliance!")
-        self.assertEqual(concurrency, 50, "Slurm array concurrency throttle must be %50 to match MSI chunk execution!")
 
 
 if __name__ == "__main__":
