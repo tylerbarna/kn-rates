@@ -174,7 +174,7 @@ def parse_args() -> argparse.Namespace:
             "'all_slices' (union of 1D marginal slices across all 10 criteria)."
         ),
     )
-    parser.add_argument("--n-transients", type=int, default=100_000)
+    parser.add_argument("--n-transients", type=int, default=1_000_000, help="Number of synthetic transients injected (default: 1,000,000 for high statistics).")
     parser.add_argument("--n-runs", type=int, default=1)
     parser.add_argument("--n-processes", type=int, default=1)
     parser.add_argument("--seed", type=int, default=20261020)
@@ -187,8 +187,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=None,
-        help="Number of grid points executed per task. Auto-calculated if omitted to guarantee <= max-tasks.",
+        default=2,
+        help="Number of grid points executed per task (default: 2 points per task for 1M sources).",
     )
     parser.add_argument(
         "--max-tasks",

@@ -23,7 +23,7 @@ The project is structured into five distinct, modular suites:
 kn-rates/
 ├── scripts/
 │   ├── 01_run_large_scale_rate_limits.sh          # 10M transients large-scale simulation (Metzger, Bu2026Fixed, Bu2026Vary)
-│   ├── 02_run_granular_criteria_sweep.sh          # Granular detection criteria sweep script (4,032 array tasks, %50 concurrency, all 10 criteria)
+│   ├── 02_run_granular_criteria_sweep.sh          # Granular detection criteria sweep script (2,016 array tasks, 2 pts/job, 1M transients)
 │   ├── 03_run_prior_vs_at2017gfo_comparison.sh    # Comparison: broad prior vs AT2017gfo-like
 │   ├── 04_run_andreoni_benchmark_comparison.sh    # Benchmark comparison against Andreoni et al. (2020)
 │   ├── 05_run_sample_convergence.sh               # Statistical convergence grid (10k, 100k, 1M, 10M)
@@ -161,7 +161,7 @@ The scripts are calibrated against MSI shared partition limits and verified empi
 | Script / Suite | CPUs | Memory | Scratch (`--tmp`) | Walltime | Slurm Array Size | Total Active Cores |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`01_run_large_scale_rate_limits.sh`** (10M) | 16 | **750 GB** (targets 755 GB nodes) | 100 GB | 36:00:00 | 3 tasks | 48 cores |
-| **`02_run_granular_criteria_sweep.sh`** | 1 | **3,900 MB** ($1 \times 3900\,{\rm MB}$) | 10 GB | 02:00:00 | 4,032 tasks (%50 throttle) | 50 concurrent cores |
+| **`02_run_granular_criteria_sweep.sh`** | 1 | **32 GB** | 10 GB | 02:30:00 | 2,016 tasks (2 pts/task, 1M sources) | 2,016 cores |
 | **`03_run_prior_vs_at2017gfo_comparison.sh`** | 4 | **15 GB** ($4 \times 3900\,{\rm MB}$) | 10 GB | 01:00:00 | 1 task | 4 cores |
 | **`04_run_andreoni_benchmark_comparison.sh`** | 1 | **3,900 MB** ($1 \times 3900\,{\rm MB}$) | 5 GB | 00:30:00 | 1 task (queued) | 1 core |
 | **`05_run_sample_convergence.sh`** (Grid) | 16 | **750 GB** (supports 10M point) | 100 GB | 36:00:00 | 1 task (queued) | 16 cores |
@@ -172,11 +172,11 @@ The scripts are calibrated against MSI shared partition limits and verified empi
 #### Option A: High-Throughput Concurrent Pipeline (Recommended)
 With your 3,000 concurrent job limit on `msismall` and 5,000 max submitted jobs:
 - **Suite 01**: 3 array tasks (10M sources each: Metzger, Bu2026Fixed, Bu2026Vary)
-- **Suite 02**: 4,032 array tasks (Broad 10-criteria grid throttled to %50 concurrency; compliant with 5,000 max job limit)
+- **Suite 02**: 2,016 array tasks (Tier 1 sweet spot: 4,032 points, 2 pts/job, 1M transients per point, <= 5,000 MSI limit)
 - **Suite 03**: 1 task (Prior vs AT2017gfo)
 - **Suite 04**: Queued automatically after Suite 01 completes (`--dependency=afterok:...`)
 - **Suite 05**: Queued automatically at the conclusion of the pipeline
-- **Total active tasks**: **2,596 / 3,000 slots**
+- **Total active tasks**: **2,020 / 3,000 slots**
 
 Launch the entire pipeline with one single command:
 ```bash
