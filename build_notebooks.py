@@ -242,8 +242,8 @@ This notebook investigates the parametric response of ZTF kilonova detection eff
 
 ### MSI Cluster Execution Profile
 - **Max Submitted Tasks**: Strictly capped at $\le 5,000$ jobs per user submission on MSI.
-- **Scheduler Throughput**: MSI schedules and executes jobs in concurrent chunks of 20 to 50 tasks (throttled via `#SBATCH --array=0-4031%50`).
-- **Dynamic Task Chunking**: Automatic batching ensures any grid size ($>5,000$ points) partitions into $\le 5,000$ submitted jobs."""),
+- **Dynamic Multi-Point Task Chunking**: Automatic batching (e.g. 10 points per task) packs broad grids (42,480+ points) into $\le 5,000$ submitted array tasks.
+- **Scheduler Throughput**: Slurm dispatches unthrottled array tasks into available MSI node partitions without client-side artificial concurrency bottlenecks."""),
 
     code_cell(r"""import json
 import math
@@ -720,8 +720,8 @@ plt.show()"""),
    - **Rise rate threshold**: Cuts up to $|\dot{m}|_{\rm{rise}} \ge 0.50$ mag/day are well tolerated ($<3\%$ loss), because kilonovae rise exceptionally fast ($>1$ mag in $<1$ day).
 
 4. **Cluster Execution Strategy**:
-   - The reworked 4,032-task broad grid maps cleanly to MSI's 5,000 max job limit.
-   - Throttling to `%50` concurrency perfectly matches MSI's actual scheduling throughput (chunks of 20–50), preventing queue stagnation while maximizing cluster utilization.""")
+   - The expanded broad grid (42,480 valid points) maps cleanly to MSI's 5,000 max job limit using 10-point task chunking (4,248 submitted jobs).
+   - Array tasks run unthrottled, allowing Slurm to dispatch freely into available worker nodes while keeping total jobs strictly compliant with MSI limits.""")
 ]
 
 

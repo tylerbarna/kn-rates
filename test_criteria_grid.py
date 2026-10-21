@@ -90,14 +90,34 @@ class TestGranularCriteriaGrid(unittest.TestCase):
             self.assertGreater(chunk_size, 0)
             self.assertGreaterEqual(n_tasks * chunk_size, total)
 
-    def test_broad_preset_native_compliance(self):
-        """Verify the default broad grid natively satisfies <= 5,000 tasks with chunk_size=1."""
+    def test_broad_preset_chunking_compliance(self):
+        """Verify the expanded broad grid (42,480 points) satisfies <= 5,000 tasks with chunk_size=10."""
         grid = get_grid_combinations("broad")
         total = len(grid)
-        self.assertEqual(total, 4032)
-        chunk_size, n_tasks = calculate_chunking(total, chunk_size=1, max_tasks=5000)
-        self.assertEqual(chunk_size, 1)
-        self.assertEqual(n_tasks, 4032)
+        self.assertEqual(total, 42480)
+        chunk_size, n_tasks = calculate_chunking(total, chunk_size=10, max_tasks=5000)
+        self.assertEqual(chunk_size, 10)
+        self.assertEqual(n_tasks, 4248)
+        self.assertLessEqual(n_tasks, 5000)
+
+    def test_ultra_fine_preset_chunking_compliance(self):
+        """Verify the ultra-fine grid (98,268 points) satisfies <= 5,000 tasks with chunk_size=20."""
+        grid = get_grid_combinations("ultra_fine")
+        total = len(grid)
+        self.assertEqual(total, 98268)
+        chunk_size, n_tasks = calculate_chunking(total, chunk_size=20, max_tasks=5000)
+        self.assertEqual(chunk_size, 20)
+        self.assertEqual(n_tasks, 4914)
+        self.assertLessEqual(n_tasks, 5000)
+
+    def test_fine_preset_chunking_compliance(self):
+        """Verify the fine grid (17,280 points) satisfies <= 5,000 tasks with chunk_size=4."""
+        grid = get_grid_combinations("fine")
+        total = len(grid)
+        self.assertEqual(total, 17280)
+        chunk_size, n_tasks = calculate_chunking(total, chunk_size=4, max_tasks=5000)
+        self.assertEqual(chunk_size, 4)
+        self.assertEqual(n_tasks, 4320)
         self.assertLessEqual(n_tasks, 5000)
 
     def test_label_generation_and_parsing_roundtrip(self):

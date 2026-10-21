@@ -70,13 +70,13 @@ except ImportError:
 EXPANDED_CRITERIA_BOUNDS = {
     "snr_threshold": (3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 7.0),
     "snr_threshold_secondary": (2.0, 2.5, 3.0, 3.5, 4.0, 5.0),
-    "min_detections": (1, 2, 3, 4, 5),
+    "min_detections": (1, 2, 3, 4, 5, 6),
     "min_detections_primary": (1, 2, 3),
     "max_timespan_days": (1.0, 3.0, 7.0, 14.0, 21.0, 28.0),
     "min_time_separation_hours": (0.5, 1.0, 3.0, 6.0, 12.0, 24.0),
-    "min_rise_rate": (0.0, 0.5, 1.0, 2.0),
+    "min_rise_rate": (0.0, 0.25, 0.5, 1.0, 2.0),
     "min_fade_rate": (0.0, 0.15, 0.30, 0.50, 0.80, 1.0),
-    "min_galactic_lat": (0.0, 5.0, 10.0, 15.0, 20.0, 25.0),
+    "min_galactic_lat": (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0),
     "require_fast_transient": (True, False),
 }
 
@@ -108,47 +108,49 @@ CANONICAL_2592_GRID = {
     "require_fast_transient": (True,),
 }
 
-# Broad MSI-Compliant Grid: 4,032 valid points covering ALL 10 criteria.
-# Fits natively <= 5,000 array tasks with chunk size 1 (1 job per point).
+# Broad MSI-Compliant Grid: 42,480 physically valid points across all 10 criteria.
+# Expanded parameter scopes across secondary SNR, detections, rise/fade rates, and galactic lat.
+# Automatically chunked into chunks of 10 points -> 4,248 tasks <= 5,000 MSI submission limit.
 BROAD_GRID = {
+    "snr_threshold": (3.5, 4.0, 5.0, 6.0),
+    "snr_threshold_secondary": (2.0, 2.5, 3.0, 4.0),
+    "min_detections": (1, 2, 3, 4),
+    "min_detections_primary": (1, 2),
+    "max_timespan_days": (2.0, 7.0, 14.0, 28.0),
+    "min_time_separation_hours": (0.5, 2.0, 6.0),
+    "min_rise_rate": (0.0, 0.5, 1.0),
+    "min_fade_rate": (0.0, 0.20, 0.50, 0.80),
+    "min_galactic_lat": (0.0, 10.0, 20.0),
+    "require_fast_transient": (True, False),
+}
+
+# Fine Grid: 17,280 physically valid points.
+# Automatically chunked into chunks of 4 points -> 4,320 tasks <= 5,000.
+FINE_GRID = {
     "snr_threshold": (4.0, 5.0, 6.0),
-    "snr_threshold_secondary": (2.5, 3.5),
-    "min_detections": (2, 3, 4),
+    "snr_threshold_secondary": (2.0, 2.5, 3.0, 4.0),
+    "min_detections": (1, 2, 3, 4),
     "min_detections_primary": (1, 2),
     "max_timespan_days": (3.0, 7.0, 14.0, 28.0),
     "min_time_separation_hours": (1.0, 6.0),
-    "min_rise_rate": (0.0, 0.5),
+    "min_rise_rate": (0.0, 0.5, 1.0),
     "min_fade_rate": (0.0, 0.30, 0.60),
-    "min_galactic_lat": (0.0, 15.0),
+    "min_galactic_lat": (0.0, 10.0, 20.0),
     "require_fast_transient": (True, False),
 }
 
-# Fine Grid: 8,064 valid points.
-# Automatically chunked into chunks of 2 points -> 4,032 tasks <= 5,000.
-FINE_GRID = {
-    "snr_threshold": (3.5, 4.5, 6.0),
-    "snr_threshold_secondary": (2.0, 3.0, 4.0),
-    "min_detections": (2, 3, 4),
-    "min_detections_primary": (1, 2),
-    "max_timespan_days": (2.0, 7.0, 14.0, 28.0),
-    "min_time_separation_hours": (0.5, 3.0, 12.0),
-    "min_rise_rate": (0.0, 0.5),
-    "min_fade_rate": (0.0, 0.30, 0.60),
-    "min_galactic_lat": (0.0, 15.0),
-    "require_fast_transient": (True, False),
-}
-
-# Ultra-Fine Grid: 47,880 valid points across full scope.
-# Automatically chunked into chunks of 10 points -> 4,788 tasks <= 5,000.
+# Ultra-Fine Grid: 98,268 physically valid points across full scope.
+# Maximum granular exploration across all 10 parameters.
+# Automatically chunked into chunks of 20 points -> 4,914 tasks <= 5,000.
 ULTRA_FINE_GRID = {
-    "snr_threshold": (3.5, 4.0, 5.0, 6.0, 7.0),
-    "snr_threshold_secondary": (2.0, 2.5, 3.0, 4.0),
-    "min_detections": (2, 3, 4, 5),
-    "min_detections_primary": (1, 2),
-    "max_timespan_days": (1.0, 3.0, 7.0, 14.0, 28.0),
-    "min_time_separation_hours": (0.5, 3.0, 12.0),
-    "min_rise_rate": (0.0, 0.5),
-    "min_fade_rate": (0.0, 0.30, 0.60),
+    "snr_threshold": (3.5, 4.0, 5.0, 6.0),
+    "snr_threshold_secondary": (2.0, 2.5, 3.0, 3.5, 4.0),
+    "min_detections": (1, 2, 3, 4, 5),
+    "min_detections_primary": (1, 2, 3),
+    "max_timespan_days": (2.0, 7.0, 14.0, 28.0),
+    "min_time_separation_hours": (0.5, 2.0, 6.0),
+    "min_rise_rate": (0.0, 0.5, 1.0),
+    "min_fade_rate": (0.0, 0.20, 0.50, 0.80),
     "min_galactic_lat": (0.0, 10.0, 20.0),
     "require_fast_transient": (True, False),
 }
@@ -167,9 +169,9 @@ def parse_args() -> argparse.Namespace:
         choices=["broad", "fine", "ultra_fine", "canonical", "all_slices"],
         help=(
             "Grid configuration preset: "
-            "'broad' (4,032 points, native <=5,000 jobs, covers all 10 criteria); "
-            "'fine' (8,064 points, chunks of 2 -> 4,032 jobs); "
-            "'ultra_fine' (47,880 points, chunks of 10 -> 4,788 jobs); "
+            "'broad' (42,480 points, chunks of 10 -> 4,248 jobs <=5,000 MSI limit); "
+            "'fine' (17,280 points, chunks of 4 -> 4,320 jobs); "
+            "'ultra_fine' (98,268 points, chunks of 20 -> 4,914 jobs); "
             "'canonical' (2,592 legacy points); "
             "'all_slices' (union of 1D marginal slices across all 10 criteria)."
         ),
@@ -187,8 +189,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=2,
-        help="Number of grid points executed per task (default: 2 points per task for 1M sources).",
+        default=10,
+        help="Number of grid points executed per task (default: 10 points per task for broad preset).",
     )
     parser.add_argument(
         "--max-tasks",
@@ -443,9 +445,9 @@ def main():
         print(f"Max Tasks Threshold:    {args.max_tasks:,} (MSI limit: 5,000)")
         print(f"Points Per Task (Chunk):{chunk_size}")
         print(f"Total Array Tasks:      {n_tasks:,}")
-        print(f"Slurm Array Directive:  #SBATCH --array=0-{n_tasks - 1}%50")
-        print(f"Scheduler Concurrency:  50 simultaneous tasks (MSI waves of 20-50)")
-        print(f"Est. Job Time Per Task: ~{chunk_size * 2:.1f} minutes")
+        print(f"Slurm Array Directive:  #SBATCH --array=0-{n_tasks - 1}")
+        print(f"Scheduler Throttling:   Unthrottled (Slurm cluster queue manages MSI node execution)")
+        print(f"Est. Job Time Per Task: ~{chunk_size * 2:.1f} minutes (100k sources) / ~{chunk_size * 40:.1f} minutes (1M sources)")
         print("=" * 80)
         return
 
