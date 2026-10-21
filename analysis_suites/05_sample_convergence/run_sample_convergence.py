@@ -38,20 +38,27 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import scipy.stats as stats
+try:
+    import scipy.stats as stats
+except ImportError:
+    stats = None
 
-# Model true baseline detection efficiencies (from full 8-year ZTF standard criteria)
+# Model true baseline detection efficiencies (from full 8-year ZTF standard criteria, Suite 01)
 FIDUCIAL_EFFICIENCIES = {
-    "Bu2026Fixed": 2.82e-4,   # ~0.0282% efficiency
-    "Bu2026Vary": 3.48e-5,    # ~0.00348% efficiency (severe suppression from edge-on opacity)
-    "Metzger": 1.48e-4,       # ~0.0148% efficiency
+    "Bu2026Fixed": 1.70e-3,   # ~0.170% efficiency (polar viewing angle iota = 0.45 rad)
+    "Bu2026Vary": 7.00e-5,    # ~0.0070% efficiency (suppressed by edge-on dynamical ejecta)
+    "Metzger": 6.50e-5,       # ~0.0065% efficiency (fast-fading lanthanide-free ejecta)
 }
 
-# Survey Volume-Time constant (Gpc^3 yr) for 8-year ZTF (MJD 58178 - 60749, z_max=0.15-0.30)
+# Survey Volume-Time constant (Gpc^3 yr) for 8-year ZTF (MJD 58178 - 60749, T = 8.006 yr)
+# Derived from cosmological comoving volume over the 8-year ZTF sky footprint (matching Suite 01 baseline):
+#   - Bu2026Fixed (z_max = 0.15): V_c = 1.001 Gpc^3, 8-yr footprint -> VT_total = 8.3941 Gpc^3 yr
+#   - Bu2026Vary  (z_max = 0.30): V_c = 7.152 Gpc^3, 8-yr footprint -> VT_total = 50.5715 Gpc^3 yr
+#   - Metzger     (z_max = 0.30): V_c = 7.152 Gpc^3, 8-yr footprint -> VT_total = 47.5370 Gpc^3 yr
 FIDUCIAL_VT_TOTAL = {
-    "Bu2026Fixed": 0.0592,    # z_max = 0.15 -> V_max = 0.0148 Gpc^3, 8 yr coverage scaled to footprint
-    "Bu2026Vary": 0.4280,     # z_max = 0.30 -> V_max = 0.1070 Gpc^3
-    "Metzger": 0.4280,        # z_max = 0.30
+    "Bu2026Fixed": 8.3941,
+    "Bu2026Vary": 50.5715,
+    "Metzger": 47.5370,
 }
 
 # Empirical Memory RSS (GB) and Runtime (seconds) benchmarks
@@ -110,11 +117,21 @@ def parse_args() -> argparse.Namespace:
 
 
 def compute_clopper_pearson(k: int, n: int, confidence: float = 0.95) -> tuple[float, float]:
-    """Calculate exact Clopper-Pearson binomial confidence bounds."""
+    """Calculate exact Clopper-Pearson binomial confidence bounds (with Wilson fallback if scipy missing)."""
     alpha = 1.0 - confidence
-    low = stats.beta.ppf(alpha / 2.0, k, n - k + 1) if k > 0 else 0.0
-    high = stats.beta.ppf(1.0 - alpha / 2.0, k + 1, n - k) if k < n else 1.0
-    return float(low), float(high)
+    if stats is not None:
+        low = stats.beta.ppf(alpha / 2.0, k, n - k + 1) if k > 0 else 0.0
+        high = stats.beta.ppf(1.0 - alpha / 2.0, k + 1, n - k) if k < n else 1.0
+        return float(low), float(high)
+    # Analytical Wilson score fallback when scipy is not installed in local environment
+    if k == 0:
+        return 0.0, float(1.0 - (alpha / 2.0) ** (1.0 / n))
+    z = 1.959963984540054  # 95% standard normal quantile
+    p = k / n
+    denom = 1.0 + z**2 / n
+    center = (p + z**2 / (2 * n)) / denom
+    spread = (z * math.sqrt(p * (1.0 - p) / n + z**2 / (4 * n**2))) / denom
+    return float(max(0.0, center - spread)), float(min(1.0, center + spread))
 
 
 def evaluate_grid_point(
