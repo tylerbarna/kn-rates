@@ -8,7 +8,7 @@
 #
 # Execution Architecture:
 #   - Suite 01 (Large-Scale Rate Limits):   3 tasks   [RUNS CONCURRENTLY]
-#   - Suite 02 (Granular Criteria Sweep): 2,592 tasks [RUNS CONCURRENTLY]
+#   - Suite 02 (Granular Criteria Sweep): 4,032 tasks (throttled to %50 concurrency, <= 5,000 MSI limit)
 #   - Suite 03 (Prior vs AT2017gfo):         1 task    [RUNS CONCURRENTLY]
 #   -----------------------------------------------------------------------
 #   Total Concurrent Tasks:               2,596 tasks (< 3,000 msismall limit)
@@ -39,8 +39,8 @@ echo "[1/4] Submitting Suite 01 (Large-Scale Rate Limits, 3 array tasks)..."
 job1_id=$(sbatch --parsable scripts/01_run_large_scale_rate_limits.sh)
 echo "  --> Job ID: ${job1_id}"
 
-# 2. Submit Suite 02: Granular Detection Criteria Sweep (2,592 array tasks)
-echo "[2/4] Submitting Suite 02 (Granular Criteria Sweep, 2,592 array tasks)..."
+# 2. Submit Suite 02: Granular Detection Criteria Sweep (4,032 array tasks, %50 concurrency)
+echo "[2/4] Submitting Suite 02 (Granular Criteria Sweep, 4,032 array tasks, %50 concurrency)..."
 job2_id=$(sbatch --parsable scripts/02_run_granular_criteria_sweep.sh)
 echo "  --> Job ID: ${job2_id}"
 

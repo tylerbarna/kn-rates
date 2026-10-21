@@ -1,20 +1,23 @@
 #!/bin/bash --login
 # ==============================================================================
-# SCRIPT 02: Granular Detection Criteria Grid Sweep
+# SCRIPT 02: Granular Detection Criteria Grid Sweep (MSI HPC Compliant)
 # ==============================================================================
 # Purpose:
-#   Executes a systematic sweep across a granular grid of detection criteria
-#   (SNR thresholds, minimum detections, qualifying timespan, time separation,
-#   fade rate, and galactic latitude) to investigate the parametric response of
-#   ZTF kilonova detection efficiencies.
+#   Executes a systematic sweep across a broad, granular grid covering ALL 10
+#   detection criteria (Primary SNR, Secondary SNR, Minimum Total Detections,
+#   Minimum Primary SNR Detections, Qualifying Timespan Window, Minimum First-Last
+#   Separation, Rise Rate, Fade Rate, Absolute Galactic Latitude, and Fast-Transient
+#   Requirement) to investigate the parametric response of ZTF kilonova search volume.
 #
-# Execution Modes:
-#   1. Slurm Job Array (MSI Cluster):
-#      Iterates over array indices 0 to N_COMBINATIONS-1.
-#   2. Local 1D Parameter Slice:
-#      Pass SLICE_PARAM (e.g. SLICE_PARAM="snr_threshold") to quickly evaluate
-#      marginal sensitivity along a single axis.
-# TODO: add number of detections as a detection criteria parameter to sweep
+# MSI HPC Scheduling Alignment:
+#   - Hard cluster limit: At most 5,000 jobs submitted at one time per user.
+#   - Scheduling throughput: MSI schedules and runs tasks in chunks of 20 to 50.
+#   - Job Array Configuration:
+#       #SBATCH --array=0-4031%50
+#     Submits 4,032 tasks (<= 5,000) throttled to 50 concurrent tasks (%50).
+#   - Automatic Chunking:
+#     For ultra-fine or fine grids (>5,000 points), points are automatically
+#     batched into chunks per task so submitted jobs NEVER exceed 5,000.
 # ==============================================================================
 # Resource allocations aligned with MSI msismall partition (3900 MB/core):
 #SBATCH -p msismall
@@ -23,7 +26,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=32g
 #SBATCH --tmp=10g
-#SBATCH --array=0-2591%2592
+#SBATCH --array=0-4031%50
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
 #SBATCH --job-name=kn_criteria_sweep
@@ -65,17 +68,31 @@ MODEL="${MODEL:-Bu2026Fixed}"
 N_TRANSIENTS="${N_TRANSIENTS:-100000}"
 SLICE_PARAM="${SLICE_PARAM:-}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-results/02_granular_criteria_sweep}"
+GRID_PRESET="${GRID_PRESET:-broad}"
+CHUNK_SIZE="${CHUNK_SIZE:-}"
+MAX_TASKS="${MAX_TASKS:-5000}"
+FORCE_RERUN="${FORCE_RERUN:-0}"
 
 ARGS=(
     --output-root "${OUTPUT_ROOT}"
     --model "${MODEL}"
+    --grid-preset "${GRID_PRESET}"
     --n-transients "${N_TRANSIENTS}"
+    --max-tasks "${MAX_TASKS}"
 )
 
 if [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
     ARGS+=(--array-index "${SLURM_ARRAY_TASK_ID}")
 elif [ -n "${SLICE_PARAM}" ]; then
     ARGS+=(--slice-param "${SLICE_PARAM}")
+fi
+
+if [ -n "${CHUNK_SIZE}" ]; then
+    ARGS+=(--chunk-size "${CHUNK_SIZE}")
+fi
+
+if [ "${FORCE_RERUN}" = "1" ]; then
+    ARGS+=(--force-rerun)
 fi
 
 python analysis_suites/02_granular_criteria_sweep/run_granular_sweep.py "${ARGS[@]}"
