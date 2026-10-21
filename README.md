@@ -111,10 +111,10 @@ kn-rates/
 ### Module 5: Sample Size Convergence Analysis across $N \in [10^4, 10^5, 10^6, 10^7]$
 - **Poisson Noise Law Verified**: The fractional uncertainty on estimated detection efficiency and rate upper limits scales strictly as $\sigma(R_{95\%}) / R_{95\%} = 1/\sqrt{N_{\rm det}} = (N \epsilon)^{-1/2}$.
 - **The Zero-Detection Catastrophe**:
-  - For rare populations like `Bu2026Vary` ($\epsilon \approx 3.48 \times 10^{-5}$), injecting $N = 10\,{\rm k}$ yields $\langle N_{\rm det} \rangle = 0.35$ and a **$70.6\%$ probability of ZERO detections**, causing singular rate limits.
-  - At $N = 100\,{\rm k}$, $\langle N_{\rm det} \rangle = 3.5$, leaving a $3.1\%$ dropout probability and $\pm 55\%$ noise.
-  - At $N = 1\,{\rm M}$, zero dropouts are eliminated, but noise is still $\pm 17\%$.
-  - At $N = 10\,{\rm M}$, $\langle N_{\rm det} \rangle \approx 350$, achieving asymptotic convergence with $\mathbf{\pm 5.3\%}$ precision.
+  - For rare populations like `Bu2026Vary` ($\epsilon \approx 7.00 \times 10^{-5}$) and `Metzger` ($\epsilon \approx 6.50 \times 10^{-5}$), injecting $N = 10\,{\rm k}$ yields $\langle N_{\rm det} \rangle \approx 0.65 - 0.70$ and a **$50 - 52\%$ probability of ZERO detections**, causing singular/unconstrained rate limits.
+  - At $N = 100\,{\rm k}$, $\langle N_{\rm det} \rangle \approx 6.5 - 7.0$, leaving Poisson variance at $\pm 38 - 39\%$.
+  - At $N = 1\,{\rm M}$, zero dropouts are eliminated, but noise is still $\pm 12\%$.
+  - At $N = 10\,{\rm M}$, $\langle N_{\rm det} \rangle \approx 650 - 700$, achieving asymptotic convergence onto definitive 8-year rate limits ($R_{95\%} \approx 210\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$ for Fixed, $846\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$ for Vary, $970\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$ for Metzger) with $\mathbf{\pm 3.8\%}$ precision.
 - **Empirical HPC Benchmark Calibration (MSI Agate Job 14237734)**:
   - **Peak Memory RSS**: **649.67 GB** (86.62% of 750.00 GB allocation).
   - **Wall-clock Time**: **20:47:00** (~21 hours).
