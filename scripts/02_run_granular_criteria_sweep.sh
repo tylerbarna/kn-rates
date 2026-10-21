@@ -14,13 +14,14 @@
 #   2. Local 1D Parameter Slice:
 #      Pass SLICE_PARAM (e.g. SLICE_PARAM="snr_threshold") to quickly evaluate
 #      marginal sensitivity along a single axis.
+# TODO: add number of detections as a detection criteria parameter to sweep
 # ==============================================================================
 # Resource allocations aligned with MSI msismall partition (3900 MB/core):
 #SBATCH -p msismall
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=3900M
+#SBATCH --mem=32g
 #SBATCH --tmp=10g
 #SBATCH --array=0-2591%2592
 #SBATCH --mail-type=BEGIN,END,FAIL

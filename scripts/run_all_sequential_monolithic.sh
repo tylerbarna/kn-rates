@@ -11,14 +11,14 @@
 # Slurm Resource Configuration:
 #   - Partition: msismall
 #   - Walltime:  96:00:00 (MSI maximum allocation window)
-#   - Cores:     8 CPUs
-#   - Memory:    31 GB (8 x 3900 MB/core)
+#   - Cores:     16 CPUs
+#   - Memory:    750 GB (8 x 93750 MB/core)
 # ==============================================================================
 #SBATCH -p msismall
 #SBATCH --time=96:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=31g
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=750g
 #SBATCH --tmp=50g
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
@@ -73,12 +73,12 @@ echo "==========================================================================
 # ------------------------------------------------------------------------------
 echo -e "\n>>> [1/4] Running Suite 01: Large-Scale 8-Year Rate Limits..."
 for MODEL in "Metzger" "Bu2026Fixed" "Bu2026Vary"; do
-    echo "  --> Simulating ${MODEL} (1,000,000 transients)..."
+    echo "  --> Simulating ${MODEL} (10,000,000 transients)..."
     python analysis_suites/01_large_scale_rate_limits/run_large_scale_simulation.py \
         --model "${MODEL}" \
-        --n-transients 1000000 \
+        --n-transients 10000000 \
         --n-runs 1 \
-        --n-processes 4 \
+        --n-processes 16 \
         --seed 20261020 \
         --output-dir results/01_large_scale_rate_limits
 done
@@ -98,7 +98,7 @@ for PARAM in "snr_threshold" "min_detections" "max_timespan_days" "min_fade_rate
     python analysis_suites/02_granular_criteria_sweep/run_granular_sweep.py \
         --slice-param "${PARAM}" \
         --model Bu2026Fixed \
-        --n-transients 100000 \
+        --n-transients 1000000 \
         --output-root results/02_granular_criteria_sweep
 done
 
@@ -112,7 +112,7 @@ python analysis_suites/02_granular_criteria_sweep/audit_granular_sweep.py \
 # ------------------------------------------------------------------------------
 echo -e "\n>>> [3/4] Running Suite 03: Broad Priors vs. AT2017gfo Comparison..."
 python analysis_suites/03_prior_vs_at2017gfo/compare_priors_at2017gfo.py \
-    --n-transients 100000 \
+    --n-transients 1000000 \
     --n-runs 3 \
     --output-dir results/03_prior_vs_at2017gfo
 
