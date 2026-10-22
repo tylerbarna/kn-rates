@@ -139,7 +139,8 @@ Run individual analysis suites:
 python analysis_suites/01_large_scale_rate_limits/run_large_scale_simulation.py --model Bu2026Fixed --n-transients 100000
 
 # 1b. 1M transients randomized parameter suite on Slurm cluster (generates rich distributions for Notebook 01):
-bash scripts/submit_1M_randomized_suite01.sh 0-29
+# Usage: bash scripts/submit_1M_randomized_suite01.sh [RUNS_PER_MODEL] (e.g. 10 -> 30 tasks total, 128 GB/task)
+bash scripts/submit_1M_randomized_suite01.sh 10
 
 # 2. Granular detection criteria sweep
 python analysis_suites/02_granular_criteria_sweep/run_granular_sweep.py --slice-param snr_threshold --n-transients 10000

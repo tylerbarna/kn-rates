@@ -8,12 +8,12 @@
 #   as soon as all array tasks complete.
 #
 # Usage:
-#   bash scripts/submit_1M_randomized_suite01.sh [ARRAY_RANGE]
+#   bash scripts/submit_1M_randomized_suite01.sh [RUNS_PER_MODEL]
 #
 # Examples:
-#   bash scripts/submit_1M_randomized_suite01.sh           # Default: 30 tasks (0-29: 10 per model)
-#   bash scripts/submit_1M_randomized_suite01.sh 0-59      # 60 tasks (20 per model)
-#   bash scripts/submit_1M_randomized_suite01.sh 0-8       # 9 quick test tasks (3 per model)
+#   bash scripts/submit_1M_randomized_suite01.sh        # Default: 10 runs per model (30 tasks: 0-29)
+#   bash scripts/submit_1M_randomized_suite01.sh 20     # 20 runs per model (60 tasks: 0-59)
+#   bash scripts/submit_1M_randomized_suite01.sh 1      # 1 run per model (3 tasks: 0-2)
 # ==============================================================================
 
 set -euo pipefail
@@ -21,14 +21,27 @@ set -euo pipefail
 PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "${PROJECT_DIR}"
 
-ARRAY_RANGE="${1:-0-29}"
+RUNS_PER_MODEL="${1:-10}"
+
+# Validate input
+if ! [[ "${RUNS_PER_MODEL}" =~ ^[0-9]+$ ]] || [ "${RUNS_PER_MODEL}" -le 0 ]; then
+    echo "Error: RUNS_PER_MODEL must be a positive integer, got '${RUNS_PER_MODEL}'" >&2
+    exit 1
+fi
+
+NUM_MODELS=3
+TOTAL_TASKS=$(( RUNS_PER_MODEL * NUM_MODELS ))
+ARRAY_RANGE="0-$(( TOTAL_TASKS - 1 ))"
 
 mkdir -p logs/01_large_scale_rate_limits results/01_large_scale_rate_limits
 
 echo "=============================================================================="
 echo "SUBMITTING 1M RANDOMIZED KILONOVA RATE LIMIT PIPELINE"
 echo "Project Directory: ${PROJECT_DIR}"
-echo "Array Range:       ${ARRAY_RANGE}"
+echo "Models:            Metzger, Bu2026Fixed, Bu2026Vary (${NUM_MODELS} models)"
+echo "Runs per Model:    ${RUNS_PER_MODEL}"
+echo "Total Array Tasks: ${TOTAL_TASKS} (array range: ${ARRAY_RANGE})"
+echo "Memory per Task:   128 GB"
 echo "Date/Time:         $(date)"
 echo "=============================================================================="
 
