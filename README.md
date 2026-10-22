@@ -205,6 +205,7 @@ All notebooks are pre-executed with complete cell outputs, figures, and formatti
 - `notebooks/03_prior_vs_at2017gfo_analysis.ipynb`: Broad physical priors vs. AT2017gfo archetype comparison.
 - `notebooks/04_historical_andreoni_comparison_analysis.ipynb`: Quantitative comparison, shortfalls, and novel advancements vs. Andreoni et al. (2020).
 - `notebooks/05_sample_convergence_analysis.ipynb`: Statistical convergence across 10k, 100k, 1M, and 10M transients, Poisson $1/\sqrt{N_{\rm det}}$ error decay, zero-detection dropout risk, and memory/walltime scaling.
+- `notebooks/job_resource_usage_analysis.ipynb`: Interactive telemetry ingestion, queue latency vs. requested memory/time of day, empirical RAM/walltime scaling fits, and Slurm rightsizer tool.
 
 ---
 
