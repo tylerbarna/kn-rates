@@ -92,6 +92,10 @@ def execute_notebook(nb_path: Path):
 
 
 if __name__ == "__main__":
-    notebooks = sorted(Path("notebooks").glob("*.ipynb"))
-    for nb in notebooks:
+    if len(sys.argv) > 1:
+        target_nbs = [Path(arg) for arg in sys.argv[1:]]
+    else:
+        target_nbs = sorted(Path("notebooks").glob("*.ipynb"))
+
+    for nb in target_nbs:
         execute_notebook(nb)

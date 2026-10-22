@@ -88,3 +88,10 @@ echo "--------------------------------------------------------------------------
 echo "To monitor status across the cluster:"
 echo "  squeue -u \$USER"
 echo "=============================================================================="
+
+# Register newly submitted jobs in the version-controlled telemetry tracker
+if command -v python &>/dev/null; then
+    python -m telemetry update 2>/dev/null || true
+elif command -v python3 &>/dev/null; then
+    python3 -m telemetry update 2>/dev/null || true
+fi
