@@ -1,6 +1,6 @@
 {
-  "last_updated": "Tue Oct 20 21:06:25 CDT 2026",
-  "total_tracked_jobs": 19,
+  "last_updated": "",
+  "total_tracked_jobs": 22771,
   "scaling_models": {
     "Metzger": {
       "ram_gb_per_million": 25.556,
@@ -11,43 +11,70 @@
       "storage_base_mb": 0.11,
       "sample_points": 2
     },
+    "Generic": {
+      "ram_gb_per_million": 0.0,
+      "ram_base_gb": 6.141,
+      "walltime_sec_per_million": 0.0,
+      "walltime_base_sec": 1601.0,
+      "storage_mb_per_million": 0.0,
+      "storage_base_mb": 0.0,
+      "sample_points": 2
+    },
     "Global": {
-      "ram_gb_per_million": 66.054,
+      "ram_gb_per_million": 65.149,
       "ram_base_gb": 0.0,
-      "walltime_sec_per_million": 7635.37,
+      "walltime_sec_per_million": 7476.19,
       "walltime_base_sec": 0.0,
-      "storage_mb_per_million": 183.78,
-      "storage_base_mb": 2.16,
-      "sample_points": 4
+      "storage_mb_per_million": 183.88,
+      "storage_base_mb": 1.25,
+      "sample_points": 6
     }
   },
   "queue_characteristics": {
     "by_memory_tier": {
       "Standard (<= 32 GB)": {
-        "count": 13,
-        "mean_min": 1.23,
+        "count": 7706,
+        "mean_min": 17.45,
         "median_min": 0.0,
-        "max_min": 12.0
+        "max_min": 638.25
       },
       "Medium (33 - 128 GB)": {
-        "count": 1,
-        "mean_min": 0.0,
-        "median_min": 0.0,
-        "max_min": 0.0
+        "count": 5206,
+        "mean_min": 61.5,
+        "median_min": 64.55,
+        "max_min": 110.35
       },
       "High-Memory (129 - 755 GB)": {
-        "count": 5,
-        "mean_min": 18.0,
-        "median_min": 0.0,
-        "max_min": 90.0
+        "count": 4338,
+        "mean_min": 1580.06,
+        "median_min": 714.82,
+        "max_min": 3877.18
       }
     },
     "by_submission_hour": {
+      "2": {
+        "count": 2,
+        "mean_min": 15.22,
+        "median_min": 15.22,
+        "max_min": 15.22
+      },
+      "5": {
+        "count": 1,
+        "mean_min": 58.98,
+        "median_min": 58.98,
+        "max_min": 58.98
+      },
       "9": {
         "count": 1,
         "mean_min": 12.0,
         "median_min": 12.0,
         "max_min": 12.0
+      },
+      "10": {
+        "count": 2,
+        "mean_min": 15.28,
+        "median_min": 15.28,
+        "max_min": 30.53
       },
       "11": {
         "count": 2,
@@ -55,69 +82,111 @@
         "median_min": 2.0,
         "max_min": 3.0
       },
+      "13": {
+        "count": 19,
+        "mean_min": 176.41,
+        "median_min": 0.85,
+        "max_min": 2744.95
+      },
       "14": {
-        "count": 1,
-        "mean_min": 90.0,
-        "median_min": 90.0,
-        "max_min": 90.0
+        "count": 2606,
+        "mean_min": 59.39,
+        "median_min": 64.55,
+        "max_min": 549.23
+      },
+      "15": {
+        "count": 1016,
+        "mean_min": 389.89,
+        "median_min": 414.34,
+        "max_min": 1648.02
+      },
+      "16": {
+        "count": 3110,
+        "mean_min": 102.04,
+        "median_min": 74.43,
+        "max_min": 495.52
+      },
+      "17": {
+        "count": 2,
+        "mean_min": 125.62,
+        "median_min": 125.62,
+        "max_min": 243.03
+      },
+      "18": {
+        "count": 2302,
+        "mean_min": 2267.79,
+        "median_min": 2969.97,
+        "max_min": 3877.18
+      },
+      "19": {
+        "count": 479,
+        "mean_min": 2249.35,
+        "median_min": 2875.23,
+        "max_min": 3636.97
       },
       "20": {
-        "count": 9,
-        "mean_min": 0.0,
-        "median_min": 0.0,
-        "max_min": 0.0
+        "count": 47,
+        "mean_min": 66.16,
+        "median_min": 1.33,
+        "max_min": 663.5
       },
       "21": {
-        "count": 6,
-        "mean_min": 0.0,
-        "median_min": 0.0,
-        "max_min": 0.0
+        "count": 2600,
+        "mean_min": 52.3,
+        "median_min": 49.35,
+        "max_min": 638.85
       }
     },
     "by_day_of_week": {
-      "Thu": {
-        "count": 1,
-        "mean_min": 90.0,
-        "median_min": 90.0,
-        "max_min": 90.0
-      },
-      "Fri": {
-        "count": 3,
-        "mean_min": 5.33,
-        "median_min": 3.0,
-        "max_min": 12.0
-      },
-      "Wed": {
-        "count": 3,
-        "mean_min": 0.0,
-        "median_min": 0.0,
-        "max_min": 0.0
+      "Mon": {
+        "count": 5388,
+        "mean_min": 1197.57,
+        "median_min": 94.93,
+        "max_min": 3877.18
       },
       "Tue": {
-        "count": 12,
-        "mean_min": 0.0,
-        "median_min": 0.0,
-        "max_min": 0.0
+        "count": 2615,
+        "mean_min": 54.99,
+        "median_min": 49.37,
+        "max_min": 1648.02
+      },
+      "Wed": {
+        "count": 64,
+        "mean_min": 57.83,
+        "median_min": 1.33,
+        "max_min": 2744.95
+      },
+      "Fri": {
+        "count": 18,
+        "mean_min": 157.07,
+        "median_min": 201.62,
+        "max_min": 549.23
+      },
+      "Thu": {
+        "count": 4104,
+        "mean_min": 172.06,
+        "median_min": 89.18,
+        "max_min": 635.0
       }
     },
     "by_batch_size": {
       "Single Task (1)": {
-        "count": 14,
-        "mean_min": 7.57,
-        "median_min": 0.0,
-        "max_min": 90.0
+        "count": 17245,
+        "mean_min": 423.76,
+        "median_min": 54.43,
+        "max_min": 3877.18
       },
       "Small Array (2 - 50)": {
         "count": 2,
-        "mean_min": 0.0,
-        "median_min": 0.0,
-        "max_min": 0.0
+        "mean_min": 559.49,
+        "median_min": 559.49,
+        "max_min": 593.68
       },
       "Massive Array (> 50)": {
         "count": 3,
-        "mean_min": 0.0,
+        "mean_min": 32.64,
         "median_min": 0.0,
-        "max_min": 0.0
+        "max_min": 97.93
       }
     }
   }
