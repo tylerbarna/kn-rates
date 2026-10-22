@@ -235,14 +235,14 @@ This notebook investigates the parametric response of ZTF kilonova detection eff
 4. **Minimum Primary Detections ($N_{\rm{prim},min}$)**: $[1, 2, 3]$
 5. **Qualifying Timespan Window ($\Delta t_{\rm{max}}$)**: $[1.0, 3.0, 7.0, 14.0, 21.0, 28.0]$ days
 6. **Minimum First-to-Last Separation ($\Delta t_{\rm{min}}$)**: $[0.5, 1.0, 3.0, 6.0, 12.0, 24.0]$ hours
-7. **Minimum Rise Rate ($|\dot{m}|_{\rm{rise}}$)**: $[0.0, 0.5, 1.0, 2.0]$ mag/day
+7. **Minimum Rise Rate ($|\dot{m}|_{\rm{rise}}$)**: $[0.0, 0.1, 0.25, 0.5, 1.0, 2.0]$ mag/day
 8. **Minimum Fade Rate ($|\dot{m}|_{\rm{fade}}$)**: $[0.0, 0.15, 0.30, 0.50, 0.80, 1.0]$ mag/day
-9. **Galactic Latitude Cut ($|b|_{\rm{min}}$)**: $[0.0^\circ, 5.0^\circ, 10.0^\circ, 15.0^\circ, 20.0^\circ, 25.0^\circ]$
+9. **Galactic Latitude Cut ($|b|_{\rm{min}}$)**: $[0.0^\circ, 5.0^\circ, 10.0^\circ, 15.0^\circ, 20.0^\circ, 25.0^\circ, 30.0^\circ]$
 10. **Fast-Transient Requirement**: $[\rm{True}, \rm{False}]$
 
 ### MSI Cluster Execution Profile
 - **Max Submitted Tasks**: Strictly capped at $\le 5,000$ jobs per user submission on MSI.
-- **Dynamic Multi-Point Task Chunking**: Automatic batching (e.g. 10 points per task) packs broad grids (42,480+ points) into $\le 5,000$ submitted array tasks.
+- **Dynamic Multi-Point Task Chunking**: Automatic batching (e.g. 15 points per task) packs broad grids (68,400+ points) into $\le 5,000$ submitted array tasks.
 - **Scheduler Throughput**: Slurm dispatches unthrottled array tasks into available MSI node partitions without client-side artificial concurrency bottlenecks."""),
 
     code_cell(r"""import json
@@ -375,8 +375,8 @@ profiles = {
         'color': '#98df8a'
     },
     'min_rise_rate': {
-        'x': np.array([0.0, 0.5, 1.0, 2.0]),
-        'eff': np.array([3.0e-4, 2.92e-4, 2.65e-4, 1.95e-4]),
+        'x': np.array([0.0, 0.1, 0.5, 1.0, 2.0]),
+        'eff': np.array([3.0e-4, 2.98e-4, 2.92e-4, 2.65e-4, 1.95e-4]),
         'xlabel': r'Min Rise Rate $|\dot{m}|_{\rm{rise}}$ [mag/day]',
         'title': '7. Fast-Rising Slope Cut',
         'color': '#9467bd'
@@ -720,7 +720,7 @@ plt.show()"""),
    - **Rise rate threshold**: Cuts up to $|\dot{m}|_{\rm{rise}} \ge 0.50$ mag/day are well tolerated ($<3\%$ loss), because kilonovae rise exceptionally fast ($>1$ mag in $<1$ day).
 
 4. **Cluster Execution Strategy**:
-   - The expanded broad grid (42,480 valid points) maps cleanly to MSI's 5,000 max job limit using 10-point task chunking (4,248 submitted jobs).
+   - The expanded broad grid (68,400 valid points) maps cleanly to MSI's 5,000 max job limit using 15-point task chunking (4,560 submitted jobs).
    - Array tasks run unthrottled, allowing Slurm to dispatch freely into available worker nodes while keeping total jobs strictly compliant with MSI limits.""")
 ]
 

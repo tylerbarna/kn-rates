@@ -15,6 +15,7 @@ from run_granular_sweep import (
     calculate_chunking,
     is_physically_valid,
     make_label,
+    save_sweep_result,
 )
 from audit_granular_sweep import parse_label_metadata
 
@@ -91,33 +92,33 @@ class TestGranularCriteriaGrid(unittest.TestCase):
             self.assertGreaterEqual(n_tasks * chunk_size, total)
 
     def test_broad_preset_chunking_compliance(self):
-        """Verify the expanded broad grid (42,480 points) satisfies <= 5,000 tasks with chunk_size=10."""
+        """Verify the expanded broad grid (68,400 points) satisfies <= 5,000 tasks with chunk_size=15."""
         grid = get_grid_combinations("broad")
         total = len(grid)
-        self.assertEqual(total, 42480)
-        chunk_size, n_tasks = calculate_chunking(total, chunk_size=10, max_tasks=5000)
-        self.assertEqual(chunk_size, 10)
-        self.assertEqual(n_tasks, 4248)
+        self.assertEqual(total, 68400)
+        chunk_size, n_tasks = calculate_chunking(total, chunk_size=15, max_tasks=5000)
+        self.assertEqual(chunk_size, 15)
+        self.assertEqual(n_tasks, 4560)
         self.assertLessEqual(n_tasks, 5000)
 
     def test_ultra_fine_preset_chunking_compliance(self):
-        """Verify the ultra-fine grid (98,268 points) satisfies <= 5,000 tasks with chunk_size=20."""
+        """Verify the ultra-fine grid (158,460 points) satisfies <= 5,000 tasks with chunk_size=35."""
         grid = get_grid_combinations("ultra_fine")
         total = len(grid)
-        self.assertEqual(total, 98268)
-        chunk_size, n_tasks = calculate_chunking(total, chunk_size=20, max_tasks=5000)
-        self.assertEqual(chunk_size, 20)
-        self.assertEqual(n_tasks, 4914)
+        self.assertEqual(total, 158460)
+        chunk_size, n_tasks = calculate_chunking(total, chunk_size=35, max_tasks=5000)
+        self.assertEqual(chunk_size, 35)
+        self.assertEqual(n_tasks, 4528)
         self.assertLessEqual(n_tasks, 5000)
 
     def test_fine_preset_chunking_compliance(self):
-        """Verify the fine grid (17,280 points) satisfies <= 5,000 tasks with chunk_size=4."""
+        """Verify the fine grid (22,464 points) satisfies <= 5,000 tasks with chunk_size=5."""
         grid = get_grid_combinations("fine")
         total = len(grid)
-        self.assertEqual(total, 17280)
-        chunk_size, n_tasks = calculate_chunking(total, chunk_size=4, max_tasks=5000)
-        self.assertEqual(chunk_size, 4)
-        self.assertEqual(n_tasks, 4320)
+        self.assertEqual(total, 22464)
+        chunk_size, n_tasks = calculate_chunking(total, chunk_size=5, max_tasks=5000)
+        self.assertEqual(chunk_size, 5)
+        self.assertEqual(n_tasks, 4493)
         self.assertLessEqual(n_tasks, 5000)
 
     def test_label_generation_and_parsing_roundtrip(self):
@@ -156,6 +157,46 @@ class TestGranularCriteriaGrid(unittest.TestCase):
         max_idx = int(match.group(1))
 
         self.assertLessEqual(max_idx + 1, 5000, "Slurm array tasks must be <= 5,000 for MSI compliance!")
+
+    def test_save_compact_summary_result(self):
+        """Verify compact summary saves lightweight JSON (<1 KB) with full rate summary."""
+        import tempfile
+        import json
+
+        class MockRS:
+            transient_type = "Kilonova"
+            volumetric_rate = 1000.0
+            detections_per_year = 0.5
+            detections_total = 4.0
+            overall_efficiency = 0.0003
+            n_simulated = 100000
+            n_detected = 30
+            z_max = 0.15
+            survey_omega_sr = 2.1
+            survey_duration_years = 8.0
+            effective_vt_gpc3_yr = 4.2e-4
+
+        class MockResult:
+            n_simulated = 100000
+            n_detected = 30
+            rate_summaries = [MockRS()]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = Path(tmpdir) / "sim_result_test.json"
+            save_sweep_result(
+                result=MockResult(),
+                filepath=out_file,
+                compact_summary_only=True,
+            )
+            self.assertTrue(out_file.exists())
+            sz = out_file.stat().st_size
+            self.assertLess(sz, 1024, f"Compact JSON must be < 1 KB, got {sz} bytes")
+
+            data = json.loads(out_file.read_text())
+            self.assertEqual(data["n_simulated"], 100000)
+            self.assertEqual(data["n_detected"], 30)
+            self.assertEqual(len(data["rate_summaries"]), 1)
+            self.assertEqual(data["rate_summaries"][0]["effective_vt_gpc3_yr"], 4.2e-4)
 
 
 if __name__ == "__main__":
