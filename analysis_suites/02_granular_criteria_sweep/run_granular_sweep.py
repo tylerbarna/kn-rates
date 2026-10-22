@@ -74,7 +74,7 @@ EXPANDED_CRITERIA_BOUNDS = {
     "min_detections_primary": (1, 2, 3),
     "max_timespan_days": (1.0, 3.0, 7.0, 14.0, 21.0, 28.0),
     "min_time_separation_hours": (0.5, 1.0, 3.0, 6.0, 12.0, 24.0),
-    "min_rise_rate": (0.0, 0.25, 0.5, 1.0, 2.0),
+    "min_rise_rate": (0.0, 0.1, 0.25, 0.5, 1.0, 2.0),
     "min_fade_rate": (0.0, 0.15, 0.30, 0.50, 0.80, 1.0),
     "min_galactic_lat": (0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0),
     "require_fast_transient": (True, False),
@@ -108,9 +108,9 @@ CANONICAL_2592_GRID = {
     "require_fast_transient": (True,),
 }
 
-# Broad MSI-Compliant Grid: 42,480 physically valid points across all 10 criteria.
-# Expanded parameter scopes across secondary SNR, detections, rise/fade rates, and galactic lat.
-# Automatically chunked into chunks of 10 points -> 4,248 tasks <= 5,000 MSI submission limit.
+# Broad MSI-Compliant Grid: 68,400 physically valid points across all 10 criteria.
+# Expanded parameter scopes across secondary SNR, detections, rise/fade rates (including 0.1 rise and 0.3 fade), and galactic lat.
+# Automatically chunked into chunks of 15 points -> 4,560 tasks <= 5,000 MSI submission limit.
 BROAD_GRID = {
     "snr_threshold": (3.5, 4.0, 5.0, 6.0),
     "snr_threshold_secondary": (2.0, 2.5, 3.0, 4.0),
@@ -118,14 +118,14 @@ BROAD_GRID = {
     "min_detections_primary": (1, 2),
     "max_timespan_days": (2.0, 7.0, 14.0, 28.0),
     "min_time_separation_hours": (0.5, 2.0, 6.0),
-    "min_rise_rate": (0.0, 0.5, 1.0),
-    "min_fade_rate": (0.0, 0.20, 0.50, 0.80),
+    "min_rise_rate": (0.0, 0.1, 0.5, 1.0),
+    "min_fade_rate": (0.0, 0.20, 0.30, 0.50, 0.80),
     "min_galactic_lat": (0.0, 10.0, 20.0),
     "require_fast_transient": (True, False),
 }
 
-# Fine Grid: 17,280 physically valid points.
-# Automatically chunked into chunks of 4 points -> 4,320 tasks <= 5,000.
+# Fine Grid: 22,464 physically valid points.
+# Automatically chunked into chunks of 5 points -> 4,493 tasks <= 5,000.
 FINE_GRID = {
     "snr_threshold": (4.0, 5.0, 6.0),
     "snr_threshold_secondary": (2.0, 2.5, 3.0, 4.0),
@@ -133,15 +133,15 @@ FINE_GRID = {
     "min_detections_primary": (1, 2),
     "max_timespan_days": (3.0, 7.0, 14.0, 28.0),
     "min_time_separation_hours": (1.0, 6.0),
-    "min_rise_rate": (0.0, 0.5, 1.0),
+    "min_rise_rate": (0.0, 0.1, 0.5, 1.0),
     "min_fade_rate": (0.0, 0.30, 0.60),
     "min_galactic_lat": (0.0, 10.0, 20.0),
     "require_fast_transient": (True, False),
 }
 
-# Ultra-Fine Grid: 98,268 physically valid points across full scope.
+# Ultra-Fine Grid: 158,460 physically valid points across full scope.
 # Maximum granular exploration across all 10 parameters.
-# Automatically chunked into chunks of 20 points -> 4,914 tasks <= 5,000.
+# Automatically chunked into chunks of 35 points -> 4,528 tasks <= 5,000.
 ULTRA_FINE_GRID = {
     "snr_threshold": (3.5, 4.0, 5.0, 6.0),
     "snr_threshold_secondary": (2.0, 2.5, 3.0, 3.5, 4.0),
@@ -149,8 +149,8 @@ ULTRA_FINE_GRID = {
     "min_detections_primary": (1, 2, 3),
     "max_timespan_days": (2.0, 7.0, 14.0, 28.0),
     "min_time_separation_hours": (0.5, 2.0, 6.0),
-    "min_rise_rate": (0.0, 0.5, 1.0),
-    "min_fade_rate": (0.0, 0.20, 0.50, 0.80),
+    "min_rise_rate": (0.0, 0.1, 0.5, 1.0),
+    "min_fade_rate": (0.0, 0.20, 0.30, 0.50, 0.80),
     "min_galactic_lat": (0.0, 10.0, 20.0),
     "require_fast_transient": (True, False),
 }
@@ -169,9 +169,9 @@ def parse_args() -> argparse.Namespace:
         choices=["broad", "fine", "ultra_fine", "canonical", "all_slices"],
         help=(
             "Grid configuration preset: "
-            "'broad' (42,480 points, chunks of 10 -> 4,248 jobs <=5,000 MSI limit); "
-            "'fine' (17,280 points, chunks of 4 -> 4,320 jobs); "
-            "'ultra_fine' (98,268 points, chunks of 20 -> 4,914 jobs); "
+            "'broad' (68,400 points, chunks of 15 -> 4,560 jobs <=5,000 MSI limit); "
+            "'fine' (22,464 points, chunks of 5 -> 4,493 jobs); "
+            "'ultra_fine' (158,460 points, chunks of 35 -> 4,528 jobs); "
             "'canonical' (2,592 legacy points); "
             "'all_slices' (union of 1D marginal slices across all 10 criteria)."
         ),
@@ -189,8 +189,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--chunk-size",
         type=int,
-        default=10,
-        help="Number of grid points executed per task (default: 10 points per task for broad preset).",
+        default=15,
+        help="Number of grid points executed per task (default: 15 points per task for broad preset).",
     )
     parser.add_argument(
         "--max-tasks",
@@ -203,6 +203,23 @@ def parse_args() -> argparse.Namespace:
         type=str,
         default=None,
         help="If set, only sweep across this single parameter holding all others at fiducial values.",
+    )
+    parser.add_argument(
+        "--exclude-non-detections",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Omit bulky 8-year non-detection history arrays from serialized JSONs (saves >90% disk space; default: True).",
+    )
+    parser.add_argument(
+        "--compact-summary-only",
+        action="store_true",
+        help="Save only rate summaries and detection metrics without lightcurves (~0.4 KB/point, >99.9% disk savings).",
+    )
+    parser.add_argument(
+        "--scratch-dir",
+        type=str,
+        default=None,
+        help="Optional high-capacity scratch directory (e.g., $TMPDIR or /scratch.global/$USER) to write raw simulation outputs.",
     )
     parser.add_argument("--force-rerun", action="store_true", help="Force recomputation even if output JSON exists.")
     parser.add_argument("--print-plan", action="store_true", help="Print grid partitioning plan and exit.")
@@ -305,6 +322,60 @@ def make_label(config: Dict[str, Any]) -> str:
     )
 
 
+def save_sweep_result(
+    result: Any,
+    filepath: Union[str, Path],
+    exclude_non_detections: bool = True,
+    compact_summary_only: bool = False,
+) -> None:
+    """Save simulation result with options to omit non-detections or full lightcurves to minimize disk usage."""
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    if compact_summary_only:
+        rate_summaries = []
+        for rs in getattr(result, "rate_summaries", []):
+            rate_summaries.append({
+                "transient_type": getattr(rs, "transient_type", "Kilonova"),
+                "volumetric_rate": getattr(rs, "volumetric_rate", 1000.0),
+                "detections_per_year": getattr(rs, "detections_per_year", 0.0),
+                "detections_total": getattr(rs, "detections_total", 0.0),
+                "overall_efficiency": getattr(rs, "overall_efficiency", 0.0),
+                "n_simulated": getattr(rs, "n_simulated", getattr(result, "n_simulated", 0)),
+                "n_detected": getattr(rs, "n_detected", getattr(result, "n_detected", 0)),
+                "z_max": getattr(rs, "z_max", 0.15),
+                "survey_omega_sr": getattr(rs, "survey_omega_sr", 0.0),
+                "survey_duration_years": getattr(rs, "survey_duration_years", 8.0),
+                "effective_vt_gpc3_yr": getattr(rs, "effective_vt_gpc3_yr", 0.0),
+            })
+        payload = {
+            "type": "SimulationResult",
+            "n_simulated": getattr(result, "n_simulated", 0),
+            "n_detected": getattr(result, "n_detected", 0),
+            "rate_summaries": rate_summaries,
+            "detected_sources": [],
+        }
+        with open(filepath, "w") as f:
+            json.dump(payload, f, indent=2)
+        return
+
+    # Standard serialization
+    if save_result is not None:
+        save_result(result, str(filepath), overwrite=True)
+        if exclude_non_detections:
+            try:
+                with open(filepath, "r") as f:
+                    data = json.load(f)
+                for src in data.get("detected_sources", []):
+                    src["non_detections_times"] = []
+                    src["non_detections_depths"] = []
+                    src["non_detections_bands"] = []
+                with open(filepath, "w") as f:
+                    json.dump(data, f, indent=2)
+            except Exception:
+                pass
+
+
 def run_grid_point(
     survey: Any,
     model_name: str,
@@ -313,6 +384,8 @@ def run_grid_point(
     seed: int,
     output_dir: Path,
     force_rerun: bool = False,
+    exclude_non_detections: bool = True,
+    compact_summary_only: bool = False,
 ) -> Dict[str, Any]:
     """Execute simulation for a single criteria configuration with resumption support."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -399,7 +472,12 @@ def run_grid_point(
 
     timestamp = time.strftime("%Y-%m-%d_%H:%M:%S")
     fname = output_dir / f"sim_result_{timestamp}.json"
-    save_result(result, str(fname))
+    save_sweep_result(
+        result=result,
+        filepath=fname,
+        exclude_non_detections=exclude_non_detections,
+        compact_summary_only=compact_summary_only,
+    )
 
     # Save metadata
     meta = {
@@ -498,12 +576,19 @@ def main():
     survey = load_ztf_survey(start="201803", end="202603", nside=64)
 
     records = []
-    root = Path(args.output_root)
+    # If scratch directory specified, write heavy simulation files to scratch to preserve home quota
+    scratch_root = Path(args.scratch_dir) if args.scratch_dir else None
+    sim_root = scratch_root if scratch_root else Path(args.output_root)
+    proj_root = Path(args.output_root)
+    proj_root.mkdir(parents=True, exist_ok=True)
+    if scratch_root:
+        scratch_root.mkdir(parents=True, exist_ok=True)
+
     base_seed = args.seed + (args.array_index * 1000 if args.array_index is not None else 0)
 
     for idx, cfg in enumerate(active_points):
         label = make_label(cfg)
-        out_dir = root / label / args.model
+        out_dir = sim_root / label / args.model
         pt_seed = base_seed + idx
         print(f"\n[{idx + 1}/{len(active_points)}] Evaluating {label}...")
         res = run_grid_point(
@@ -514,6 +599,8 @@ def main():
             seed=pt_seed,
             output_dir=out_dir,
             force_rerun=args.force_rerun,
+            exclude_non_detections=args.exclude_non_detections,
+            compact_summary_only=args.compact_summary_only,
         )
         records.append(res)
         status = "CACHED" if res.get("cached") else f"{res['elapsed_seconds']:.2f}s"
@@ -526,9 +613,13 @@ def main():
     # Save summary
     if pd is not None:
         task_suffix = f"_task{args.array_index}" if args.array_index is not None else ""
-        summary_file = root / f"sweep_summary_{args.model}{task_suffix}.csv"
-        pd.DataFrame(records).to_csv(summary_file, index=False)
+        df = pd.DataFrame(records)
+        summary_file = proj_root / f"sweep_summary_{args.model}{task_suffix}.csv"
+        df.to_csv(summary_file, index=False)
         print(f"\nSaved sweep summary to {summary_file}")
+        if scratch_root and scratch_root != proj_root:
+            scratch_summary = scratch_root / f"sweep_summary_{args.model}{task_suffix}.csv"
+            df.to_csv(scratch_summary, index=False)
 
 
 if __name__ == "__main__":

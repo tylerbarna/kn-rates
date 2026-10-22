@@ -8,11 +8,11 @@
 #
 # Execution Architecture:
 #   - Suite 01 (Large-Scale Rate Limits):     3 tasks   [RUNS CONCURRENTLY]
-#   - Suite 02 (Granular Criteria Sweep): 4,248 tasks (42,480 points, 10 pts/task, 1M sources, <= 5,000 limit)
+#   - Suite 02 (Granular Criteria Sweep): 4,560 tasks (68,400 points, 15 pts/task, 1M sources, <= 5,000 limit)
 #   - Suite 03 (Prior vs AT2017gfo):           1 task    [RUNS CONCURRENTLY]
 #   -----------------------------------------------------------------------
-#   Total Concurrent Tasks:                 4,252 tasks (< 5,000 submission limit)
-#   Total Walltime to Finish All 3:         ~8 hours (parallelized)
+#   Total Concurrent Tasks:                 4,564 tasks (< 5,000 submission limit)
+#   Total Walltime to Finish All 3:         ~10-12 hours (parallelized)
 #   -----------------------------------------------------------------------
 #   - Suite 04 (Historical Andreoni Comp):     1 task    [QUEUED: afterok:Suite 01]
 #   - Sweep Audit & Aggregation:               1 task    [QUEUED: afterok:Suite 02]
@@ -39,8 +39,8 @@ echo "[1/4] Submitting Suite 01 (Large-Scale Rate Limits, 3 array tasks)..."
 job1_id=$(sbatch --parsable scripts/01_run_large_scale_rate_limits.sh)
 echo "  --> Job ID: ${job1_id}"
 
-# 2. Submit Suite 02: Granular Detection Criteria Sweep (4,248 array tasks, 10 points/task, 1M sources)
-echo "[2/4] Submitting Suite 02 (Granular Criteria Sweep, 4,248 array tasks, 1M sources)..."
+# 2. Submit Suite 02: Granular Detection Criteria Sweep (4,560 array tasks, 15 points/task, 1M sources)
+echo "[2/4] Submitting Suite 02 (Granular Criteria Sweep, 4,560 array tasks, 1M sources)..."
 job2_id=$(sbatch --parsable scripts/02_run_granular_criteria_sweep.sh)
 echo "  --> Job ID: ${job2_id}"
 

@@ -12,21 +12,21 @@
 # MSI HPC Scheduling Alignment:
 #   - Hard cluster limit: At most 5,000 jobs submitted at one time per user.
 #   - Multi-Point Chunking:
-#     Executes 10 points per array task, compressing 42,480 valid points across
-#     all 10 detection criteria into 4,248 array tasks (< 5,000 limit).
+#     Executes 15 points per array task, compressing 68,400 valid points across
+#     all 10 detection criteria into 4,560 array tasks (< 5,000 limit).
 #   - Job Array Configuration:
-#       #SBATCH --array=0-4247
-#     Submits 4,248 tasks covering all 42,480 points with chunk_size=10.
+#       #SBATCH --array=0-4559
+#     Submits 4,560 tasks covering all 68,400 points with chunk_size=15.
 #     No artificial concurrency throttling (%50 removed) so Slurm dispatches freely.
 # ==============================================================================
 # Resource allocations aligned with MSI msismall partition (3900 MB/core):
 #SBATCH -p msismall
-#SBATCH --time=08:00:00
+#SBATCH --time=12:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=32g
 #SBATCH --tmp=10g
-#SBATCH --array=0-4247
+#SBATCH --array=0-4559
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
 #SBATCH --job-name=kn_criteria_sweep
@@ -69,9 +69,21 @@ N_TRANSIENTS="${N_TRANSIENTS:-1000000}"
 SLICE_PARAM="${SLICE_PARAM:-}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-results/02_granular_criteria_sweep}"
 GRID_PRESET="${GRID_PRESET:-broad}"
-CHUNK_SIZE="${CHUNK_SIZE:-10}"
+CHUNK_SIZE="${CHUNK_SIZE:-15}"
 MAX_TASKS="${MAX_TASKS:-5000}"
 FORCE_RERUN="${FORCE_RERUN:-0}"
+EXCLUDE_NON_DETECTIONS="${EXCLUDE_NON_DETECTIONS:-1}"
+COMPACT_SUMMARY_ONLY="${COMPACT_SUMMARY_ONLY:-0}"
+
+# Auto-detect MSI high-capacity scratch storage to safeguard home directory quota:
+SCRATCH_DIR="${SCRATCH_DIR:-}"
+if [ -z "${SCRATCH_DIR}" ]; then
+    if [ -d "/scratch.global/${USER:-}" ]; then
+        SCRATCH_DIR="/scratch.global/${USER:-}/kn-rates/02_granular_criteria_sweep"
+    elif [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR}" ]; then
+        SCRATCH_DIR="${TMPDIR}/02_granular_criteria_sweep"
+    fi
+fi
 
 ARGS=(
     --output-root "${OUTPUT_ROOT}"
@@ -80,6 +92,19 @@ ARGS=(
     --n-transients "${N_TRANSIENTS}"
     --max-tasks "${MAX_TASKS}"
 )
+
+if [ -n "${SCRATCH_DIR}" ]; then
+    mkdir -p "${SCRATCH_DIR}"
+    ARGS+=(--scratch-dir "${SCRATCH_DIR}")
+fi
+
+if [ "${EXCLUDE_NON_DETECTIONS}" = "1" ]; then
+    ARGS+=(--exclude-non-detections)
+fi
+
+if [ "${COMPACT_SUMMARY_ONLY}" = "1" ]; then
+    ARGS+=(--compact-summary-only)
+fi
 
 if [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
     ARGS+=(--array-index "${SLURM_ARRAY_TASK_ID}")
