@@ -1,11 +1,11 @@
 #!/bin/bash
 # ==============================================================================
-# INSTALL / UNINSTALL / MANAGE TELEMETRY CRON JOB
+# INSTALL / UNINSTALL / MANAGE TELEMETRY SCRONTAB JOB
 # ==============================================================================
 # Usage:
-#   ./scripts/install_cron.sh             # Installs hourly cron job with auto-commit
+#   ./scripts/install_cron.sh             # Installs hourly scrontab job with auto-commit
 #   ./scripts/install_cron.sh --install   # Same as above
-#   ./scripts/install_cron.sh --uninstall # Removes telemetry cron job from crontab
+#   ./scripts/install_cron.sh --uninstall # Removes telemetry job from scrontab
 #   ./scripts/install_cron.sh --status    # Checks active cron status and recent log
 # ==============================================================================
 
@@ -21,7 +21,7 @@ ACTION="${1:---install}"
 case "${ACTION}" in
     --install)
         echo "=============================================================================="
-        echo "INSTALLING HOURLY TELEMETRY TRACKER CRON JOB"
+        echo "INSTALLING HOURLY TELEMETRY TRACKER SCRONTAB JOB"
         echo "Script:    ${CRON_SCRIPT}"
         echo "Cadence:   Hourly at minute 0 (0 * * * *)"
         echo "=============================================================================="
@@ -30,8 +30,8 @@ case "${ACTION}" in
 
         CRON_CMD="0 * * * * ${CRON_SCRIPT} --commit ${CRON_TAG}"
 
-        # Get existing crontab excluding previous kn_rates telemetry entries
-        EXISTING_CRON=$(crontab -l 2>/dev/null | grep -v "${CRON_TAG}" || true)
+        # Get existing scrontab excluding previous kn_rates telemetry entries
+        EXISTING_CRON=$(scrontab -l 2>/dev/null | grep -v "${CRON_TAG}" || true)
 
         if [ -n "${EXISTING_CRON}" ]; then
             NEW_CRONTAB="${EXISTING_CRON}"$'\n'"${CRON_CMD}"
@@ -39,9 +39,9 @@ case "${ACTION}" in
             NEW_CRONTAB="${CRON_CMD}"
         fi
 
-        echo "${NEW_CRONTAB}" | crontab -
+        echo "${NEW_CRONTAB}" | scrontab -
 
-        echo "[+] Successfully installed crontab entry:"
+        echo "[+] Successfully installed scrontab entry:"
         echo "    ${CRON_CMD}"
         echo ""
         echo "Telemetry registry will update at the top of every hour."
@@ -52,15 +52,15 @@ case "${ACTION}" in
 
     --uninstall)
         echo "=============================================================================="
-        echo "UNINSTALLING TELEMETRY TRACKER CRON JOB"
+        echo "UNINSTALLING TELEMETRY TRACKER SCRONTAB JOB"
         echo "=============================================================================="
 
-        EXISTING_CRON=$(crontab -l 2>/dev/null | grep -v "${CRON_TAG}" || true)
+        EXISTING_CRON=$(scrontab -l 2>/dev/null | grep -v "${CRON_TAG}" || true)
 
         if [ -n "${EXISTING_CRON}" ]; then
-            echo "${EXISTING_CRON}" | crontab -
+            echo "${EXISTING_CRON}" | scrontab -
         else
-            crontab -r 2>/dev/null || true
+            scrontab -r 2>/dev/null || true
         fi
 
         echo "[+] Removed telemetry tracker from crontab."
@@ -72,13 +72,13 @@ case "${ACTION}" in
         echo "TELEMETRY TRACKER CRON STATUS"
         echo "=============================================================================="
 
-        ACTIVE_ENTRY=$(crontab -l 2>/dev/null | grep "${CRON_TAG}" || true)
+        ACTIVE_ENTRY=$(scrontab -l 2>/dev/null | grep "${CRON_TAG}" || true)
 
         if [ -n "${ACTIVE_ENTRY}" ]; then
-            echo "[*] Status: ACTIVE (Installed in crontab)"
+            echo "[*] Status: ACTIVE (Installed in scrontab)"
             echo "    Entry:  ${ACTIVE_ENTRY}"
         else
-            echo "[*] Status: NOT INSTALLED in user crontab"
+            echo "[*] Status: NOT INSTALLED in user scrontab"
         fi
 
         echo ""
