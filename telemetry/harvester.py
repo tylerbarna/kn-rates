@@ -98,7 +98,15 @@ class JobHarvester:
             else:
                 records[key] = r
 
-        # 4. Scrape result metadata files in results/
+        # 4. Scrape miscellaneous logs outside testing suites
+        for r in self.harvest_misc_logs():
+            key = (r.job_id, r.array_task_id)
+            if key in records:
+                self._merge_records(records[key], r)
+            else:
+                records[key] = r
+
+        # 5. Scrape result metadata files in results/
         for r in self.harvest_result_metadata():
             key = (r.job_id, r.array_task_id)
             if key in records:
@@ -106,7 +114,15 @@ class JobHarvester:
             else:
                 records[key] = r
 
-        # 5. Query Slurm sacct if available on the current machine
+        # 6. Scrape historical standalone sbatch simulation scripts
+        for r in self.harvest_standalone_scripts():
+            key = (r.job_id, r.array_task_id)
+            if key in records:
+                self._merge_records(records[key], r)
+            else:
+                records[key] = r
+
+        # 7. Query Slurm sacct if available on the current machine
         if shutil.which("sacct"):
             for r in self.harvest_sacct(start_date=start_date):
                 key = (r.job_id, r.array_task_id)
@@ -416,6 +432,129 @@ class JobHarvester:
                 n_transients=n_transients,
                 data_source="task_log",
             ))
+
+        return records
+
+    def harvest_misc_logs(self) -> List[JobTelemetryRecord]:
+        """Harvest arbitrary miscellaneous log and output files across the workspace.
+
+        Scrapes *.log, *.out, *.err, and text files outside testing suites
+        (e.g., defunct/, root, debug outputs) for job IDs, timings, resource numbers,
+        and simulation metrics.
+        """
+        records: List[JobTelemetryRecord] = []
+        patterns = [
+            str(self.project_root / "*.log"),
+            str(self.project_root / "*.err"),
+            str(self.project_root / "*.out"),
+            str(self.project_root / "logs" / "*.log"),
+            str(self.project_root / "logs" / "*.err"),
+            str(self.project_root / "defunct" / "*.log"),
+            str(self.project_root / "defunct" / "*.err"),
+            str(self.project_root / "defunct" / "*.out"),
+            str(self.project_root / "defunct" / "*.txt"),
+        ]
+
+        found_files = []
+        for pat in patterns:
+            found_files.extend(glob.glob(pat))
+
+        for fpath in sorted(set(found_files)):
+            # Skip master submission outputs and standard cron logs handled elsewhere
+            fname = Path(fpath).name
+            if fname.startswith("slurm-") or fname == "telemetry_cron.log":
+                continue
+
+            try:
+                text = Path(fpath).read_text(errors="ignore")
+            except Exception:
+                continue
+
+            # Look for Job ID patterns
+            job_matches = re.findall(r"(?:Job ID|SLURM_JOB_ID|job\s*id)[\s:=]+(\d+)", text, re.IGNORECASE)
+            model_m = re.search(r"--model\s+([A-Za-z0-9_]+)", text)
+            trans_m = re.search(r"(?:--n-transients|transients)[\s:=]+(\d+)", text, re.IGNORECASE)
+            time_m = re.search(r"(?:elapsed|walltime|time)[\s:=]+([\d:.]+)", text, re.IGNORECASE)
+            rss_m = re.search(r"(?:maxrss|memory|rss)[\s:=]+([\d.]+\s*[KMGTPE]?B?)", text, re.IGNORECASE)
+
+            if job_matches:
+                for jid in set(job_matches):
+                    rec = JobTelemetryRecord(
+                        job_id=jid,
+                        job_name=Path(fpath).stem,
+                        suite="Misc",
+                        model=model_m.group(1) if model_m else "",
+                        n_transients=int(trans_m.group(1)) if trans_m else 0,
+                        used_walltime_sec=parse_slurm_time_to_seconds(time_m.group(1)) if time_m else 0.0,
+                        used_max_rss_gb=parse_memory_to_gb(rss_m.group(1)) if rss_m else 0.0,
+                        data_source="misc_log",
+                    )
+                    records.append(rec)
+
+        return records
+
+    def harvest_standalone_scripts(self) -> List[JobTelemetryRecord]:
+        """Scrape legacy and standalone sbatch simulation shell scripts outside testing suites.
+
+        Extracts requested resources (--mem, --time, --cpus-per-task, --partition)
+        and transient counts/models from defunct/ and scripts/.
+        """
+        records: List[JobTelemetryRecord] = []
+        script_files = glob.glob(str(self.project_root / "defunct" / "*.sh")) + \
+                       glob.glob(str(self.project_root / "scripts" / "*.sh"))
+
+        for sfile in script_files:
+            try:
+                text = Path(sfile).read_text(errors="ignore")
+            except Exception:
+                continue
+
+            if "#SBATCH" not in text:
+                continue
+
+            mem_m = re.search(r"#SBATCH\s+--mem[=\s]+(\w+)", text)
+            time_m = re.search(r"#SBATCH\s+--time[=\s]+([\d:-]+)", text)
+            part_m = re.search(r"#SBATCH\s+(?:-p|--partition)[=\s]+(\w+)", text)
+            cpus_m = re.search(r"#SBATCH\s+--cpus-per-task[=\s]+(\d+)", text)
+            ntasks_m = re.search(r"#SBATCH\s+--ntasks[=\s]+(\d+)", text)
+            name_m = re.search(r"#SBATCH\s+--job-name[=\s]+([\w-]+)", text)
+            array_m = re.search(r"#SBATCH\s+--array[=\s]+([\d%-]+)", text)
+
+            trans_m = re.search(r"--n-transients[=\s]+(\d+)", text)
+            model_m = re.search(r"--model[=\s]+([A-Za-z0-9_]+)", text)
+
+            job_name = name_m.group(1) if name_m else Path(sfile).stem
+            suite = "Defunct" if "defunct" in sfile else "Scripts"
+            cpus = int(cpus_m.group(1)) if cpus_m else (int(ntasks_m.group(1)) if ntasks_m else 1)
+            time_sec = parse_slurm_time_to_seconds(time_m.group(1)) if time_m else 0.0
+
+            # Derive synthetic task counts for array directives
+            tasks = 1
+            if array_m:
+                arr_val = array_m.group(1).split("%")[0]
+                if "-" in arr_val:
+                    try:
+                        start_idx, end_idx = map(int, arr_val.split("-")[:2])
+                        tasks = max(1, end_idx - start_idx + 1)
+                    except ValueError:
+                        tasks = 1
+
+            # Use deterministic ID based on script name to index configuration templates
+            pseudo_id = f"cfg_{Path(sfile).stem}"
+            rec = JobTelemetryRecord(
+                job_id=pseudo_id,
+                job_name=job_name,
+                suite=suite,
+                partition=part_m.group(1) if part_m else "msismall",
+                req_cpus=cpus,
+                req_mem_gb=parse_memory_to_gb(mem_m.group(1)) if mem_m else 0.0,
+                req_time_min=round(time_sec / 60.0, 1),
+                concurrent_tasks=tasks,
+                model=model_m.group(1) if model_m else "",
+                n_transients=int(trans_m.group(1)) if trans_m else 0,
+                data_source="script_configuration",
+            )
+            records.append(rec)
 
         return records
 
