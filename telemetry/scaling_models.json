@@ -1,0 +1,124 @@
+{
+  "last_updated": "Tue Oct 20 21:06:25 CDT 2026",
+  "total_tracked_jobs": 19,
+  "scaling_models": {
+    "Metzger": {
+      "ram_gb_per_million": 25.556,
+      "ram_base_gb": 1.244,
+      "walltime_sec_per_million": 1333.33,
+      "walltime_base_sec": 16.67,
+      "storage_mb_per_million": 228.89,
+      "storage_base_mb": 0.11,
+      "sample_points": 2
+    },
+    "Global": {
+      "ram_gb_per_million": 66.054,
+      "ram_base_gb": 0.0,
+      "walltime_sec_per_million": 7635.37,
+      "walltime_base_sec": 0.0,
+      "storage_mb_per_million": 183.78,
+      "storage_base_mb": 2.16,
+      "sample_points": 4
+    }
+  },
+  "queue_characteristics": {
+    "by_memory_tier": {
+      "Standard (<= 32 GB)": {
+        "count": 13,
+        "mean_min": 1.23,
+        "median_min": 0.0,
+        "max_min": 12.0
+      },
+      "Medium (33 - 128 GB)": {
+        "count": 1,
+        "mean_min": 0.0,
+        "median_min": 0.0,
+        "max_min": 0.0
+      },
+      "High-Memory (129 - 755 GB)": {
+        "count": 5,
+        "mean_min": 18.0,
+        "median_min": 0.0,
+        "max_min": 90.0
+      }
+    },
+    "by_submission_hour": {
+      "9": {
+        "count": 1,
+        "mean_min": 12.0,
+        "median_min": 12.0,
+        "max_min": 12.0
+      },
+      "11": {
+        "count": 2,
+        "mean_min": 2.0,
+        "median_min": 2.0,
+        "max_min": 3.0
+      },
+      "14": {
+        "count": 1,
+        "mean_min": 90.0,
+        "median_min": 90.0,
+        "max_min": 90.0
+      },
+      "20": {
+        "count": 9,
+        "mean_min": 0.0,
+        "median_min": 0.0,
+        "max_min": 0.0
+      },
+      "21": {
+        "count": 6,
+        "mean_min": 0.0,
+        "median_min": 0.0,
+        "max_min": 0.0
+      }
+    },
+    "by_day_of_week": {
+      "Thu": {
+        "count": 1,
+        "mean_min": 90.0,
+        "median_min": 90.0,
+        "max_min": 90.0
+      },
+      "Fri": {
+        "count": 3,
+        "mean_min": 5.33,
+        "median_min": 3.0,
+        "max_min": 12.0
+      },
+      "Wed": {
+        "count": 3,
+        "mean_min": 0.0,
+        "median_min": 0.0,
+        "max_min": 0.0
+      },
+      "Tue": {
+        "count": 12,
+        "mean_min": 0.0,
+        "median_min": 0.0,
+        "max_min": 0.0
+      }
+    },
+    "by_batch_size": {
+      "Single Task (1)": {
+        "count": 14,
+        "mean_min": 7.57,
+        "median_min": 0.0,
+        "max_min": 90.0
+      },
+      "Small Array (2 - 50)": {
+        "count": 2,
+        "mean_min": 0.0,
+        "median_min": 0.0,
+        "max_min": 0.0
+      },
+      "Massive Array (> 50)": {
+        "count": 3,
+        "mean_min": 0.0,
+        "median_min": 0.0,
+        "max_min": 0.0
+      }
+    }
+  }
+}

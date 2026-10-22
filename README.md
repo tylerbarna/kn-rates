@@ -199,23 +199,52 @@ sbatch scripts/05_run_sample_convergence.sh
 ```
 
 ### Review Interactive Notebooks in VSCode / Jupyter
-All notebooks are pre-executed with complete cell outputs, figures, and formatting ready for instant inspection in VSCode:
+All notebooks are pre-executed with complete cell outputs, figures, and formatting ready for instant inspection in VSCode or Jupyter Lab:
 - `notebooks/01_large_scale_rate_limits_analysis.ipynb`: 8-year ZTF rate limit curves, effective volume-times, and duration scaling.
 - `notebooks/02_granular_criteria_sweep_analysis.ipynb`: 10-criteria multidimensional response surface, strictness cliffs, sensitivity elasticity, and Pareto frontier.
 - `notebooks/03_prior_vs_at2017gfo_analysis.ipynb`: Broad physical priors vs. AT2017gfo archetype comparison.
 - `notebooks/04_historical_andreoni_comparison_analysis.ipynb`: Quantitative comparison, shortfalls, and novel advancements vs. Andreoni et al. (2020).
 - `notebooks/05_sample_convergence_analysis.ipynb`: Statistical convergence across 10k, 100k, 1M, and 10M transients, Poisson $1/\sqrt{N_{\rm det}}$ error decay, zero-detection dropout risk, and memory/walltime scaling.
-sbatch scripts/03_run_prior_vs_at2017gfo_comparison.sh
-sbatch scripts/04_run_andreoni_benchmark_comparison.sh
-```
 
-### Review Interactive Notebooks
-Launch Jupyter:
-```bash
-jupyter lab notebooks/
-```
-Open any of:
-- `notebooks/01_large_scale_rate_limits_analysis.ipynb`
-- `notebooks/02_granular_criteria_sweep_analysis.ipynb`
-- `notebooks/03_prior_vs_at2017gfo_analysis.ipynb`
-- `notebooks/04_historical_andreoni_comparison_analysis.ipynb`
+---
+
+## 4. HPC Job Telemetry & Resource Rightsizing Tracker
+
+To rightsize Slurm allocations, minimize queue wait times, and avoid OOM kills or over-allocation penalties on MSI (`msismall`), the repository includes an automated telemetry tracking and predictive scaling engine in `telemetry/`:
+
+- **Version-Controlled Registry**: `telemetry/job_resource_registry.csv` tracks historical job submissions, queue wait times, submit hour-of-day, requested vs. consumed physical RAM (`MaxRSS`), CPU efficiency, and simulation parameters.
+- **Empirical Scaling Model**: `telemetry/scaling_models.json` stores fitted linear scaling models ($\text{RAM}(N)$, $\text{Walltime}(N)$, $\text{Storage}(N)$).
+
+### Quick CLI Commands
+
+1. **Harvest & Update Registry from Slurm `sacct` and local logs**:
+   ```bash
+   ./scripts/update_telemetry.sh
+   # Or via Python module:
+   python -m telemetry update
+   ```
+
+2. **Display Telemetry & Queue Wait Report**:
+   ```bash
+   python -m telemetry report
+   ```
+
+3. **Get Rightsizing Recommendations for Proposed Simulation**:
+   ```bash
+   python -m telemetry rightsize --model Bu2026Fixed --n-transients 1000000
+   ```
+   Outputs exact `#SBATCH` directives (`--mem`, `--time`, `--cpus-per-task`) along with queue placement advice (e.g., fast backfill eligibility vs. high-memory node wait).
+
+4. **Automate via Hourly Cron or Background Daemon**:
+   - **System / Cluster Crontab**: Install an hourly cron job that auto-updates and commits telemetry changes:
+     ```bash
+     ./scripts/install_cron.sh --install     # Installs '0 * * * *' into user crontab
+     ./scripts/install_cron.sh --status      # Checks cron status and recent log
+     ./scripts/install_cron.sh --uninstall   # Removes telemetry cron entry
+     ```
+   - **Background Daemon Runner** (alternative when user crontabs are restricted on cluster nodes):
+     ```bash
+     ./scripts/run_telemetry_daemon.sh start  # Starts persistent background loop (1h interval)
+     ./scripts/run_telemetry_daemon.sh status # Checks daemon PID and tail log
+     ./scripts/run_telemetry_daemon.sh stop   # Stops the daemon
+     ```

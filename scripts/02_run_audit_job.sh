@@ -66,4 +66,7 @@ python analysis_suites/02_granular_criteria_sweep/audit_granular_sweep.py \
     --output-csv results/02_granular_criteria_sweep/granular_sweep_metrics.csv \
     --ranking-csv results/02_granular_criteria_sweep/criteria_sensitivity_ranking.csv
 
-echo "Audit and aggregation completed successfully at $(date)."
+echo "Updating Job Telemetry & Resource Rightsizing Registry..."
+python -m telemetry update || true
+
+echo "Audit, aggregation, and telemetry tracking completed successfully at $(date)."
