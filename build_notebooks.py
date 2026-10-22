@@ -112,7 +112,11 @@ The historical scripts in `defunct/` suffered from critical architectural bottle
 - Comprehensive logging to `logs/01_large_scale_rate_limits/`."""),
 
     code_cell(r"""# Ingest simulation benchmark data
-bench_csv = Path('results/rate_limit_benchmark.csv')
+bench_csv = Path('results/01_large_scale_rate_limits/rate_limit_summary.csv')
+if not bench_csv.exists():
+    bench_csv = Path('../results/01_large_scale_rate_limits/rate_limit_summary.csv')
+if not bench_csv.exists():
+    bench_csv = Path('results/rate_limit_benchmark.csv')
 if not bench_csv.exists():
     raise FileNotFoundError(f"Benchmark file not found: {bench_csv}")
 
