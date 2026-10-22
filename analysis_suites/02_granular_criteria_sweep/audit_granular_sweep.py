@@ -35,10 +35,17 @@ except ImportError:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit and analyze detection criteria sweep results.")
+    
+    default_root = "results/02_granular_criteria_sweep"
+    user = os.environ.get("USER", "")
+    scratch_candidate = f"/scratch.global/{user}/kn-rates/02_granular_criteria_sweep"
+    if user and os.path.isdir(scratch_candidate):
+        default_root = scratch_candidate
+
     parser.add_argument(
         "--sweep-root",
-        default="results/02_granular_criteria_sweep",
-        help="Root directory containing criteria sweep subdirectories.",
+        default=default_root,
+        help="Root directory containing criteria sweep subdirectories (default: auto-detected scratch or results).",
     )
     parser.add_argument(
         "--output-csv",
