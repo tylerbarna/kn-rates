@@ -12,20 +12,20 @@
 #
 # HPC Calibration & Partition Alignment:
 #   - 1M Transients Profile (calibrated against MSI Agate Job 14237734):
-#       * Peak Memory RSS: ~24.8 GB RAM (fits on ANY standard 248-755 GB node)
+#       * Peak Memory RSS: ~25-100+ GB depending on detection volume / data structures
 #       * Wall-clock Time: ~40 minutes per realization (with 8-16 threads)
 #   - Allocation:
 #       * #SBATCH -p msismall
-#       * #SBATCH --mem=32g (generous cushion for ~25 GB footprint)
+#       * #SBATCH --mem=128g (expanded to 128 GB to prevent OOM kills)
 #       * #SBATCH --cpus-per-task=8
 #       * #SBATCH --time=02:00:00 (3x cushion for ~40m runtime)
-#       * #SBATCH --array=0-29 (30 tasks: 10 per model by default)
+#       * #SBATCH --array=0-29 (overridden dynamically via submit_1M_randomized_suite01.sh)
 # ==============================================================================
 #SBATCH -p msismall
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32g
+#SBATCH --mem=128g
 #SBATCH --tmp=20g
 #SBATCH --array=0-29
 #SBATCH --mail-type=BEGIN,END,FAIL
