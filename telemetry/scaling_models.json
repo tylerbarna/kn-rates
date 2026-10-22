@@ -1,6 +1,6 @@
 {
   "last_updated": "Tue Oct 20 21:06:25 CDT 2026",
-  "total_tracked_jobs": 19,
+  "total_tracked_jobs": 50,
   "scaling_models": {
     "Metzger": {
       "ram_gb_per_million": 25.556,
@@ -24,20 +24,20 @@
   "queue_characteristics": {
     "by_memory_tier": {
       "Standard (<= 32 GB)": {
-        "count": 13,
-        "mean_min": 1.23,
+        "count": 19,
+        "mean_min": 0.84,
         "median_min": 0.0,
         "max_min": 12.0
       },
       "Medium (33 - 128 GB)": {
-        "count": 1,
+        "count": 5,
         "mean_min": 0.0,
         "median_min": 0.0,
         "max_min": 0.0
       },
       "High-Memory (129 - 755 GB)": {
-        "count": 5,
-        "mean_min": 18.0,
+        "count": 26,
+        "mean_min": 3.46,
         "median_min": 0.0,
         "max_min": 90.0
       }
@@ -102,19 +102,19 @@
     },
     "by_batch_size": {
       "Single Task (1)": {
-        "count": 14,
-        "mean_min": 7.57,
+        "count": 39,
+        "mean_min": 2.72,
         "median_min": 0.0,
         "max_min": 90.0
       },
       "Small Array (2 - 50)": {
-        "count": 2,
+        "count": 5,
         "mean_min": 0.0,
         "median_min": 0.0,
         "max_min": 0.0
       },
       "Massive Array (> 50)": {
-        "count": 3,
+        "count": 6,
         "mean_min": 0.0,
         "median_min": 0.0,
         "max_min": 0.0
