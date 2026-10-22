@@ -23,10 +23,13 @@ The project is structured into five distinct, modular suites:
 kn-rates/
 ├── scripts/
 │   ├── 01_run_large_scale_rate_limits.sh          # 10M transients large-scale simulation (Metzger, Bu2026Fixed, Bu2026Vary)
+│   ├── 01_run_large_scale_1M_randomized.sh        # 1M transients randomized parameter distribution array (30 tasks)
+│   ├── 01_aggregate_and_build_distributions.sh    # Post-processing aggregator & Notebook 01 distribution builder
 │   ├── 02_run_granular_criteria_sweep.sh          # Granular detection criteria sweep script (2,592 array tasks)
 │   ├── 03_run_prior_vs_at2017gfo_comparison.sh    # Comparison: broad prior vs AT2017gfo-like
 │   ├── 04_run_andreoni_benchmark_comparison.sh    # Benchmark comparison against Andreoni et al. (2020)
 │   ├── 05_run_sample_convergence.sh               # Statistical convergence grid (10k, 100k, 1M, 10M)
+│   ├── submit_1M_randomized_suite01.sh            # Launcher for 1M randomized simulation + auto-aggregation
 │   ├── submit_all_suites.sh                       # High-throughput cluster launcher with automatic job dependencies
 │   └── run_all_sequential_monolithic.sh           # 96-hour self-contained sequential runner
 ├── analysis_suites/
@@ -134,6 +137,9 @@ Run individual analysis suites:
 ```bash
 # 1. Large-scale rate limit simulation (100k test or 10M production)
 python analysis_suites/01_large_scale_rate_limits/run_large_scale_simulation.py --model Bu2026Fixed --n-transients 100000
+
+# 1b. 1M transients randomized parameter suite on Slurm cluster (generates rich distributions for Notebook 01):
+bash scripts/submit_1M_randomized_suite01.sh 0-29
 
 # 2. Granular detection criteria sweep
 python analysis_suites/02_granular_criteria_sweep/run_granular_sweep.py --slice-param snr_threshold --n-transients 10000
