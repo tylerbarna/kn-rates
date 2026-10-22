@@ -208,12 +208,12 @@ def parse_args() -> argparse.Namespace:
         "--exclude-non-detections",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Omit bulky 8-year non-detection history arrays from serialized JSONs (saves >90% disk space; default: True).",
+        help="Omit bulky 8-year non-detection history arrays from serialized JSONs (saves >90%% disk space; default: True).",
     )
     parser.add_argument(
         "--compact-summary-only",
         action="store_true",
-        help="Save only rate summaries and detection metrics without lightcurves (~0.4 KB/point, >99.9% disk savings).",
+        help="Save only rate summaries and detection metrics without lightcurves (~0.4 KB/point, >99.9%% disk savings).",
     )
     parser.add_argument(
         "--scratch-dir",
