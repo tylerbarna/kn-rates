@@ -13,11 +13,11 @@
 # ==============================================================================
 # Resource allocations aligned with MSI msismall partition (3900 MB/core):
 #SBATCH -p msismall
-#SBATCH --time=01:00:00
+#SBATCH --time=02:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=32g
-#SBATCH --tmp=10g
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=128g
+#SBATCH --tmp=30g
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
 #SBATCH --job-name=kn_prior_vs_at2017gfo
@@ -55,7 +55,8 @@ echo "Hostname:         $(hostname -f)"
 echo "Date/Time:        $(date)"
 echo "=============================================================================="
 
-N_TRANSIENTS="${N_TRANSIENTS:-100000}"
+# Use 1,000,000 transients to prevent zero-detection dropouts and small-N Poisson spikes
+N_TRANSIENTS="${N_TRANSIENTS:-1000000}"
 N_RUNS="${N_RUNS:-3}"
 SEED="${SEED:-20261020}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/03_prior_vs_at2017gfo}"
