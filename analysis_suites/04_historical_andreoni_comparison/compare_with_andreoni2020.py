@@ -100,7 +100,10 @@ def generate_quantitative_comparison(df: pd.DataFrame) -> pd.DataFrame:
         vt_mean = sub_fixed["effective_vt_gpc3_yr"].mean()
         r95_8yr = sub_fixed["rate_95_zero_events"].mean()
         dur_8yr = sub_fixed["survey_duration_years"].median()
-        r95_scaled = r95_8yr * (dur_8yr / t_andreoni)
+        # Backward scaling: what our rate limit would have been at 1.92 years
+        our_equiv_1_92yr = r95_8yr * (dur_8yr / t_andreoni)
+        # Forward scaling: what Andreoni's limit would project to over 8.01 years
+        andreoni_proj_8yr = 1775.0 * (t_andreoni / dur_8yr)
         
         records.append({
             "Comparison_Axis": "Fixed Orientation (Polar / Face-on)",
@@ -108,12 +111,13 @@ def generate_quantitative_comparison(df: pd.DataFrame) -> pd.DataFrame:
             "Our_Survey_Duration_Yrs": dur_8yr,
             "Our_Mean_VT_eff_Gpc3_yr": vt_mean,
             "Our_Raw_R95_Gpc3_yr": r95_8yr,
-            "Our_Duration_Scaled_R95": r95_scaled,
+            "Our_Equivalent_R95_at_1_92yr": our_equiv_1_92yr,
             "Andreoni_Model": "Kasen (2017) 0.05 Msun / Bulla fixed",
             "Andreoni_Duration_Yrs": t_andreoni,
-            "Andreoni_R95_Gpc3_yr": 1775.0,
+            "Andreoni_R95_Published_1_92yr": 1775.0,
+            "Andreoni_Projected_8yr_R95": andreoni_proj_8yr,
             "Raw_Improvement_Factor": 1775.0 / r95_8yr,
-            "Duration_Scaled_Ratio": r95_scaled / 1775.0,
+            "Duration_Scaled_Ratio": our_equiv_1_92yr / 1775.0,
         })
 
     # 2. Bu2026Vary vs Andreoni Isotropic (4029 Gpc^-3 yr^-1)
@@ -122,7 +126,8 @@ def generate_quantitative_comparison(df: pd.DataFrame) -> pd.DataFrame:
         vt_mean = sub_vary["effective_vt_gpc3_yr"].mean()
         r95_8yr = sub_vary["rate_95_zero_events"].mean()
         dur_8yr = sub_vary["survey_duration_years"].median()
-        r95_scaled = r95_8yr * (dur_8yr / t_andreoni)
+        our_equiv_1_92yr = r95_8yr * (dur_8yr / t_andreoni)
+        andreoni_proj_8yr = 4029.0 * (t_andreoni / dur_8yr)
         
         records.append({
             "Comparison_Axis": "Isotropic Viewing Angle (Angle-Averaged)",
@@ -130,12 +135,13 @@ def generate_quantitative_comparison(df: pd.DataFrame) -> pd.DataFrame:
             "Our_Survey_Duration_Yrs": dur_8yr,
             "Our_Mean_VT_eff_Gpc3_yr": vt_mean,
             "Our_Raw_R95_Gpc3_yr": r95_8yr,
-            "Our_Duration_Scaled_R95": r95_scaled,
+            "Our_Equivalent_R95_at_1_92yr": our_equiv_1_92yr,
             "Andreoni_Model": "Bulla (2019) POSSIS Isotropic",
             "Andreoni_Duration_Yrs": t_andreoni,
-            "Andreoni_R95_Gpc3_yr": 4029.0,
+            "Andreoni_R95_Published_1_92yr": 4029.0,
+            "Andreoni_Projected_8yr_R95": andreoni_proj_8yr,
             "Raw_Improvement_Factor": 4029.0 / r95_8yr,
-            "Duration_Scaled_Ratio": r95_scaled / 4029.0,
+            "Duration_Scaled_Ratio": our_equiv_1_92yr / 4029.0,
         })
 
     # 3. Metzger vs Andreoni Kasen 0.025 Msun (2020 Gpc^-3 yr^-1)
@@ -144,7 +150,8 @@ def generate_quantitative_comparison(df: pd.DataFrame) -> pd.DataFrame:
         vt_mean = sub_metzger["effective_vt_gpc3_yr"].mean()
         r95_8yr = sub_metzger["rate_95_zero_events"].mean()
         dur_8yr = sub_metzger["survey_duration_years"].median()
-        r95_scaled = r95_8yr * (dur_8yr / t_andreoni)
+        our_equiv_1_92yr = r95_8yr * (dur_8yr / t_andreoni)
+        andreoni_proj_8yr = 2020.0 * (t_andreoni / dur_8yr)
         
         records.append({
             "Comparison_Axis": "Analytic / Fast-Ejecta Benchmark",
@@ -152,12 +159,13 @@ def generate_quantitative_comparison(df: pd.DataFrame) -> pd.DataFrame:
             "Our_Survey_Duration_Yrs": dur_8yr,
             "Our_Mean_VT_eff_Gpc3_yr": vt_mean,
             "Our_Raw_R95_Gpc3_yr": r95_8yr,
-            "Our_Duration_Scaled_R95": r95_scaled,
+            "Our_Equivalent_R95_at_1_92yr": our_equiv_1_92yr,
             "Andreoni_Model": "Kasen 0.025 Msun / Hotokezaka (2013)",
             "Andreoni_Duration_Yrs": t_andreoni,
-            "Andreoni_R95_Gpc3_yr": 2020.0,
+            "Andreoni_R95_Published_1_92yr": 2020.0,
+            "Andreoni_Projected_8yr_R95": andreoni_proj_8yr,
             "Raw_Improvement_Factor": 2020.0 / r95_8yr,
-            "Duration_Scaled_Ratio": r95_scaled / 2020.0,
+            "Duration_Scaled_Ratio": our_equiv_1_92yr / 2020.0,
         })
 
     return pd.DataFrame(records)

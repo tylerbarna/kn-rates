@@ -25,6 +25,7 @@ HPC MSI Cluster Scheduling Architecture:
 """
 
 import argparse
+import gc
 import itertools
 import json
 import math
@@ -609,6 +610,8 @@ def main():
             f"Eff: {res['efficiency']:.6f} | "
             f"VT: {res['effective_vt_gpc3_yr']:.4e} | Status: {status}"
         )
+        del res
+        gc.collect()
 
     # Save summary
     if pd is not None:

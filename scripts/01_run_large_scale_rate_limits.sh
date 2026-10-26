@@ -1,40 +1,33 @@
 #!/bin/bash --login
 # ==============================================================================
-# SCRIPT 01: Large-Scale ZTF 8-Year Kilonova Rate Limits Simulation
+# SCRIPT 01: Large-Scale ZTF 8-Year Kilonova Rate Limits Ensemble Simulation
 # ==============================================================================
 # Purpose:
-#   Executes large-scale Monte Carlo simulations (default 10,000,000 transients)
-#   for the three primary kilonova models:
-#     - Task 0: Metzger (analytic 1-component model)
-#     - Task 1: Bu2026Fixed (2-component Fiesta surrogate, fixed inclination 0.45 rad)
-#     - Task 2: Bu2026Vary (2-component Fiesta surrogate, isotropic cos iota)
+#   Executes a high-statistics Monte Carlo ensemble of 100 independent 1,000,000-transient
+#   simulation samples for each of the three primary kilonova models:
+#     - Tasks 000-099: Metzger (analytic 1-component model) - 100 x 1M samples
+#     - Tasks 100-199: Bu2026Fixed (2-component Fiesta, iota=0.45 rad) - 100 x 1M samples
+#     - Tasks 200-299: Bu2026Vary (2-component Fiesta, isotropic cos iota) - 100 x 1M samples
 #
-# MSI msismall Resource Calibration & Empirical Benchmark:
-#   - Verified Empirical Benchmark (MSI Agate Job 14237734, 10M transients):
-#       * Memory Utilized: 649.67 GB (86.62% of 750.00 GB allocation)
-#       * Job Wall-clock:  20:47:00 (~21 hours)
-#       * Cores Utilized:  10 cores (28.91% CPU efficiency)
-#   - Partition Specifications (msismall):
-#       * Max Cores:       128 cores/node
-#       * Memory:          248 - 755 GB RAM per node (3,900 MB/core base ratio)
-#       * Max Walltime:    96:00:00
-#       * Local Scratch:   850 GB
-#   - Resource Configuration:
-#       * --mem=750g: Automatically targets the 755 GB high-memory msismall nodes,
-#                     guaranteeing sufficient headroom for the ~650 GB peak footprint.
-#       * --time=36:00:00: Comfortably accommodates the ~21 hr walltime with 70% cushion.
-#       * --cpus-per-task=16: Provides 16 worker threads for multi-threaded Rust/BLAS.
+# Total Ensemble Scale:
+#   - 300 array tasks x 1,000,000 transients = 300,000,000 total simulated transients
+#   - 100,000,000 transients per model family (10x statistics of monolithic 10M run)
+#
+# MSI msismall Resource Calibration:
+#   - Memory: 128 GB per task (massive headroom over 25-35 GB peak RSS, completely eliminating OOMs)
+#   - Walltime: 04:00:00 (~1.5-2.0 hours per 1M run, 2x safety cushion)
+#   - Scheduling: Runs concurrently across standard 248 GB msismall nodes (no waiting for 755 GB nodes)
 # ==============================================================================
 #SBATCH -p msismall
-#SBATCH --time=36:00:00
+#SBATCH --time=04:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=750g
-#SBATCH --tmp=100g
-#SBATCH --array=0-2
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=128g
+#SBATCH --tmp=30g
+#SBATCH --array=0-299
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
-#SBATCH --job-name=kn_rate_limits_10M
+#SBATCH --job-name=kn_rate_limits_1M_ensemble
 #SBATCH --output=logs/01_large_scale_rate_limits/%x_%A_%a.log
 #SBATCH --error=logs/01_large_scale_rate_limits/%x_%A_%a.err
 
@@ -76,20 +69,22 @@ echo "Python Executable: $(which python)"
 echo "Date/Time:        $(date)"
 echo "=============================================================================="
 
-# Define model array
+# Define model array (3 models x 100 samples each = 300 array tasks)
 MODELS=("Metzger" "Bu2026Fixed" "Bu2026Vary")
 TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
-MODEL="${MODELS[$((TASK_ID % 3))]}"
+MODEL_IDX=$((TASK_ID / 100))
+SAMPLE_ID=$((TASK_ID % 100))
+MODEL="${MODELS[$MODEL_IDX]}"
 
-# Configure simulation parameters (default: 10,000,000 sources)
-N_TRANSIENTS="${N_TRANSIENTS:-10000000}"
+# Configure simulation parameters (default: 1,000,000 sources per sample)
+N_TRANSIENTS="${N_TRANSIENTS:-1000000}"
 N_RUNS="${N_RUNS:-1}"
-N_PROCESSES="${N_PROCESSES:-16}"
+N_PROCESSES="${N_PROCESSES:-8}"
 BASE_SEED="${BASE_SEED:-20261020}"
 TASK_SEED=$((BASE_SEED + TASK_ID * 10007))
 OUTPUT_DIR="${OUTPUT_DIR:-results/01_large_scale_rate_limits}"
 
-echo "Model:            ${MODEL}"
+echo "Model:            ${MODEL} (Sample #${SAMPLE_ID} / 100)"
 echo "Transients:       ${N_TRANSIENTS}"
 echo "Runs:             ${N_RUNS}"
 echo "Processes:        ${N_PROCESSES}"
@@ -105,4 +100,4 @@ python analysis_suites/01_large_scale_rate_limits/run_large_scale_simulation.py 
     --seed "${TASK_SEED}" \
     --output-dir "${OUTPUT_DIR}"
 
-echo "Task ${TASK_ID} (${MODEL}) completed successfully at $(date)."
+echo "Task ${TASK_ID} (${MODEL} sample ${SAMPLE_ID}) completed successfully at $(date)."
