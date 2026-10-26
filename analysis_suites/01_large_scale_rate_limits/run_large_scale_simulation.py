@@ -173,6 +173,8 @@ def build_population(
         params["z_max"] = float(rng.uniform(*bounds["z_max"]))
         if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
             params["vary_inclination"] = (model_name == "Bu2026Vary")
+            if model_name == "Bu2026Fixed":
+                params["inclination_em"] = 0.45  # Keep polar viewing angle fixed (iota=26 deg)
         params.update(overrides)
         if model_name == "Metzger":
             return FixedMetzgerKilonovaPopulation(**params)

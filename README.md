@@ -23,11 +23,14 @@ The project is structured into six distinct, modular suites:
 kn-rates/
 ├── scripts/
 │   ├── 01_run_large_scale_rate_limits.sh          # 10M transients large-scale simulation (Metzger, Bu2026Fixed, Bu2026Vary)
-│   ├── 02_run_granular_criteria_sweep.sh          # Granular detection criteria sweep script (2,016 array tasks, 2 pts/job, 1M transients)
+│   ├── 01_run_large_scale_1M_randomized.sh        # 1M transients randomized parameter distribution array (30 tasks)
+│   ├── 01_aggregate_and_build_distributions.sh    # Post-processing aggregator & Notebook 01 distribution builder
+│   ├── 02_run_granular_criteria_sweep.sh          # Granular detection criteria sweep script (2,592 array tasks)
 │   ├── 03_run_prior_vs_at2017gfo_comparison.sh    # Comparison: broad prior vs AT2017gfo-like
 │   ├── 04_run_andreoni_benchmark_comparison.sh    # Benchmark comparison against Andreoni et al. (2020)
 │   ├── 05_run_sample_convergence.sh               # Statistical convergence grid (10k, 100k, 1M, 10M)
 │   ├── 06_run_inclination_investigation.sh        # Bu2026 Fixed vs Varying inclination angle investigation
+│   ├── submit_1M_randomized_suite01.sh            # Launcher for 1M randomized simulation + auto-aggregation
 │   ├── submit_all_suites.sh                       # High-throughput cluster launcher with automatic job dependencies
 │   └── run_all_sequential_monolithic.sh           # 96-hour self-contained sequential runner
 ├── analysis_suites/
@@ -155,6 +158,10 @@ Run individual analysis suites:
 # 1. Large-scale rate limit simulation (100k test or 10M production)
 python analysis_suites/01_large_scale_rate_limits/run_large_scale_simulation.py --model Bu2026Fixed --n-transients 100000
 
+# 1b. 1M transients randomized parameter suite on Slurm cluster (generates rich distributions for Notebook 01):
+# Usage: bash scripts/submit_1M_randomized_suite01.sh [RUNS_PER_MODEL] (e.g. 10 -> 30 tasks total, 128 GB/task)
+bash scripts/submit_1M_randomized_suite01.sh 10
+
 # 2. Granular detection criteria sweep
 python analysis_suites/02_granular_criteria_sweep/run_granular_sweep.py --slice-param snr_threshold --n-transients 10000
 
@@ -232,8 +239,53 @@ All notebooks are pre-executed with complete cell outputs, figures, and formatti
 - `notebooks/04_historical_andreoni_comparison_analysis.ipynb`: Quantitative comparison, shortfalls, and novel advancements vs. Andreoni et al. (2020).
 - `notebooks/05_sample_convergence_analysis.ipynb`: Statistical convergence across 10k, 100k, 1M, and 10M transients, Poisson $1/\sqrt{N_{\rm det}}$ error decay, zero-detection dropout risk, and memory/walltime scaling.
 - `notebooks/06_bu2026_inclination_discrepancy_investigation.ipynb`: 5-experiment investigation into Bu2026 Fixed vs Varying inclination discrepancy, establishing that the 3.56x rate limit difference is legitimate astrophysics, plus an exhaustive audit and fix of high rate limits in notebooks 02, 03, and 04.
+- `notebooks/job_resource_usage_analysis.ipynb`: Interactive telemetry ingestion, queue latency vs. requested memory/time of day, empirical RAM/walltime scaling fits, and Slurm rightsizer tool.
 
 Launch Jupyter:
 ```bash
 jupyter lab notebooks/
 ```
+
+---
+
+## 4. HPC Job Telemetry & Resource Rightsizing Tracker
+
+To rightsize Slurm allocations, minimize queue wait times, and avoid OOM kills or over-allocation penalties on MSI (`msismall`), the repository includes an automated telemetry tracking and predictive scaling engine in `telemetry/`:
+
+- **Version-Controlled Registry**: `telemetry/job_resource_registry.csv` tracks historical job submissions, queue wait times, submit hour-of-day, requested vs. consumed physical RAM (`MaxRSS`), CPU efficiency, and simulation parameters.
+- **Empirical Scaling Model**: `telemetry/scaling_models.json` stores fitted linear scaling models ($\text{RAM}(N)$, $\text{Walltime}(N)$, $\text{Storage}(N)$).
+
+### Quick CLI Commands
+
+1. **Harvest & Update Registry from Slurm `sacct` and local logs**:
+   ```bash
+   ./scripts/update_telemetry.sh
+   # Or via Python module:
+   python -m telemetry update
+   ```
+
+2. **Display Telemetry & Queue Wait Report**:
+   ```bash
+   python -m telemetry report
+   ```
+
+3. **Get Rightsizing Recommendations for Proposed Simulation**:
+   ```bash
+   python -m telemetry rightsize --model Bu2026Fixed --n-transients 1000000
+   ```
+   Outputs exact `#SBATCH` directives (`--mem`, `--time`, `--cpus-per-task`) along with queue placement advice (e.g., fast backfill eligibility vs. high-memory node wait).
+
+4. **Automate via Hourly Cron or Background Daemon**:
+   - **System / Cluster Crontab**: Install an hourly cron job that auto-updates and commits telemetry changes:
+     ```bash
+     ./scripts/install_cron.sh --install     # Installs '0 * * * *' into user crontab
+     ./scripts/install_cron.sh --status      # Checks cron status and recent log
+     ./scripts/install_cron.sh --uninstall   # Removes telemetry cron entry
+     ```
+   - **Background Daemon Runner** (alternative when user crontabs are restricted on cluster nodes):
+     ```bash
+     ./scripts/run_telemetry_daemon.sh start  # Starts persistent background loop (1h interval)
+     ./scripts/run_telemetry_daemon.sh status # Checks daemon PID and tail log
+     ./scripts/run_telemetry_daemon.sh stop   # Stops the daemon
+     ```
+>>>>>>> origin/main
