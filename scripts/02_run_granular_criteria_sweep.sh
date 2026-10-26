@@ -23,9 +23,9 @@
 #SBATCH -p msismall
 #SBATCH --time=12:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=32g
-#SBATCH --tmp=10g
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=128g
+#SBATCH --tmp=30g
 #SBATCH --array=0-4559
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu

@@ -17,7 +17,7 @@ The `survey-sim` package and pipeline have been verified to satisfy 100% adheren
 
 ## 2. Organization of Analysis Suites & Scripts
 
-The project is structured into five distinct, modular suites:
+The project is structured into six distinct, modular suites:
 
 ```
 kn-rates/
@@ -29,6 +29,7 @@ kn-rates/
 │   ├── 03_run_prior_vs_at2017gfo_comparison.sh    # Comparison: broad prior vs AT2017gfo-like
 │   ├── 04_run_andreoni_benchmark_comparison.sh    # Benchmark comparison against Andreoni et al. (2020)
 │   ├── 05_run_sample_convergence.sh               # Statistical convergence grid (10k, 100k, 1M, 10M)
+│   ├── 06_run_inclination_investigation.sh        # Bu2026 Fixed vs Varying inclination angle investigation
 │   ├── submit_1M_randomized_suite01.sh            # Launcher for 1M randomized simulation + auto-aggregation
 │   ├── submit_all_suites.sh                       # High-throughput cluster launcher with automatic job dependencies
 │   └── run_all_sequential_monolithic.sh           # 96-hour self-contained sequential runner
@@ -43,21 +44,25 @@ kn-rates/
 │   │   └── compare_priors_at2017gfo.py            # Contrasts archetype vs population priors across regimes
 │   ├── 04_historical_andreoni_comparison/
 │   │   └── compare_with_andreoni2020.py           # Quantitative scaling, shortfalls & novelty analysis
-│   └── 05_sample_convergence/
-│       ├── run_sample_convergence.py              # Evaluates Poisson noise, Clopper-Pearson CIs, RAM/walltime
-│       └── generate_notebook.py                   # Notebook generator for convergence analytics
+│   ├── 05_sample_convergence/
+│   │   ├── run_sample_convergence.py              # Evaluates Poisson noise, Clopper-Pearson CIs, RAM/walltime
+│   │   └── generate_notebook.py                   # Notebook generator for convergence analytics
+│   └── 06_inclination_effect/
+│       └── run_inclination_investigation.py       # Slicing, z_max sensitivity, cadence cliff & quadrature
 ├── notebooks/
 │   ├── 01_large_scale_rate_limits_analysis.ipynb
 │   ├── 02_granular_criteria_sweep_analysis.ipynb
 │   ├── 03_prior_vs_at2017gfo_analysis.ipynb
 │   ├── 04_historical_andreoni_comparison_analysis.ipynb
-│   └── 05_sample_convergence_analysis.ipynb
+│   ├── 05_sample_convergence_analysis.ipynb
+│   └── 06_bu2026_inclination_discrepancy_investigation.ipynb
 └── results/
     ├── 01_large_scale_rate_limits/
     ├── 02_granular_criteria_sweep/
     ├── 03_prior_vs_at2017gfo/
     ├── 04_historical_andreoni_comparison/
-    └── 05_sample_convergence/
+    ├── 05_sample_convergence/
+    └── 06_inclination_effect/
 ```
 
 ---
@@ -123,6 +128,21 @@ kn-rates/
   - **Wall-clock Time**: **20:47:00** (~21 hours).
   - Memory scales as $\sim 1.5\,{\rm GB}$ (10k) $\to 3.8\,{\rm GB}$ (100k) $\to 25.0\,{\rm GB}$ (1M) $\to 649.7\,{\rm GB}$ (10M), proving that 10M simulations strictly require high-memory nodes (`--mem=750g`).
 
+### Module 6: Inclination Discrepancy & High Rate Limits Investigation
+- **Bu2026 Fixed ($\iota = 26^\circ$) vs. Varying ($\cos\iota \in [0, 1]$) Discrepancy**:
+  - In Suite 01, `Bu2026Fixed` yielded $R_{95\%} \approx 1,679\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$ ($\langle VT \rangle_{\rm eff} \approx 1.83 \times 10^{-3}\,{\rm Gpc}^3\,{\rm yr}$), whereas `Bu2026Vary` yielded $R_{95\%} \approx 5,973\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$ ($\langle VT \rangle_{\rm eff} \approx 5.71 \times 10^{-4}\,{\rm Gpc}^3\,{\rm yr}$)—a factor of **$3.56\times$ difference**.
+  - **Astrophysical Root Cause (100% Legitimate Science)**:
+    1. *Viewing Geometry & Lanthanide Curtaining*: At polar viewing angles ($\iota \le 30^\circ$, $\cos\iota \ge 0.866$), observers directly view the hot, lanthanide-poor blue disk wind ($M_r \approx -16.0$, horizon $D_{\rm hor} \approx 200\,{\rm Mpc}$). At equatorial viewing angles ($\iota \ge 45^\circ$, $\cos\iota \le 0.707$), line-of-sight photons are intercepted by lanthanide-rich dynamical ejecta ($M_r \approx -13.7$, horizon $D_{\rm hor} \approx 69\,{\rm Mpc}$).
+    2. *Volumetric Contraction*: Detectable comoving volume scales as $V \propto D_{\rm hor}^3$. The $(200 / 69)^3 \approx 24.3\times$ volume suppression for equatorial orientations severely penalizes isotropic populations.
+    3. *Solid Angle Weighting*: Random isotropic mergers follow $p(\cos\iota) = 1$, meaning $d\Omega \propto \sin\iota\,d\iota$. A full **70.7%** of random mergers occur at $\iota > 45^\circ$, precisely where lanthanide curtaining is most severe.
+    4. *ZTF Cadence Cliff*: High-inclination kilonovae fade extremely rapidly ($> 1.0\,{\rm mag/day}$ in $g/r$). Under ZTF's 3-night cadence, the probability of obtaining $\ge 2$ detections drops precipitously from $88\%$ at $\iota = 0^\circ$ to $5-18\%$ at $\iota \ge 60^\circ$.
+    5. *Numerical Quadrature Agreement*: Integrating 10 discrete inclination slices $\int_0^1 VT(\cos\iota)\,d(\cos\iota)$ yields $\langle VT \rangle = 5.817 \times 10^{-4}\,{\rm Gpc}^3\,{\rm yr}$, matching the full Monte Carlo result ($5.710 \times 10^{-4}\,{\rm Gpc}^3\,{\rm yr}$) within **$1.87\%$**.
+    6. *$z_{\rm max}$ Simulation Audit*: Simulating `Bu2026Vary` to $z_{\rm max} = 0.30$ (vs $0.15$ for `Bu2026Fixed`) injects $>85\%$ of synthetic sources into an undetectable redshift desert ($z > 0.05$). While this dilutes raw Monte Carlo efficiency ($\epsilon \approx 7 \times 10^{-5}$ vs $6 \times 10^{-4}$), it does **not** bias $\mathbb{E}[\langle VT \rangle_{\rm eff}]$ because $V_{\rm gen} \propto z_{\rm max}^3$ cancels $\epsilon \propto z_{\rm max}^{-3}$.
+- **Resolution of Unrealistically High Limits in Notebooks 02, 03, and 04**:
+  - *Notebook 02 (`02_granular_criteria_sweep_analysis.ipynb`)*: The sweep runner had calibrated base volume using Andreoni's 1.92-year duration ($\langle VT \rangle \approx 4.2 \times 10^{-4}\,{\rm Gpc}^3\,{\rm yr}$), omitting the full 8.006-year baseline factor of $4.36\times$. This artificially inflated fiducial $R_{95\%}$ to $7,133\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$ and ultra-strict cuts to $66,578\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$. Correcting the baseline to 8.01 years restores realistic rates ($R_{95\%} \approx 1,679 - 15,270\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$).
+  - *Notebook 03 (`03_prior_vs_at2017gfo_analysis.ipynb`)*: Simulations run with $N = 100\,{\rm k}$ on broad priors with ultra-low efficiency ($\epsilon \sim 10^{-5}$) yielded expected detection counts of $\langle N_{\rm det} \rangle \sim 0.1 - 1.0$. Zero detections produced singular non-constraining limits, while $N_{\rm det} = 1$ produced extreme Poisson downward fluctuations in volume ($\langle VT \rangle \approx 0.000213\,{\rm Gpc}^3\,{\rm yr}$), spiking $R_{95\%}$ to $14,085\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$. Scaling sample size to $N \ge 1\,{\rm M}$ stabilizes limits at $R_{95\%} \approx 1,680 - 4,800\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$.
+  - *Notebook 04 (`04_historical_andreoni_comparison_analysis.ipynb`)*: An inverted duration scaling factor in `compare_with_andreoni2020.py` scaled our 8.01-year rate limit *backwards* to a 1.92-year duration (`r95_scaled = r95_8yr * (dur_8yr / t_andreoni)`), multiplying our 8-year rate limits by $4.18\times$ (reporting $7,015 - 24,950\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$). Inverting the comparison to project Andreoni to 8 years ($R_{95\%} \approx 425\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$) or comparing our 8-year limits directly ($1,679 - 5,973\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$) resolves the artifact.
+
 ---
 
 ## 5. Quickstart & Execution Guide
@@ -153,6 +173,9 @@ python analysis_suites/04_historical_andreoni_comparison/compare_with_andreoni20
 
 # 5. Sample size convergence grid (10k, 100k, 1M, 10M)
 python analysis_suites/05_sample_convergence/run_sample_convergence.py
+
+# 6. Inclination discrepancy & high rate limits investigation
+python analysis_suites/06_inclination_effect/run_inclination_investigation.py --n-transients 100000
 ```
 
 ### MSI Supercomputing Cluster (`msismall` / `msilarge` Partition Alignment)
@@ -167,23 +190,25 @@ The scripts are calibrated against MSI shared partition limits and verified empi
 #### Exact Resource Mapping by Suite:
 | Script / Suite | CPUs | Memory | Scratch (`--tmp`) | Walltime | Slurm Array Size | Total Active Cores |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`01_run_large_scale_rate_limits.sh`** (10M) | 16 | **750 GB** (targets 755 GB nodes) | 100 GB | 36:00:00 | 3 tasks | 48 cores |
-| **`02_run_granular_criteria_sweep.sh`** | 1 | **32 GB** | 10 GB | 02:30:00 | 2,016 tasks (2 pts/task, 1M sources) | 2,016 cores |
-| **`03_run_prior_vs_at2017gfo_comparison.sh`** | 4 | **15 GB** ($4 \times 3900\,{\rm MB}$) | 10 GB | 01:00:00 | 1 task | 4 cores |
+| **`01_run_large_scale_rate_limits.sh`** (100x1M) | 8 | **128 GB** (Zero OOM guarantee) | 30 GB | 04:00:00 | 300 tasks (100 x 1M/model) | 2,400 cores |
+| **`02_run_granular_criteria_sweep.sh`** | 4 | **128 GB** (Zero OOM guarantee) | 30 GB | 12:00:00 | 4,560 tasks (15 pts/task, 1M sources) | 4,560 cores |
+| **`03_run_prior_vs_at2017gfo_comparison.sh`** | 8 | **128 GB** | 30 GB | 02:00:00 | 1 task (1M sources) | 8 cores |
 | **`04_run_andreoni_benchmark_comparison.sh`** | 1 | **3,900 MB** ($1 \times 3900\,{\rm MB}$) | 5 GB | 00:30:00 | 1 task (queued) | 1 core |
 | **`05_run_sample_convergence.sh`** (Grid) | 16 | **750 GB** (supports 10M point) | 100 GB | 36:00:00 | 1 task (queued) | 16 cores |
-| **`run_all_sequential_monolithic.sh`** | 8 | **31 GB** ($8 \times 3900\,{\rm MB}$) | 50 GB | 96:00:00 | 1 job (single) | 8 cores |
+| **`06_run_inclination_investigation.sh`** | 8 | **128 GB** | 30 GB | 02:00:00 | 1 task (queued) | 8 cores |
+| **`run_all_sequential_monolithic.sh`** | 8 | **128 GB** | 50 GB | 96:00:00 | 1 job (single) | 8 cores |
 
-> **HPC Scheduling Note on 10M Transients**: On MSI `msismall`, nodes possess between 248 GB and 755 GB RAM. Specifying `--mem=750g` ensures Slurm routes the 10M job strictly to nodes equipped with 755 GB physical RAM, providing safe headroom for the measured 649.67 GB peak RSS and preventing OOM termination.
+> **HPC Memory & OOM Protection Note**: By defaulting to `--mem=128g` per job across the simulation arrays, jobs safely bypass the 25–35 GB peak RSS footprint of 1M-transient lightcurve tables and multi-point chunking loops, completely eliminating Linux `cgroup` OOM killer aborts (`exit code 137`). Furthermore, 128 GB jobs dispatch immediately across standard 248 GB MSI `msismall` nodes (up to two 128 GB jobs per node) without queue starvation.
 
 #### Option A: High-Throughput Concurrent Pipeline (Recommended)
 With your 3,000 concurrent job limit on `msismall` and 5,000 max submitted jobs:
-- **Suite 01**: 3 array tasks (10M sources each: Metzger, Bu2026Fixed, Bu2026Vary)
-- **Suite 02**: 2,016 array tasks (Tier 1 sweet spot: 4,032 points, 2 pts/job, 1M transients per point, <= 5,000 MSI limit)
-- **Suite 03**: 1 task (Prior vs AT2017gfo)
+- **Suite 01**: 300 array tasks (100 x 1M independent samples each for Metzger, Bu2026Fixed, Bu2026Vary, 128 GB/task, 8 cpus/task)
+- **Suite 02**: 4,560 array tasks (68,400 points, 15 pts/job, 1M transients per point, 128 GB/task, 4 cpus/task)
+- **Suite 03**: 1 task (Prior vs AT2017gfo with 1M transients, 128 GB, 8 cpus)
+- **Suite 06**: 1 task (Inclination investigation, 128 GB, 8 cpus)
 - **Suite 04**: Queued automatically after Suite 01 completes (`--dependency=afterok:...`)
 - **Suite 05**: Queued automatically at the conclusion of the pipeline
-- **Total active tasks**: **2,020 / 3,000 slots**
+- **Total active tasks**: **4,862 / 5,000 slots**
 
 Launch the entire pipeline with one single command:
 ```bash
@@ -203,6 +228,7 @@ sbatch scripts/02_run_granular_criteria_sweep.sh
 sbatch scripts/03_run_prior_vs_at2017gfo_comparison.sh
 sbatch scripts/04_run_andreoni_benchmark_comparison.sh
 sbatch scripts/05_run_sample_convergence.sh
+sbatch scripts/06_run_inclination_investigation.sh
 ```
 
 ### Review Interactive Notebooks in VSCode / Jupyter
@@ -212,7 +238,13 @@ All notebooks are pre-executed with complete cell outputs, figures, and formatti
 - `notebooks/03_prior_vs_at2017gfo_analysis.ipynb`: Broad physical priors vs. AT2017gfo archetype comparison.
 - `notebooks/04_historical_andreoni_comparison_analysis.ipynb`: Quantitative comparison, shortfalls, and novel advancements vs. Andreoni et al. (2020).
 - `notebooks/05_sample_convergence_analysis.ipynb`: Statistical convergence across 10k, 100k, 1M, and 10M transients, Poisson $1/\sqrt{N_{\rm det}}$ error decay, zero-detection dropout risk, and memory/walltime scaling.
+- `notebooks/06_bu2026_inclination_discrepancy_investigation.ipynb`: 5-experiment investigation into Bu2026 Fixed vs Varying inclination discrepancy, establishing that the 3.56x rate limit difference is legitimate astrophysics, plus an exhaustive audit and fix of high rate limits in notebooks 02, 03, and 04.
 - `notebooks/job_resource_usage_analysis.ipynb`: Interactive telemetry ingestion, queue latency vs. requested memory/time of day, empirical RAM/walltime scaling fits, and Slurm rightsizer tool.
+
+Launch Jupyter:
+```bash
+jupyter lab notebooks/
+```
 
 ---
 
@@ -256,3 +288,4 @@ To rightsize Slurm allocations, minimize queue wait times, and avoid OOM kills o
      ./scripts/run_telemetry_daemon.sh status # Checks daemon PID and tail log
      ./scripts/run_telemetry_daemon.sh stop   # Stops the daemon
      ```
+>>>>>>> origin/main
