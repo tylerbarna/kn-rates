@@ -1,0 +1,27 @@
+==============================================================================
+SUBMITTING 1M RANDOMIZED KILONOVA RATE LIMIT PIPELINE
+Project Directory: /users/8/barna314/kn-rates
+Models:            Metzger, Bu2026Fixed, Bu2026Vary (3 models)
+Runs per Model:    100
+Total Array Tasks: 300 (array range: 0-299)
+Memory per Task:   128 GB
+Date/Time:         Thu Oct 22 14:47:31 CDT 2026
+==============================================================================
+--> Submitting 1M randomized simulation array (tasks 0-299)...
+sbatch: Setting account: cough052
+    Simulation Job ID: 4478314
+--> Submitting post-processing aggregator & notebook generator (afterok:4478314)...
+sbatch: Setting account: cough052
+    Aggregator Job ID: 4478315
+==============================================================================
+PIPELINE SUBMITTED SUCCESSFULLY
+==============================================================================
+  1. Simulation Array: 4478314 (0-299)
+  2. Distribution Aggregator: 4478315 (queued on 4478314)
+
+Monitor status with:
+  squeue -u $USER
+
+Logs will be written to:
+  logs/01_large_scale_rate_limits/
+==============================================================================

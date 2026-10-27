@@ -25,7 +25,7 @@
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=128g
+#SBATCH --mem=256g
 #SBATCH --tmp=20g
 #SBATCH --array=0-29
 #SBATCH --mail-type=BEGIN,END,FAIL

@@ -1,0 +1,45 @@
+==============================================================================
+LAUNCHING COMPLETE ZTF 8-YEAR KILONOVA SIMULATION & ANALYSIS PIPELINE
+Project Directory: /users/8/barna314/kn-rates
+Current Date/Time: Mon Oct 26 14:34:58 CDT 2026
+==============================================================================
+[1/6] Submitting Suite 01 (100 x 1M Ensemble Rate Limits, 300 array tasks, 128GB/task)...
+sbatch: Setting account: cough052
+  --> Job ID: 4735810
+[2/6] Submitting Suite 02 (Granular Criteria Sweep, 4,560 array tasks, 128GB/task)...
+sbatch: Setting account: cough052
+  --> Job ID: 4735811
+[3/6] Submitting Suite 03 (Broad Priors vs AT2017gfo Comparison, 1 task, 1M transients, 128GB)...
+sbatch: Setting account: cough052
+  --> Job ID: 4735813
+[4/6] Submitting Suite 06 (Inclination Discrepancy Investigation, 1 task, 128GB)...
+sbatch: Setting account: cough052
+  --> Job ID: 4735815
+[5/6] Submitting Suite 04 (Historical Andreoni Comparison, afterok:4735810)...
+sbatch: Setting account: cough052
+  --> Job ID: 4735816 (queued on Suite 01)
+[+] Submitting Sweep Audit & Sensitivity Analysis (afterok:4735811)...
+sbatch: Setting account: cough052
+  --> Job ID: 4735817 (queued on Suite 02)
+[6/6] Submitting Suite 05 (Sample Size Convergence Grid, afterok:4735816)...
+sbatch: Setting account: cough052
+  --> Job ID: 4735946 (queued on Suite 04 to run at pipeline conclusion)
+==============================================================================
+PIPELINE SUBMISSION SUMMARY
+==============================================================================
+  Suite 01 (100x1M Ensemble Rate Limits): 4735810 (300 tasks @ 128 GB)
+  Suite 02 (Criteria Sweep 4,560 tasks):  4735811 (4,560 tasks @ 128 GB)
+  Suite 03 (Prior vs AT2017gfo 1M):       4735813 (1 task @ 128 GB)
+  Suite 04 (Andreoni Comparison):         4735816 (dependent on 4735810)
+  Suite 05 (Sample Convergence Grid):     4735946 (dependent on 4735816)
+  Suite 06 (Inclination Study):           4735815 (1 task @ 128 GB)
+  Audit    (Criteria Sweep Audit):        4735817 (dependent on 4735811)
+------------------------------------------------------------------------------
+Total Active Concurrent Slots:            4,862 / 5,000 max queue limit
+Estimated Time to Completion:             ~2 to 4 hours total wall-clock time
+OOM Protection:                           All memory allocations boosted to 128 GB
+------------------------------------------------------------------------------
+To monitor status across the cluster:
+  squeue -u $USER
+==============================================================================
+[2026-10-26T14:36:07.007] error: *** JOB 4735752 ON acn01 CANCELLED AT 2026-10-26T14:36:07 DUE TO TIME LIMIT ***
