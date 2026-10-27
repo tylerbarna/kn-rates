@@ -1,6 +1,6 @@
 {
   "last_updated": "",
-  "total_tracked_jobs": 28547,
+  "total_tracked_jobs": 30200,
   "scaling_models": {
     "Metzger": {
       "ram_gb_per_million": 25.556,
@@ -33,21 +33,21 @@
   "queue_characteristics": {
     "by_memory_tier": {
       "Standard (<= 32 GB)": {
-        "count": 10530,
-        "mean_min": 12.78,
+        "count": 11360,
+        "mean_min": 11.85,
         "median_min": 0.0,
         "max_min": 638.25
       },
       "Medium (33 - 128 GB)": {
-        "count": 7577,
-        "mean_min": 186.04,
-        "median_min": 71.5,
-        "max_min": 926.47
+        "count": 7872,
+        "mean_min": 215.74,
+        "median_min": 74.43,
+        "max_min": 1075.12
       },
       "High-Memory (129 - 755 GB)": {
-        "count": 4363,
-        "mean_min": 1571.08,
-        "median_min": 686.97,
+        "count": 4460,
+        "mean_min": 1537.39,
+        "median_min": 633.07,
         "max_min": 3877.18
       }
     },
@@ -77,10 +77,10 @@
         "max_min": 12.0
       },
       "10": {
-        "count": 2,
-        "mean_min": 15.28,
-        "median_min": 15.28,
-        "max_min": 30.53
+        "count": 99,
+        "mean_min": 21.91,
+        "median_min": 1.3,
+        "max_min": 202.33
       },
       "11": {
         "count": 2,
@@ -95,10 +95,10 @@
         "max_min": 2744.95
       },
       "14": {
-        "count": 4984,
-        "mean_min": 249.71,
-        "median_min": 74.92,
-        "max_min": 926.47
+        "count": 5279,
+        "mean_min": 290.44,
+        "median_min": 78.43,
+        "max_min": 1075.12
       },
       "15": {
         "count": 1016,
@@ -145,15 +145,15 @@
     },
     "by_day_of_week": {
       "Mon": {
-        "count": 7452,
-        "mean_min": 1011.57,
-        "median_min": 487.54,
+        "count": 7747,
+        "mean_min": 1010.31,
+        "median_min": 528.43,
         "max_min": 3877.18
       },
       "Tue": {
-        "count": 2615,
-        "mean_min": 54.99,
-        "median_min": 49.37,
+        "count": 2712,
+        "mean_min": 53.81,
+        "median_min": 49.32,
         "max_min": 1648.02
       },
       "Wed": {
@@ -177,9 +177,9 @@
     },
     "by_batch_size": {
       "Single Task (1)": {
-        "count": 22454,
-        "mean_min": 373.98,
-        "median_min": 43.38,
+        "count": 23676,
+        "mean_min": 366.96,
+        "median_min": 40.02,
         "max_min": 3877.18
       },
       "Small Array (2 - 50)": {
