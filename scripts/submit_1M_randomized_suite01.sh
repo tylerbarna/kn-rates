@@ -36,7 +36,7 @@ NUM_MODELS=3
 TOTAL_TASKS=$(( RUNS_PER_MODEL * NUM_MODELS ))
 ARRAY_RANGE="0-$(( TOTAL_TASKS - 1 ))"
 
-mkdir -p logs/01_large_scale_rate_limits results/01_large_scale_rate_limits
+mkdir -p logs/01_large_scale_rate_limits_randomized results/01_large_scale_rate_limits_randomized
 
 # If running interactively outside Slurm batch, log to timestamped file in logs/
 if [ -z "${SLURM_JOB_ID:-}" ] && [ -t 1 ]; then
@@ -51,7 +51,8 @@ echo "Project Directory: ${PROJECT_DIR}"
 echo "Models:            Metzger, Bu2026Fixed, Bu2026Vary (${NUM_MODELS} models)"
 echo "Runs per Model:    ${RUNS_PER_MODEL}"
 echo "Total Array Tasks: ${TOTAL_TASKS} (array range: ${ARRAY_RANGE})"
-echo "Memory per Task:   256 GB"
+echo "Memory per Task:   128 GB"
+echo "Output Directory:  results/01_large_scale_rate_limits_randomized"
 echo "Date/Time:         $(date)"
 echo "Execution Host:    $(hostname -f 2>/dev/null || hostname)"
 echo "Slurm Job ID:      ${SLURM_JOB_ID:-INTERACTIVE_SHELL}"

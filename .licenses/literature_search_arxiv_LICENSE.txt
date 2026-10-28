@@ -1,0 +1,8 @@
+Notice: arXiv API and Literature Search License Terms
+Timestamp: 2026-10-28T15:28:00-05:00
+
+Please note the terms of use for arXiv and its API at:
+https://info.arxiv.org/help/api/index.html
+
+Always check the license of the papers retrieved by the literature search skill for any restrictions (e.g. arXiv non-exclusive license to distribute, Creative Commons licenses, etc.).
+Maximum 1 request every 3 seconds to arXiv endpoints.

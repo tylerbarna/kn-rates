@@ -49,25 +49,32 @@ else
     echo "Warning: No standard conda environment matched; using currently active environment: $(which python)"
 fi
 
+TARGET_DIR="${1:-results/01_large_scale_rate_limits}"
+OUTPUT_CSV="${TARGET_DIR}/rate_limit_summary.csv"
+
 echo "=============================================================================="
-echo "AGGREGATING 1M RANDOMIZED KILONOVA RATE LIMIT SIMULATION RUNS"
+echo "AGGREGATING KILONOVA RATE LIMIT SIMULATION RUNS"
 echo "Project Directory: ${PROJECT_DIR}"
+echo "Target Directory:  ${TARGET_DIR}"
+echo "Output CSV:        ${OUTPUT_CSV}"
 echo "Date/Time:         $(date)"
 echo "=============================================================================="
 
 # 1. Aggregate simulation JSONs into rate_limit_summary.csv
-echo "[1/3] Ingesting serialized JSON outputs..."
+echo "[1/3] Ingesting serialized JSON outputs from ${TARGET_DIR}..."
 python analysis_suites/01_large_scale_rate_limits/aggregate_rate_limits.py \
-    --glob "results/01_large_scale_rate_limits/*/*.json" \
-    --output-csv "results/01_large_scale_rate_limits/rate_limit_summary.csv"
+    --glob "${TARGET_DIR}/*/*.json" \
+    --output-csv "${OUTPUT_CSV}"
 
-# Also sync to results/rate_limit_benchmark.csv for compatibility with suite 04
-cp results/01_large_scale_rate_limits/rate_limit_summary.csv results/rate_limit_benchmark.csv 2>/dev/null || true
+# Only sync canonical fiducial suite to benchmark CSV if not running randomized target
+if [ "${TARGET_DIR}" = "results/01_large_scale_rate_limits" ]; then
+    cp "${OUTPUT_CSV}" results/rate_limit_benchmark.csv 2>/dev/null || true
+fi
 
 # 2. Update historical comparison with Andreoni (2020)
 echo "[2/3] Updating comparative analysis with Andreoni et al. (2020)..."
 python analysis_suites/04_historical_andreoni_comparison/compare_with_andreoni2020.py \
-    --rate-limit-csv "results/01_large_scale_rate_limits/rate_limit_summary.csv" \
+    --rate-limit-csv "${OUTPUT_CSV}" \
     --output-dir "results/04_historical_andreoni_comparison"
 
 # 3. Execute Notebook 01 to populate rich boxplots, ECDFs, and scatter plots

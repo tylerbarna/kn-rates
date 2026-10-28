@@ -31,8 +31,8 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
 #SBATCH --job-name=kn_sim_1M_random
-#SBATCH --output=logs/01_large_scale_rate_limits/%x_%A_%a.log
-#SBATCH --error=logs/01_large_scale_rate_limits/%x_%A_%a.err
+#SBATCH --output=logs/01_large_scale_rate_limits_randomized/%x_%A_%a.log
+#SBATCH --error=logs/01_large_scale_rate_limits_randomized/%x_%A_%a.err
 
 set -euo pipefail
 
@@ -44,7 +44,7 @@ PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}
 cd "${PROJECT_DIR}"
 
 # Ensure output and log directories exist
-mkdir -p logs/01_large_scale_rate_limits results/01_large_scale_rate_limits
+mkdir -p logs/01_large_scale_rate_limits_randomized results/01_large_scale_rate_limits_randomized
 
 # Activate Conda environment
 if command -v module &>/dev/null; then
@@ -77,7 +77,7 @@ N_TRANSIENTS="${N_TRANSIENTS:-1000000}"
 N_PROCESSES="${N_PROCESSES:-8}"
 BASE_SEED="${BASE_SEED:-20261021}"
 TASK_SEED=$((BASE_SEED + TASK_ID * 10007))
-OUTPUT_DIR="${OUTPUT_DIR:-results/01_large_scale_rate_limits}"
+OUTPUT_DIR="${OUTPUT_DIR:-results/01_large_scale_rate_limits_randomized}"
 
 echo "=============================================================================="
 echo "Job ID:            ${SLURM_JOB_ID:-LOCAL}"
@@ -88,8 +88,8 @@ echo "Date/Time:         $(date)"
 echo "Model:             ${MODEL}"
 echo "Transients:        ${N_TRANSIENTS}"
 echo "Processes:         ${N_PROCESSES}"
-echo "Randomize Params:  YES (--randomize-params)"
-echo "Vary Rate:         YES (--vary-rate)"
+echo "Randomize Params:  YES (--randomize-params, physical bounds M_ej >= 10^-2.5 M_sun)"
+echo "Z_max:             0.15 (horizon-matched)"
 echo "Task Seed:         ${TASK_SEED}"
 echo "Output Directory:  ${OUTPUT_DIR}/${MODEL}"
 echo "=============================================================================="
@@ -100,7 +100,7 @@ python analysis_suites/01_large_scale_rate_limits/run_large_scale_simulation.py 
     --n-runs 1 \
     --n-processes "${N_PROCESSES}" \
     --randomize-params \
-    --vary-rate \
+    --z-max 0.15 \
     --seed "${TASK_SEED}" \
     --task-id "${TASK_ID}" \
     --output-dir "${OUTPUT_DIR}"
