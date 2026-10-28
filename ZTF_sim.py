@@ -146,21 +146,21 @@ def _parameter_bounds_for_model(model_name: str):
     """
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         return {
-            "log10_mej_dyn": (-4.0, -1.3010299956639813),
+            "log10_mej_dyn": (-2.5, -1.3010299956639813),    # ~0.003 to 0.05 M_sun (BNS dynamical ejecta)
             "v_ej_dyn": (0.12, 0.35),
             "ye_dyn": (0.15, 0.35),
-            "log10_mej_wind": (-4.0, -0.5502131530142267),
+            "log10_mej_wind": (-2.0, -0.5502131530142267),   # ~0.01 to 0.28 M_sun (secular disk wind)
             "v_ej_wind": (0.05, 0.15),
             "ye_wind": (0.2, 0.4),
             "inclination_em": (0.0, 1.5707963267948966),
-            "z_max": (0.15, 0.35),
+            "z_max": (0.15, 0.20),                            # Constrained to horizon-matched volume
         }
     if model_name == "Metzger":
         return {
-            "mej": (0.0005, 0.0050),
-            "vej": (0.20, 0.80),
-            "kappa": (50.0, 1000.0),
-            "z_max": (0.15, 0.35),
+            "mej": (0.0010, 0.0100),                          # 0.001 to 0.010 M_sun
+            "vej": (0.30, 0.70),                              # 0.30c to 0.70c
+            "kappa": (10.0, 500.0),                           # 10 to 500 cm^2/g
+            "z_max": (0.15, 0.20),
         }
     raise ValueError(f"Unsupported model: {model_name}")
 
