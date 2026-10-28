@@ -91,12 +91,22 @@ def process_file(path: Path) -> List[Dict[str, Any]]:
         # Scaling to 1.92 years equivalent: R_scaled = R_8yr * (T_8yr / T_1.92yr)
         r95_duration_scaled = r95 * (duration / ANDREONI_DURATION_YRS)
 
+        n_det = int(rs.get("n_detected", content.get("n_detected", 0)))
+        
+        # Reference Andreoni benchmark forward-projected to 8 years for direct physical comparison
+        if model == "Bu2026Fixed":
+            andreoni_proj_8yr = ANDREONI_FIXED_95 * (ANDREONI_DURATION_YRS / duration)
+        elif model == "Bu2026Vary":
+            andreoni_proj_8yr = ANDREONI_ISOTROPIC_95 * (ANDREONI_DURATION_YRS / duration)
+        else:
+            andreoni_proj_8yr = 1000.0 * (ANDREONI_DURATION_YRS / duration)
+
         rows.append({
             "file": str(path),
             "model": model,
             "transient_type": rs.get("transient_type", "Kilonova"),
             "n_simulated": rs.get("n_simulated", content.get("n_simulated", 1_000_000)),
-            "n_detected": rs.get("n_detected", content.get("n_detected", 0)),
+            "n_detected": n_det,
             "overall_efficiency": rs.get("overall_efficiency", 0.0),
             "survey_duration_years": duration,
             "effective_vt_gpc3_yr": eff_vt,
@@ -104,6 +114,8 @@ def process_file(path: Path) -> List[Dict[str, Any]]:
             "rate_95_upper_limit": r95,
             "rate_99_upper_limit": r99,
             "rate_95_duration_scaled_1_92yr": r95_duration_scaled,
+            "andreoni_projected_8yr_r95": andreoni_proj_8yr,
+            "is_poisson_sparse": n_det < 5,
             "ratio_to_andreoni_fixed_1775": r95_duration_scaled / ANDREONI_FIXED_95,
             "ratio_to_andreoni_isotropic_4029": r95_duration_scaled / ANDREONI_ISOTROPIC_95,
         })
@@ -153,11 +165,17 @@ def main():
         vt_eff_median=("effective_vt_gpc3_yr", "median"),
         r95_8yr_median=("rate_95_upper_limit", "median"),
         r95_scaled_median=("rate_95_duration_scaled_1_92yr", "median"),
+        sparse_runs=("is_poisson_sparse", "sum"),
     )
     print(summary_table.to_string())
     print("-" * 95)
-    print(f"Reference Andreoni (2020) Fixed Benchmark:     {ANDREONI_FIXED_95:.1f} Gpc^-3 yr^-1 (23 months)")
-    print(f"Reference Andreoni (2020) Isotropic Benchmark: {ANDREONI_ISOTROPIC_95:.1f} Gpc^-3 yr^-1 (23 months)")
+    print("Direct 8-Year Physical Comparison (raw R_95 vs forward-projected Andreoni 2020):")
+    print(f"  Fixed/Polar (Bu2026Fixed) : {ANDREONI_FIXED_95 * (ANDREONI_DURATION_YRS / 8.0057):.1f} Gpc^-3 yr^-1 (Andreoni 8-yr projected benchmark)")
+    print(f"  Isotropic (Bu2026Vary)    : {ANDREONI_ISOTROPIC_95 * (ANDREONI_DURATION_YRS / 8.0057):.1f} Gpc^-3 yr^-1 (Andreoni 8-yr projected benchmark)")
+    print("-" * 95)
+    print(f"Historical 23-Month Benchmarks (Andreoni 2020 at 1.92 yr baseline):")
+    print(f"  Fixed:     {ANDREONI_FIXED_95:.1f} Gpc^-3 yr^-1")
+    print(f"  Isotropic: {ANDREONI_ISOTROPIC_95:.1f} Gpc^-3 yr^-1")
     print("=" * 95)
 
 

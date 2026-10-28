@@ -102,6 +102,12 @@ def parse_args() -> argparse.Namespace:
         default="results/01_large_scale_rate_limits",
         help="Base directory for serialized JSON and metadata results.",
     )
+    parser.add_argument(
+        "--z-max",
+        type=float,
+        default=0.15,
+        help="Maximum redshift cutoff for injected transients (default: 0.15 to match ZTF horizon and prevent sample dilution).",
+    )
     # Detection criteria parameter overrides
     parser.add_argument("--snr-threshold", type=float, default=5.0, help="Primary detection SNR threshold.")
     parser.add_argument("--snr-threshold-secondary", type=float, default=3.0, help="Secondary detection SNR threshold.")
@@ -121,32 +127,37 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_model_bounds(model_name: str) -> Dict[str, tuple]:
+def get_model_bounds(model_name: str, z_max: float = 0.15) -> Dict[str, tuple]:
     """Retrieve physical prior bounds for kilonova model parameters.
+
+    Bounds are calibrated against numerical relativity simulations of binary neutron
+    star mergers (e.g. Radice+18, Dietrich+20) to prevent unphysically sub-luminous
+    ejecta masses (M < 10^-3 M_sun) that cause artificial detection volume collapse.
 
     Args:
         model_name: The identifier for the model family.
+        z_max: Cosmological redshift horizon cutoff (default: 0.15).
 
     Returns:
         Dictionary mapping parameter names to (min, max) bounds.
     """
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
         return {
-            "log10_mej_dyn": (-4.0, -1.301),    # 10^-4 to 0.05 M_sun
+            "log10_mej_dyn": (-2.5, -1.301),    # ~0.003 to 0.05 M_sun (BNS dynamical ejecta)
             "v_ej_dyn": (0.12, 0.35),            # 0.12c to 0.35c
             "ye_dyn": (0.15, 0.35),              # Electron fraction (lanthanide rich to poor)
-            "log10_mej_wind": (-4.0, -0.550),   # 10^-4 to 0.28 M_sun
+            "log10_mej_wind": (-2.0, -0.550),   # ~0.01 to 0.28 M_sun (secular disk wind)
             "v_ej_wind": (0.05, 0.15),           # 0.05c to 0.15c
             "ye_wind": (0.20, 0.40),             # Lanthanide-poor wind
             "inclination_em": (0.0, math.pi / 2.0),
-            "z_max": (0.15, 0.35),
+            "z_max": (z_max, z_max + 0.05),     # Horizon-matched to avoid volume dilution
         }
     if model_name == "Metzger":
         return {
-            "mej": (0.0005, 0.0050),            # 0.0005 to 0.005 M_sun
-            "vej": (0.20, 0.80),                # 0.20c to 0.80c
-            "kappa": (50.0, 1000.0),            # Opacity in cm^2 g^-1
-            "z_max": (0.15, 0.35),
+            "mej": (0.001, 0.010),              # 0.001 to 0.010 M_sun (realistic fast ejecta)
+            "vej": (0.30, 0.70),                # 0.30c to 0.70c
+            "kappa": (10.0, 500.0),             # Opacity in cm^2 g^-1 (lanthanide-free to moderate)
+            "z_max": (z_max, z_max + 0.05),
         }
     raise ValueError(f"Unsupported model: {model_name}")
 
@@ -155,6 +166,7 @@ def build_population(
     model_name: str,
     rate: float,
     randomize_params: bool = False,
+    z_max: float = 0.15,
     rng: Optional[np.random.Generator] = None,
     **overrides: Any,
 ):
@@ -163,24 +175,25 @@ def build_population(
         rng = np.random.default_rng()
 
     if randomize_params:
-        bounds = get_model_bounds(model_name)
+        bounds = get_model_bounds(model_name, z_max=z_max)
         params = {
             k: float(rng.uniform(low, high))
             for k, (low, high) in bounds.items()
             if k != "z_max"
         }
         params["rate"] = rate
-        params["z_max"] = float(rng.uniform(*bounds["z_max"]))
+        params["z_max"] = z_max
         if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
             params["vary_inclination"] = (model_name == "Bu2026Vary")
             if model_name == "Bu2026Fixed":
                 params["inclination_em"] = 0.45  # Keep polar viewing angle fixed (iota=26 deg)
         params.update(overrides)
+        print(f"  [Randomized Draw] {model_name} params: {params}")
         if model_name == "Metzger":
             return FixedMetzgerKilonovaPopulation(**params)
         return FixedBu2026KilonovaPopulation(**params)
 
-    # Standard fiducial population parameters
+    # Standard canonical fiducial population parameters
     if model_name == "Bu2026Fixed":
         params = dict(
             log10_mej_dyn=-1.7,
@@ -189,10 +202,10 @@ def build_population(
             log10_mej_wind=-1.1,
             v_ej_wind=0.10,
             ye_wind=0.35,
-            inclination_em=0.45,  # ~26 degrees
+            inclination_em=0.45,  # ~26 degrees (polar line-of-sight)
             vary_inclination=False,
             rate=rate,
-            z_max=0.15,
+            z_max=z_max,
         )
         params.update(overrides)
         return FixedBu2026KilonovaPopulation(**params)
@@ -208,7 +221,7 @@ def build_population(
             inclination_em=0.45,
             vary_inclination=True,  # Flat in cos(iota)
             rate=rate,
-            z_max=0.30,
+            z_max=z_max,  # Set to 0.15 (matching Fixed) to eliminate 85% Monte Carlo sample dilution
         )
         params.update(overrides)
         return FixedBu2026KilonovaPopulation(**params)
@@ -219,7 +232,7 @@ def build_population(
             vej=0.50,
             kappa=398.0,
             rate=rate,
-            z_max=0.30,
+            z_max=z_max,
         )
         params.update(overrides)
         return FixedMetzgerKilonovaPopulation(**params)
@@ -267,6 +280,7 @@ def run_single_simulation(
         args.model,
         rate=rate,
         randomize_params=args.randomize_params,
+        z_max=args.z_max,
         rng=np.random.default_rng(seed),
     )
     model_instance = build_lightcurve_model(args.model)
@@ -295,6 +309,8 @@ def run_single_simulation(
         "n_transients": args.n_transients,
         "run_index": run_idx,
         "seed": seed,
+        "z_max": args.z_max,
+        "randomize_params": args.randomize_params,
         "elapsed_seconds": elapsed,
         "detection_criteria": {
             "snr_threshold": args.snr_threshold,
