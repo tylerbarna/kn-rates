@@ -115,6 +115,7 @@ def parse_args() -> argparse.Namespace:
         help="Do not overwrite existing result files.",
     )
     parser.set_defaults(overwrite=True)
+    parser.add_argument(
         "--z-max",
         type=float,
         default=0.15,
