@@ -103,6 +103,18 @@ def parse_args() -> argparse.Namespace:
         help="Base directory for serialized JSON and metadata results.",
     )
     parser.add_argument(
+        "--task-id",
+        type=str,
+        default=None,
+        help="Optional array task index (defaults to SLURM_ARRAY_TASK_ID if available).",
+    )
+    parser.add_argument(
+        "--no-overwrite",
+        dest="overwrite",
+        action="store_false",
+        help="Do not overwrite existing result files.",
+    )
+    parser.set_defaults(overwrite=True)
         "--z-max",
         type=float,
         default=0.15,
@@ -299,15 +311,18 @@ def run_single_simulation(
     result = pipeline.run()
     elapsed = time.perf_counter() - t_start
 
+    task_id = args.task_id if args.task_id is not None else os.environ.get("SLURM_ARRAY_TASK_ID")
+    task_suffix = f"_task_{task_id}" if task_id is not None else f"_pid_{os.getpid()}"
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    fname = out_dir / f"ztf_{args.model}_{args.n_transients//1000}k_run_{run_idx}_{timestamp}.json"
-    save_result(result, str(fname))
+    fname = out_dir / f"ztf_{args.model}_{args.n_transients//1000}k{task_suffix}_run_{run_idx}_{timestamp}.json"
+    save_result(result, str(fname), overwrite=args.overwrite)
 
     # Save detailed metadata
     metadata = {
         "model": args.model,
         "n_transients": args.n_transients,
         "run_index": run_idx,
+        "task_id": str(task_id) if task_id is not None else None,
         "seed": seed,
         "z_max": args.z_max,
         "randomize_params": args.randomize_params,

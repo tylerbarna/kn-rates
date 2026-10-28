@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash --login
 # ==============================================================================
 # SUBMITTER: 1M Randomized Parameter Large-Scale Rate Limit Suite
 # ==============================================================================
@@ -9,12 +9,15 @@
 #
 # Usage:
 #   bash scripts/submit_1M_randomized_suite01.sh [RUNS_PER_MODEL]
-#
-# Examples:
-#   bash scripts/submit_1M_randomized_suite01.sh        # Default: 10 runs per model (30 tasks: 0-29)
-#   bash scripts/submit_1M_randomized_suite01.sh 20     # 20 runs per model (60 tasks: 0-59)
-#   bash scripts/submit_1M_randomized_suite01.sh 1      # 1 run per model (3 tasks: 0-2)
 # ==============================================================================
+#SBATCH -p msismall
+#SBATCH --time=00:30:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=8g
+#SBATCH --job-name=kn_sub_1M_rand
+#SBATCH --output=logs/01_large_scale_rate_limits/submit_1M_randomized_%j.log
+#SBATCH --error=logs/01_large_scale_rate_limits/submit_1M_randomized_%j.err
 
 set -euo pipefail
 
@@ -35,6 +38,13 @@ ARRAY_RANGE="0-$(( TOTAL_TASKS - 1 ))"
 
 mkdir -p logs/01_large_scale_rate_limits_randomized results/01_large_scale_rate_limits_randomized
 
+# If running interactively outside Slurm batch, log to timestamped file in logs/
+if [ -z "${SLURM_JOB_ID:-}" ] && [ -t 1 ]; then
+    INTERACTIVE_LOG="logs/01_large_scale_rate_limits/submit_1M_randomized_$(date +%Y%m%d_%H%M%S).log"
+    echo "[INFO] Running interactively; teeing execution log to ${INTERACTIVE_LOG}"
+    exec > >(tee -a "${INTERACTIVE_LOG}") 2>&1
+fi
+
 echo "=============================================================================="
 echo "SUBMITTING 1M RANDOMIZED KILONOVA RATE LIMIT PIPELINE"
 echo "Project Directory: ${PROJECT_DIR}"
@@ -44,6 +54,8 @@ echo "Total Array Tasks: ${TOTAL_TASKS} (array range: ${ARRAY_RANGE})"
 echo "Memory per Task:   128 GB"
 echo "Output Directory:  results/01_large_scale_rate_limits_randomized"
 echo "Date/Time:         $(date)"
+echo "Execution Host:    $(hostname -f 2>/dev/null || hostname)"
+echo "Slurm Job ID:      ${SLURM_JOB_ID:-INTERACTIVE_SHELL}"
 echo "=============================================================================="
 
 # 1. Submit simulation array
@@ -52,8 +64,8 @@ sim_job_id=$(sbatch --parsable --array="${ARRAY_RANGE}" scripts/01_run_large_sca
 echo "    Simulation Job ID: ${sim_job_id}"
 
 # 2. Submit aggregation and notebook rendering job (dependent on array completion)
-echo "--> Submitting post-processing aggregator & notebook generator (afterok:${sim_job_id})..."
-agg_job_id=$(sbatch --parsable --dependency="afterok:${sim_job_id}" scripts/01_aggregate_and_build_distributions.sh)
+echo "--> Submitting post-processing aggregator & notebook generator (afterany:${sim_job_id})..."
+agg_job_id=$(sbatch --parsable --dependency="afterany:${sim_job_id}" scripts/01_aggregate_and_build_distributions.sh)
 echo "    Aggregator Job ID: ${agg_job_id}"
 
 echo "=============================================================================="
@@ -63,7 +75,7 @@ echo "  1. Simulation Array: ${sim_job_id} (${ARRAY_RANGE})"
 echo "  2. Distribution Aggregator: ${agg_job_id} (queued on ${sim_job_id})"
 echo ""
 echo "Monitor status with:"
-echo "  squeue -u \$USER"
+echo "  squeue -u ${USER:-\$USER}"
 echo ""
 echo "Logs will be written to:"
 echo "  logs/01_large_scale_rate_limits/"

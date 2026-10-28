@@ -229,11 +229,20 @@ class JobHarvester:
         return list(records.values())
 
     def harvest_submission_summaries(self) -> List[JobTelemetryRecord]:
-        """Parse master submission outputs (slurm-*.out) to extract job batch contexts."""
+        """Parse master submission outputs (slurm-*.out or logs/submit_*.log) to extract job batch contexts."""
         records: List[JobTelemetryRecord] = []
-        pattern = str(self.project_root / "slurm-*.out")
+        patterns = [
+            str(self.project_root / "slurm-*.out"),
+            str(self.project_root / "logs" / "submit_*.log"),
+            str(self.project_root / "logs" / "submit_*.out"),
+            str(self.project_root / "logs" / "*" / "submit_*.log"),
+            str(self.project_root / "logs" / "*" / "submit_*.out"),
+        ]
+        files = []
+        for pat in patterns:
+            files.extend(glob.glob(pat))
 
-        for fpath in glob.glob(pattern):
+        for fpath in sorted(set(files)):
             try:
                 text = Path(fpath).read_text()
             except Exception:
@@ -462,7 +471,7 @@ class JobHarvester:
         for fpath in sorted(set(found_files)):
             # Skip master submission outputs and standard cron logs handled elsewhere
             fname = Path(fpath).name
-            if fname.startswith("slurm-") or fname == "telemetry_cron.log":
+            if fname.startswith("slurm-") or fname.startswith("submit_") or fname == "telemetry_cron.log":
                 continue
 
             try:

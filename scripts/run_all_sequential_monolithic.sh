@@ -28,6 +28,9 @@
 
 set -euo pipefail
 
+# Suppress CUPTI initialization warnings on CPU compute nodes
+export JAX_PLATFORMS=cpu
+
 PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "${PROJECT_DIR}"
 
@@ -87,6 +90,9 @@ echo "  --> Aggregating Rate Limits..."
 python analysis_suites/01_large_scale_rate_limits/aggregate_rate_limits.py \
     --glob 'results/01_large_scale_rate_limits/**/*.json' \
     --output-csv results/01_large_scale_rate_limits/rate_limit_summary.csv
+
+# Sync to results/rate_limit_benchmark.csv for compatibility with suite 04
+cp results/01_large_scale_rate_limits/rate_limit_summary.csv results/rate_limit_benchmark.csv 2>/dev/null || true
 
 # ------------------------------------------------------------------------------
 # STEP 2: Granular Detection Criteria Sweep
