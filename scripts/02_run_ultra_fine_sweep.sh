@@ -34,6 +34,9 @@
 
 set -euo pipefail
 
+# Suppress CUPTI initialization warnings on CPU compute nodes
+export JAX_PLATFORMS=cpu
+
 PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "${PROJECT_DIR}"
 

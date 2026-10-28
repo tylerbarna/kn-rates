@@ -33,6 +33,9 @@
 
 set -euo pipefail
 
+# Suppress CUPTI initialization warnings on CPU compute nodes
+export JAX_PLATFORMS=cpu
+
 # Determine project root dynamically
 PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "${PROJECT_DIR}"
@@ -98,6 +101,7 @@ python analysis_suites/01_large_scale_rate_limits/run_large_scale_simulation.py 
     --n-runs "${N_RUNS}" \
     --n-processes "${N_PROCESSES}" \
     --seed "${TASK_SEED}" \
+    --task-id "${TASK_ID}" \
     --output-dir "${OUTPUT_DIR}"
 
 echo "Task ${TASK_ID} (${MODEL} sample ${SAMPLE_ID}) completed successfully at $(date)."

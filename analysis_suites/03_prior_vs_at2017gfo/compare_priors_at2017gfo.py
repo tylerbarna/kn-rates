@@ -49,6 +49,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n-runs", type=int, default=3, help="Number of Monte Carlo realizations per configuration.")
     parser.add_argument("--output-dir", default="results/03_prior_vs_at2017gfo")
     parser.add_argument("--seed", type=int, default=20261020)
+    parser.add_argument(
+        "--no-overwrite",
+        dest="overwrite",
+        action="store_false",
+        help="Do not overwrite existing result files.",
+    )
+    parser.set_defaults(overwrite=True)
     return parser.parse_args()
 
 
@@ -231,7 +238,7 @@ def main():
 
                 # Serialize result
                 fname = out_dir / f"sim_{crit_name}_{pop_name}_run{r}.json"
-                save_result(result, str(fname))
+                save_result(result, str(fname), overwrite=args.overwrite)
 
                 record = {
                     "criteria_regime": crit_name,
