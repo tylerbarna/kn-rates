@@ -1,0 +1,57 @@
+name: Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pandas
+
+      - name: Run unit tests
+        run: |
+          ./scripts/run_unit_tests.sh
+
+  all-tests-passed:
+    name: All Unit Tests Passed
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check unit tests completion
+        run: |
+          if [ "${{ needs.unit-tests.result }}" = "success" ]; then
+            echo "All unit test suites across all matrix environments passed successfully."
+            exit 0
+          else
+            echo "ERROR: Unit test suite failed with status '${{ needs.unit-tests.result }}'."
+            exit 1
+          fi

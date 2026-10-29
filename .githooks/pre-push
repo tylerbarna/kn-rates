@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Git pre-push hook for kn-rates
+# Runs the full unit test suite before allowing any push to remote.
+# ==============================================================================
+set -eo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+
+if [ -f "$REPO_ROOT/scripts/run_unit_tests.sh" ]; then
+    echo "=================================================="
+    echo "Running local pre-push unit test validation..."
+    echo "=================================================="
+    "$REPO_ROOT/scripts/run_unit_tests.sh"
+    echo "Local unit test validation succeeded."
+else
+    echo "Warning: scripts/run_unit_tests.sh not found, skipping."
+fi

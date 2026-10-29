@@ -288,4 +288,59 @@ To rightsize Slurm allocations, minimize queue wait times, and avoid OOM kills o
      ./scripts/run_telemetry_daemon.sh status # Checks daemon PID and tail log
      ./scripts/run_telemetry_daemon.sh stop   # Stops the daemon
      ```
->>>>>>> origin/main
+
+---
+
+## 5. Unit Testing, CI & PR Merge Protection
+
+### Automated Unit Testing Suite
+All rate limit aggregation, Andreoni comparison logic, Slurm telemetry harvesting, scaling models, detection criteria bounds, chunking, and inclination physics models are validated by unit tests:
+
+```bash
+# Run the complete test suite locally
+./scripts/run_unit_tests.sh
+
+# Or invoke standard unittest directly:
+python3 -m unittest discover -s tests -v
+python3 -m unittest test_criteria_grid.py test_inclination_discrepancy.py
+```
+
+### Continuous Integration (GitHub Actions)
+The repository enforces test passing on every PR via [`.github/workflows/test.yml`](.github/workflows/test.yml):
+- **Triggers**: Every `pull_request` targeting `main`, `push` to `main`, and manual `workflow_dispatch`.
+- **Test Matrix**: Validates tests across Python 3.10, 3.11, and 3.12.
+- **Rollup Gate Check**: The `all-tests-passed` job (`All Unit Tests Passed`) acts as the single required gatekeeper check for GitHub PR branch protection.
+
+### Enforcing Passing Unit Tests Before Merging PRs
+
+To prevent any pull request from being merged into `main` without all unit tests passing, configure branch protection in GitHub:
+
+#### Via GitHub Web UI (Branch Protection Rules)
+1. Navigate to **Settings** &rarr; **Branches** in the GitHub repository (`https://github.com/tylerbarna/kn-rates/settings/branches`).
+2. Click **Add branch protection rule** (or edit the rule for `main`).
+3. Set **Branch name pattern** to `main`.
+4. Enable **Require a pull request before merging**.
+5. Enable **Require status checks to pass before merging**.
+6. Enable **Require branches to be up to date before merging**.
+7. In the search box under "Status checks that are required", search and check:
+   - `All Unit Tests Passed`
+   - *(Optional)* `Unit Tests (Python 3.10)`, `Unit Tests (Python 3.11)`, `Unit Tests (Python 3.12)`
+8. Enable **Do not allow bypassing the above settings** if administrators must also satisfy passing tests.
+9. Click **Create** / **Save changes**.
+
+#### Via GitHub Rulesets (Alternative)
+1. Navigate to **Settings** &rarr; **Rules** &rarr; **Rulesets** &rarr; **New branch ruleset**.
+2. Set title to `Require Unit Tests on Main` and enforcement status to **Active**.
+3. Under **Target branches**, add `Include default branch` (`main`).
+4. Under **Rules**, enable **Require status checks to pass**.
+5. Add status check: **`All Unit Tests Passed`**.
+6. Save the ruleset.
+
+### Local Pre-Push Guardrail
+To catch test failures before pushing commits to GitHub:
+```bash
+git config core.hooksPath .githooks
+# Or:
+./scripts/install_git_hooks.sh
+```
+Future `git push` commands will automatically validate all unit tests and abort the push if any test fails.
