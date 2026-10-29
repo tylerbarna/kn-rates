@@ -45,13 +45,18 @@ def parse_memory_to_gb(mem_str: Optional[str]) -> float:
 
 def parse_slurm_time_to_seconds(time_str: Optional[str]) -> float:
     """Convert Slurm elapsed time string (e.g. '20:47:00', '1-02:30:15', '03:12.45') to seconds."""
-    if not time_str or time_str in ("INVALID", "UNLIMITED", "N/A", "0"):
+    if not time_str or time_str in ("INVALID", "UNLIMITED", "N/A", "0", "---", "--", "-"):
         return 0.0
     time_str = time_str.strip()
+    if not any(c.isdigit() for c in time_str):
+        return 0.0
     days = 0
     if "-" in time_str:
         days_str, time_str = time_str.split("-", 1)
-        days = int(days_str)
+        try:
+            days = int(days_str)
+        except ValueError:
+            days = 0
 
     parts = time_str.split(":")
     try:
@@ -66,6 +71,41 @@ def parse_slurm_time_to_seconds(time_str: Optional[str]) -> float:
     except ValueError:
         return 0.0
     return 0.0
+
+
+def parse_percentage(val: Optional[str]) -> float:
+    """Parse percentage string (e.g. '123.3%', '15.0%', '0.2%', '---', 'N/A') to float."""
+    if not val or val in ("---", "N/A", "NONE", "-", "", "INVALID"):
+        return 0.0
+    cleaned = val.strip().replace("%", "").strip()
+    try:
+        return float(cleaned)
+    except ValueError:
+        return 0.0
+
+
+def infer_suite_from_job_name(job_name: Optional[str]) -> str:
+    """Infer analysis suite family from standard Slurm job submission name."""
+    if not job_name:
+        return ""
+    name = job_name.lower()
+    if any(k in name for k in ("criteria_sweep", "crit_ultrafine", "crit_audit", "detection_criteria")):
+        return "Suite 02: Granular Criteria Sweep"
+    if any(k in name for k in ("marathon", "rate_limits_1m", "sim_1m_random", "rate_limits_10m", "1m_random")):
+        return "Suite 01: Large-Scale Rate Limits"
+    if any(k in name for k in ("at2017gfo", "prior_vs_at2017gfo")):
+        return "Suite 03: Prior vs AT2017gfo"
+    if any(k in name for k in ("andreoni", "historical_andreoni")):
+        return "Suite 04: Historical Andreoni Comparison"
+    if any(k in name for k in ("sample_convergence", "convergence")):
+        return "Suite 05: Sample Convergence"
+    if any(k in name for k in ("inclination", "bu2026_inclination")):
+        return "Suite 06: Inclination Effect"
+    if any(k in name for k in ("gw170817",)):
+        return "Suite 07: GW170817 Rate Limits"
+    if any(k in name for k in ("cron", "telemetry")):
+        return "Telemetry Infrastructure"
+    return ""
 
 
 class JobHarvester:
@@ -131,6 +171,15 @@ class JobHarvester:
                 else:
                     records[key] = r
 
+        # 8. Query Slurm reportseff if available on the current machine
+        if shutil.which("reportseff"):
+            for r in self.harvest_reportseff(since="now-3week"):
+                key = (r.job_id, r.array_task_id)
+                if key in records:
+                    self._merge_records(records[key], r)
+                else:
+                    records[key] = r
+
         # Finalize derived metrics
         final_list = list(records.values())
         for rec in final_list:
@@ -139,6 +188,157 @@ class JobHarvester:
         final_list.sort(key=lambda x: (x.submit_time or x.start_time or "9999", x.job_id, x.array_task_id))
         return final_list
 
+    def harvest_reportseff(
+        self,
+        user: Optional[str] = None,
+        since: str = "now-3week",
+        job_ids: Optional[List[str]] = None,
+    ) -> List[JobTelemetryRecord]:
+        """Harvest job efficiency metrics using Slurm reportseff CLI utility."""
+        if not shutil.which("reportseff"):
+            return []
+
+        u = user or os.environ.get("USER")
+        cmd = ["reportseff", "-p"]
+        if u:
+            cmd.extend(["-u", u])
+        if since:
+            cmd.extend(["--since", since])
+        if job_ids:
+            cmd.extend(job_ids)
+
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            return self.parse_reportseff_output(res.stdout)
+        except Exception:
+            return []
+
+    def parse_reportseff_output(self, text: str) -> List[JobTelemetryRecord]:
+        """Parse raw output from reportseff command (pipe-delimited or tabular)."""
+        if not text or not text.strip():
+            return []
+
+        records: List[JobTelemetryRecord] = []
+        lines = [line.strip() for line in text.strip().splitlines() if line.strip()]
+        if not lines:
+            return []
+
+        # Check if output is pipe-delimited (-p / --parsable)
+        is_pipe = "|" in lines[0] or (len(lines) > 1 and "|" in lines[1])
+
+        if is_pipe:
+            header_map: Dict[str, int] = {}
+            for line in lines:
+                parts = [p.strip() for p in line.split("|")]
+                if not parts:
+                    continue
+                lower_parts = [p.lower() for p in parts]
+                if "jobid" in lower_parts:
+                    header_map = {name: idx for idx, name in enumerate(lower_parts)}
+                    continue
+
+                if not header_map:
+                    # Default reportseff columns: JobID, State, Elapsed, TimeEff, CPUEff, MemEff
+                    col_names = ["jobid", "state", "elapsed", "timeeff", "cpueff", "memeff"]
+                    header_map = {name: idx for idx, name in enumerate(col_names) if idx < len(parts)}
+
+                raw_job_id = parts[header_map["jobid"]] if "jobid" in header_map and header_map["jobid"] < len(parts) else parts[0]
+                if not raw_job_id or raw_job_id.lower() == "jobid":
+                    continue
+
+                array_task_id = ""
+                base_job_id = raw_job_id
+                if "_" in raw_job_id:
+                    base_job_id, array_task_id = raw_job_id.split("_", 1)
+
+                state = parts[header_map["state"]] if "state" in header_map and header_map["state"] < len(parts) else "COMPLETED"
+                elapsed_str = parts[header_map["elapsed"]] if "elapsed" in header_map and header_map["elapsed"] < len(parts) else "00:00:00"
+                elapsed_sec = parse_slurm_time_to_seconds(elapsed_str)
+
+                time_eff = parse_percentage(parts[header_map["timeeff"]]) if "timeeff" in header_map and header_map["timeeff"] < len(parts) else 0.0
+                cpu_eff = parse_percentage(parts[header_map["cpueff"]]) if "cpueff" in header_map and header_map["cpueff"] < len(parts) else 0.0
+                mem_eff = parse_percentage(parts[header_map["memeff"]]) if "memeff" in header_map and header_map["memeff"] < len(parts) else 0.0
+
+                req_mem_gb = 0.0
+                if "reqmem" in header_map and header_map["reqmem"] < len(parts):
+                    req_mem_gb = parse_memory_to_gb(parts[header_map["reqmem"]])
+                req_cpus = 1
+                if "reqcpus" in header_map and header_map["reqcpus"] < len(parts):
+                    try:
+                        req_cpus = int(parts[header_map["reqcpus"]])
+                    except ValueError:
+                        req_cpus = 1
+
+                req_time_min = 0.0
+                if "timelimit" in header_map and header_map["timelimit"] < len(parts):
+                    req_time_min = round(parse_slurm_time_to_seconds(parts[header_map["timelimit"]]) / 60.0, 2)
+                elif time_eff > 0 and elapsed_sec > 0:
+                    req_time_min = round(elapsed_sec / (time_eff / 100.0) / 60.0, 2)
+
+                max_rss_gb = 0.0
+                if "maxrss" in header_map and header_map["maxrss"] < len(parts):
+                    max_rss_gb = parse_memory_to_gb(parts[header_map["maxrss"]])
+                elif req_mem_gb > 0 and mem_eff > 0:
+                    max_rss_gb = round(req_mem_gb * (mem_eff / 100.0), 3)
+
+                rec = JobTelemetryRecord(
+                    job_id=base_job_id,
+                    array_task_id=array_task_id,
+                    state=state,
+                    req_cpus=req_cpus,
+                    req_mem_gb=req_mem_gb,
+                    req_time_min=req_time_min,
+                    used_walltime_sec=elapsed_sec,
+                    time_efficiency_pct=time_eff,
+                    used_max_rss_gb=max_rss_gb,
+                    mem_efficiency_pct=mem_eff,
+                    cpu_efficiency_pct=cpu_eff,
+                    data_source="reportseff",
+                )
+                rec.compute_derived_metrics()
+                records.append(rec)
+        else:
+            # Fixed-width / whitespace delimited tabular output
+            for line in lines:
+                if "JobID" in line or line.startswith("---") or line.startswith("==="):
+                    continue
+                toks = line.split()
+                if len(toks) < 6:
+                    continue
+
+                raw_job_id = toks[0]
+                array_task_id = ""
+                base_job_id = raw_job_id
+                if "_" in raw_job_id:
+                    base_job_id, array_task_id = raw_job_id.split("_", 1)
+
+                mem_eff = parse_percentage(toks[-1])
+                cpu_eff = parse_percentage(toks[-2])
+                time_eff = parse_percentage(toks[-3])
+                elapsed_str = toks[-4]
+                elapsed_sec = parse_slurm_time_to_seconds(elapsed_str)
+                state = " ".join(toks[1:-4])
+
+                req_time_min = 0.0
+                if time_eff > 0 and elapsed_sec > 0:
+                    req_time_min = round(elapsed_sec / (time_eff / 100.0) / 60.0, 2)
+
+                rec = JobTelemetryRecord(
+                    job_id=base_job_id,
+                    array_task_id=array_task_id,
+                    state=state,
+                    req_time_min=req_time_min,
+                    used_walltime_sec=elapsed_sec,
+                    time_efficiency_pct=time_eff,
+                    mem_efficiency_pct=mem_eff,
+                    cpu_efficiency_pct=cpu_eff,
+                    data_source="reportseff",
+                )
+                rec.compute_derived_metrics()
+                records.append(rec)
+
+        return records
+
     def harvest_sacct(self, start_date: str = "2026-01-01") -> List[JobTelemetryRecord]:
         """Query Slurm's sacct command to harvest kernel-level job accounting."""
         cmd = [
@@ -146,7 +346,7 @@ class JobHarvester:
             "--starttime", start_date,
             "--parsable2",
             "--delimiter=|",
-            "--format=JobIDRaw,JobName,Partition,Submit,Start,End,ElapsedRaw,ReqMem,MaxRSS,ReqCPUS,CPUTimeRAW,State,ExitCode,NodeList",
+            "--format=JobIDRaw,JobName,Partition,Submit,Start,End,ElapsedRaw,ReqMem,MaxRSS,ReqCPUS,CPUTimeRAW,State,ExitCode,NodeList,TotalCPU,Timelimit",
         ]
         user = os.environ.get("USER")
         if user:
@@ -201,10 +401,21 @@ class JobHarvester:
             except ValueError:
                 cpu_sec = parse_slurm_time_to_seconds(cpu_time_raw)
 
+            # Check optional TotalCPU and Timelimit fields
+            req_time_min = 0.0
+            if len(parts) > 14 and parts[14]:
+                actual_cpu_sec = parse_slurm_time_to_seconds(parts[14])
+                if actual_cpu_sec > 0:
+                    cpu_sec = actual_cpu_sec
+
+            if len(parts) > 15 and parts[15]:
+                req_time_min = round(parse_slurm_time_to_seconds(parts[15]) / 60.0, 2)
+
             rec = JobTelemetryRecord(
                 job_id=base_job_id,
                 array_task_id=array_task_id,
                 job_name=job_name,
+                suite=infer_suite_from_job_name(job_name),
                 partition=partition or "msismall",
                 node_list=node_list,
                 submit_time=submit_t,
@@ -212,6 +423,7 @@ class JobHarvester:
                 end_time=end_t,
                 req_cpus=cpus,
                 req_mem_gb=parse_memory_to_gb(req_mem),
+                req_time_min=req_time_min,
                 used_walltime_sec=elapsed_sec,
                 used_max_rss_gb=parse_memory_to_gb(max_rss),
                 used_cpu_sec=cpu_sec,
@@ -691,10 +903,28 @@ class JobHarvester:
 
     def _merge_records(self, target: JobTelemetryRecord, source: JobTelemetryRecord) -> None:
         """Merge non-empty fields from source record into target record."""
+        # Prioritize reportseff metrics for efficiency and state
+        if source.data_source == "reportseff":
+            if source.time_efficiency_pct > 0:
+                target.time_efficiency_pct = source.time_efficiency_pct
+            if source.cpu_efficiency_pct > 0:
+                target.cpu_efficiency_pct = source.cpu_efficiency_pct
+            if source.mem_efficiency_pct > 0:
+                target.mem_efficiency_pct = source.mem_efficiency_pct
+            if source.state and (source.state != "PENDING" or target.state in ("PENDING", "UNKNOWN", "")):
+                target.state = source.state
+            if source.used_walltime_sec > 0 and target.used_walltime_sec <= 0:
+                target.used_walltime_sec = source.used_walltime_sec
+                target.used_walltime_hours = source.used_walltime_hours
+            if source.req_time_min > 0 and target.req_time_min <= 0:
+                target.req_time_min = source.req_time_min
+            target.data_source = "reportseff"
+            return
+
         for key, val in source.__dict__.items():
             current = getattr(target, key)
             if (current == "" or current == 0 or current is None or current == -1) and val not in ("", 0, None, -1):
                 setattr(target, key, val)
         # Preserve specific high-fidelity data_sources
-        if source.data_source in ("sacct", "empirical_benchmark"):
+        if source.data_source in ("sacct", "empirical_benchmark", "reportseff"):
             target.data_source = source.data_source

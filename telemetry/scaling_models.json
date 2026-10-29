@@ -1,6 +1,6 @@
 {
   "last_updated": "",
-  "total_tracked_jobs": 31739,
+  "total_tracked_jobs": 31745,
   "scaling_models": {
     "Metzger": {
       "ram_gb_per_million": 25.556,
@@ -12,43 +12,43 @@
       "sample_points": 2
     },
     "Generic": {
-      "ram_gb_per_million": -15.872,
-      "ram_base_gb": 16.316,
-      "walltime_sec_per_million": -1219.34,
-      "walltime_base_sec": 1304.4,
+      "ram_gb_per_million": -20.991,
+      "ram_base_gb": 21.485,
+      "walltime_sec_per_million": -2730.51,
+      "walltime_base_sec": 2788.2,
       "storage_mb_per_million": 0.0,
       "storage_base_mb": 0.0,
-      "sample_points": 4
+      "sample_points": 8
     },
     "Global": {
-      "ram_gb_per_million": 64.755,
+      "ram_gb_per_million": 64.631,
       "ram_base_gb": 0.0,
-      "walltime_sec_per_million": 7498.78,
+      "walltime_sec_per_million": 7432.26,
       "walltime_base_sec": 0.0,
-      "storage_mb_per_million": 185.04,
+      "storage_mb_per_million": 186.15,
       "storage_base_mb": 0.0,
-      "sample_points": 8
+      "sample_points": 12
     }
   },
   "queue_characteristics": {
     "by_memory_tier": {
       "Standard (<= 32 GB)": {
-        "count": 11972,
-        "mean_min": 11.26,
+        "count": 17972,
+        "mean_min": 30.95,
         "median_min": 0.0,
         "max_min": 638.25
       },
       "Medium (33 - 128 GB)": {
-        "count": 8461,
-        "mean_min": 203.35,
-        "median_min": 71.47,
-        "max_min": 1075.12
+        "count": 8928,
+        "mean_min": 244.13,
+        "median_min": 74.45,
+        "max_min": 1140.23
       },
       "High-Memory (129 - 755 GB)": {
-        "count": 4721,
-        "mean_min": 1496.26,
+        "count": 4787,
+        "mean_min": 1495.57,
         "median_min": 631.05,
-        "max_min": 3877.18
+        "max_min": 3896.28
       }
     },
     "by_submission_hour": {
@@ -64,6 +64,12 @@
         "median_min": 15.22,
         "max_min": 15.22
       },
+      "3": {
+        "count": 1,
+        "mean_min": 2334.18,
+        "median_min": 2334.18,
+        "max_min": 2334.18
+      },
       "5": {
         "count": 1,
         "mean_min": 58.98,
@@ -77,63 +83,69 @@
         "max_min": 12.0
       },
       "10": {
-        "count": 271,
-        "mean_min": 675.14,
-        "median_min": 600.38,
+        "count": 272,
+        "mean_min": 672.66,
+        "median_min": 593.11,
         "max_min": 1480.53
       },
       "11": {
-        "count": 2,
-        "mean_min": 2.0,
-        "median_min": 2.0,
+        "count": 3,
+        "mean_min": 1.34,
+        "median_min": 1.0,
         "max_min": 3.0
       },
+      "12": {
+        "count": 3,
+        "mean_min": 4.8,
+        "median_min": 1.3,
+        "max_min": 12.0
+      },
       "13": {
-        "count": 19,
-        "mean_min": 176.41,
-        "median_min": 0.85,
+        "count": 20,
+        "mean_min": 167.59,
+        "median_min": 0.73,
         "max_min": 2744.95
       },
       "14": {
-        "count": 5279,
-        "mean_min": 290.44,
-        "median_min": 78.43,
-        "max_min": 1075.12
+        "count": 6270,
+        "mean_min": 318.83,
+        "median_min": 76.95,
+        "max_min": 1140.23
       },
       "15": {
-        "count": 1016,
-        "mean_min": 389.89,
-        "median_min": 414.34,
+        "count": 1021,
+        "mean_min": 388.24,
+        "median_min": 413.42,
         "max_min": 1648.02
       },
       "16": {
-        "count": 3110,
-        "mean_min": 102.04,
+        "count": 3116,
+        "mean_min": 101.94,
         "median_min": 74.43,
         "max_min": 495.52
       },
       "17": {
-        "count": 3,
-        "mean_min": 103.72,
-        "median_min": 59.9,
+        "count": 8,
+        "mean_min": 39.16,
+        "median_min": 0.99,
         "max_min": 243.03
       },
       "18": {
-        "count": 2594,
-        "mean_min": 2013.76,
-        "median_min": 2301.68,
-        "max_min": 3877.18
+        "count": 2621,
+        "mean_min": 1997.59,
+        "median_min": 2293.35,
+        "max_min": 3896.28
       },
       "19": {
-        "count": 479,
-        "mean_min": 2249.35,
-        "median_min": 2875.23,
-        "max_min": 3636.97
+        "count": 5654,
+        "mean_min": 277.68,
+        "median_min": 91.35,
+        "max_min": 3786.78
       },
       "20": {
-        "count": 437,
-        "mean_min": 111.2,
-        "median_min": 60.4,
+        "count": 748,
+        "mean_min": 67.87,
+        "median_min": 14.02,
         "max_min": 663.5
       },
       "21": {
@@ -141,6 +153,12 @@
         "mean_min": 52.3,
         "median_min": 49.35,
         "max_min": 638.85
+      },
+      "22": {
+        "count": 1,
+        "mean_min": 303.92,
+        "median_min": 303.92,
+        "max_min": 303.92
       },
       "23": {
         "count": 1,
@@ -151,42 +169,42 @@
     },
     "by_day_of_week": {
       "Mon": {
-        "count": 7747,
-        "mean_min": 1010.31,
-        "median_min": 528.43,
-        "max_min": 3877.18
+        "count": 8750,
+        "mean_min": 958.09,
+        "median_min": 515.11,
+        "max_min": 3896.28
       },
       "Tue": {
-        "count": 2884,
-        "mean_min": 113.29,
-        "median_min": 52.47,
-        "max_min": 1648.02
+        "count": 3129,
+        "mean_min": 105.82,
+        "median_min": 49.28,
+        "max_min": 2334.18
       },
       "Wed": {
-        "count": 748,
-        "mean_min": 70.19,
-        "median_min": 31.1,
+        "count": 5996,
+        "mean_min": 77.93,
+        "median_min": 76.07,
         "max_min": 2744.95
       },
       "Fri": {
-        "count": 19,
-        "mean_min": 151.92,
-        "median_min": 199.27,
+        "count": 24,
+        "mean_min": 131.65,
+        "median_min": 39.28,
         "max_min": 549.23
       },
       "Thu": {
-        "count": 4418,
-        "mean_min": 160.75,
+        "count": 4445,
+        "mean_min": 159.78,
         "median_min": 86.15,
         "max_min": 635.0
       }
     },
     "by_batch_size": {
       "Single Task (1)": {
-        "count": 25138,
-        "mean_min": 354.75,
-        "median_min": 37.17,
-        "max_min": 3877.18
+        "count": 31671,
+        "mean_min": 312.38,
+        "median_min": 46.35,
+        "max_min": 3896.28
       },
       "Small Array (2 - 50)": {
         "count": 8,
@@ -201,5 +219,241 @@
         "max_min": 97.93
       }
     }
+  },
+  "efficiency_profile": {
+    "time_efficiency": {
+      "count": 42,
+      "mean": 16.47,
+      "median": 2.58,
+      "min": 0.01,
+      "max": 140.0,
+      "p25": 0.5,
+      "p75": 10.0
+    },
+    "cpu_efficiency": {
+      "count": 22269,
+      "mean": 99.91,
+      "median": 100.0,
+      "min": 1.2,
+      "max": 100.0,
+      "p25": 100.0,
+      "p75": 100.0
+    },
+    "memory_efficiency": {
+      "count": 22168,
+      "mean": 39.38,
+      "median": 25.49,
+      "min": 0.01,
+      "max": 100.0,
+      "p25": 8.8,
+      "p75": 81.51
+    },
+    "by_state": {
+      "FAILED": {
+        "time_eff": {
+          "count": 6,
+          "mean": 4.63,
+          "median": 2.85,
+          "min": 0.9,
+          "max": 10.2,
+          "p25": 1.1,
+          "p75": 9.9
+        },
+        "cpu_eff": {
+          "count": 329,
+          "mean": 98.61,
+          "median": 100.0,
+          "min": 10.0,
+          "max": 100.0,
+          "p25": 100.0,
+          "p75": 100.0
+        },
+        "mem_eff": {
+          "count": 328,
+          "mean": 16.79,
+          "median": 0.08,
+          "min": 0.01,
+          "max": 97.54,
+          "p25": 0.04,
+          "p75": 25.89
+        }
+      },
+      "CANCELLED": {
+        "time_eff": {
+          "count": 2,
+          "mean": 17.5,
+          "median": 17.5,
+          "min": 10.0,
+          "max": 25.0,
+          "p25": 10.0,
+          "p75": 25.0
+        },
+        "cpu_eff": {
+          "count": 1084,
+          "mean": 99.88,
+          "median": 100.0,
+          "min": 16.7,
+          "max": 100.0,
+          "p25": 100.0,
+          "p75": 100.0
+        },
+        "mem_eff": {
+          "count": 995,
+          "mean": 43.29,
+          "median": 32.87,
+          "min": 0.04,
+          "max": 100.0,
+          "p25": 31.68,
+          "p75": 79.26
+        }
+      },
+      "OUT_OF_MEMORY": {
+        "time_eff": {
+          "count": 0,
+          "mean": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "p25": 0.0,
+          "p75": 0.0
+        },
+        "cpu_eff": {
+          "count": 5364,
+          "mean": 100.0,
+          "median": 100.0,
+          "min": 100.0,
+          "max": 100.0,
+          "p25": 100.0,
+          "p75": 100.0
+        },
+        "mem_eff": {
+          "count": 5364,
+          "mean": 99.99,
+          "median": 99.99,
+          "min": 99.87,
+          "max": 100.0,
+          "p25": 99.99,
+          "p75": 99.99
+        }
+      },
+      "COMPLETED": {
+        "time_eff": {
+          "count": 31,
+          "mean": 8.55,
+          "median": 2.06,
+          "min": 0.01,
+          "max": 85.94,
+          "p25": 0.39,
+          "p75": 3.33
+        },
+        "cpu_eff": {
+          "count": 14169,
+          "mean": 99.92,
+          "median": 100.0,
+          "min": 1.2,
+          "max": 100.0,
+          "p25": 100.0,
+          "p75": 100.0
+        },
+        "mem_eff": {
+          "count": 14168,
+          "mean": 17.71,
+          "median": 16.1,
+          "min": 0.01,
+          "max": 89.67,
+          "p25": 8.2,
+          "p75": 25.51
+        }
+      },
+      "TIMEOUT": {
+        "time_eff": {
+          "count": 2,
+          "mean": 111.9,
+          "median": 111.9,
+          "min": 100.5,
+          "max": 123.3,
+          "p25": 100.5,
+          "p75": 123.3
+        },
+        "cpu_eff": {
+          "count": 16,
+          "mean": 89.84,
+          "median": 100.0,
+          "min": 2.7,
+          "max": 100.0,
+          "p25": 100.0,
+          "p75": 100.0
+        },
+        "mem_eff": {
+          "count": 16,
+          "mean": 54.3,
+          "median": 55.44,
+          "min": 0.11,
+          "max": 100.0,
+          "p25": 14.4,
+          "p75": 100.0
+        }
+      },
+      "RUNNING": {
+        "time_eff": {
+          "count": 0,
+          "mean": 0.0,
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0,
+          "p25": 0.0,
+          "p75": 0.0
+        },
+        "cpu_eff": {
+          "count": 1306,
+          "mean": 100.0,
+          "median": 100.0,
+          "min": 100.0,
+          "max": 100.0,
+          "p25": 100.0,
+          "p75": 100.0
+        },
+        "mem_eff": {
+          "count": 1296,
+          "mean": 27.89,
+          "median": 33.14,
+          "min": 0.04,
+          "max": 35.67,
+          "p25": 17.3,
+          "p75": 33.22
+        }
+      },
+      "REQUEUED": {
+        "time_eff": {
+          "count": 1,
+          "mean": 140.0,
+          "median": 140.0,
+          "min": 140.0,
+          "max": 140.0,
+          "p25": 140.0,
+          "p75": 140.0
+        },
+        "cpu_eff": {
+          "count": 1,
+          "mean": 8.3,
+          "median": 8.3,
+          "min": 8.3,
+          "max": 8.3,
+          "p25": 8.3,
+          "p75": 8.3
+        },
+        "mem_eff": {
+          "count": 1,
+          "mean": 14.9,
+          "median": 14.9,
+          "min": 14.9,
+          "max": 14.9,
+          "p25": 14.9,
+          "p75": 14.9
+        }
+      }
+    },
+    "total_wasted_core_hours": 151.13,
+    "total_wasted_mem_gb_hours": 1442057.72
   }
 }

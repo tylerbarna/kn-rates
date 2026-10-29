@@ -36,10 +36,12 @@ class JobTelemetryRecord:
     req_time_min: float = 0.0
     used_walltime_sec: float = 0.0
     used_walltime_hours: float = 0.0
+    time_efficiency_pct: float = 0.0
     used_max_rss_gb: float = 0.0
     mem_efficiency_pct: float = 0.0
     used_cpu_sec: float = 0.0
     cpu_efficiency_pct: float = 0.0
+    energy_joules: float = 0.0
 
     # Astrophysical Simulation Parameters & Footprint
     model: str = ""
@@ -76,13 +78,46 @@ class JobTelemetryRecord:
         if self.used_walltime_sec > 0:
             self.used_walltime_hours = round(self.used_walltime_sec / 3600.0, 3)
 
-        if self.req_mem_gb > 0 and self.used_max_rss_gb > 0:
+        # Time efficiency (Elapsed / Timelimit)
+        # Note: Do not cap at 100% because jobs can exceed time limit (TIMEOUT / REQUEUED)
+        if self.req_time_min > 0 and self.used_walltime_sec > 0 and self.time_efficiency_pct <= 0:
+            req_sec = self.req_time_min * 60.0
+            time_eff = (self.used_walltime_sec / req_sec) * 100.0
+            self.time_efficiency_pct = round(time_eff, 2)
+
+        # Infer req_time_min if missing but time_efficiency_pct and used_walltime_sec exist
+        if self.req_time_min <= 0 and self.time_efficiency_pct > 0 and self.used_walltime_sec > 0:
+            req_sec = self.used_walltime_sec / (self.time_efficiency_pct / 100.0)
+            self.req_time_min = round(req_sec / 60.0, 2)
+
+        # Memory efficiency (MaxRSS / ReqMem)
+        if self.req_mem_gb > 0 and self.used_max_rss_gb > 0 and self.mem_efficiency_pct <= 0:
             eff = (self.used_max_rss_gb / self.req_mem_gb) * 100.0
             self.mem_efficiency_pct = round(min(100.0, eff), 2)
 
-        if self.used_walltime_sec > 0 and self.req_cpus > 0 and self.used_cpu_sec > 0:
+        # CPU efficiency (TotalCPU / (Elapsed * ReqCPUS))
+        if self.used_walltime_sec > 0 and self.req_cpus > 0 and self.used_cpu_sec > 0 and self.cpu_efficiency_pct <= 0:
             cpu_eff = (self.used_cpu_sec / (self.used_walltime_sec * self.req_cpus)) * 100.0
             self.cpu_efficiency_pct = round(min(100.0, cpu_eff), 2)
+
+    @property
+    def wasted_core_hours(self) -> float:
+        """Estimated CPU core-hours allocated but not actively utilized."""
+        if self.used_walltime_sec <= 0 or self.req_cpus <= 0:
+            return 0.0
+        allocated_core_sec = self.used_walltime_sec * self.req_cpus
+        used_core_sec = self.used_cpu_sec if self.used_cpu_sec > 0 else (allocated_core_sec * (self.cpu_efficiency_pct / 100.0))
+        wasted_sec = max(0.0, allocated_core_sec - used_core_sec)
+        return round(wasted_sec / 3600.0, 3)
+
+    @property
+    def wasted_mem_gb_hours(self) -> float:
+        """Estimated RAM GB-hours reserved but unused."""
+        if self.req_mem_gb <= 0 or self.used_walltime_sec <= 0:
+            return 0.0
+        used_mem = self.used_max_rss_gb if self.used_max_rss_gb > 0 else (self.req_mem_gb * (self.mem_efficiency_pct / 100.0))
+        slack_gb = max(0.0, self.req_mem_gb - used_mem)
+        return round(slack_gb * (self.used_walltime_sec / 3600.0), 3)
 
     @staticmethod
     def _parse_iso(val: str) -> Optional[datetime]:

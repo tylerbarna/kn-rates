@@ -273,35 +273,44 @@ jupyter lab notebooks/
 
 To rightsize Slurm allocations, minimize queue wait times, and avoid OOM kills or over-allocation penalties on MSI (`msismall`), the repository includes an automated telemetry tracking and predictive scaling engine in `telemetry/`:
 
-- **Version-Controlled Registry**: `telemetry/job_resource_registry.csv` tracks historical job submissions, queue wait times, submit hour-of-day, requested vs. consumed physical RAM (`MaxRSS`), CPU efficiency, and simulation parameters.
-- **Empirical Scaling Model**: `telemetry/scaling_models.json` stores fitted linear scaling models ($\text{RAM}(N)$, $\text{Walltime}(N)$, $\text{Storage}(N)$).
+- **Version-Controlled Registry**: `telemetry/job_resource_registry.csv` tracks historical job submissions, queue wait times, submit hour-of-day, requested vs. consumed physical RAM (`MaxRSS`), time efficiency (`TimeEff`), true CPU efficiency (`CPUEff`), memory efficiency (`MemEff`), and simulation parameters.
+- **Empirical Scaling Model**: `telemetry/scaling_models.json` stores fitted linear scaling models ($\text{RAM}(N)$, $\text{Walltime}(N)$, $\text{Storage}(N)$) and statistical efficiency distributions.
 
 ### Quick CLI Commands
 
-1. **Harvest & Update Registry from Slurm `sacct` and local logs**:
+1. **Harvest & Update Registry from Slurm `reportseff`, `sacct`, and local logs**:
    ```bash
    ./scripts/update_telemetry.sh
    # Or via Python module:
    python -m telemetry update
    ```
 
-2. **Display Telemetry & Queue Wait Report**:
+2. **Display Telemetry, Efficiency & Queue Wait Report**:
    ```bash
    python -m telemetry report
    ```
 
-3. **Get Rightsizing Recommendations for Proposed Simulation**:
+3. **Cross-Match Historical Registry with `reportseff` Accounting**:
+   ```bash
+   # Using MSI calibration benchmark or local reportseff CLI:
+   python scripts/backfill_reportseff_telemetry.py
+
+   # Or piping live output directly from MSI cluster:
+   reportseff -u $USER d=now-3week | python scripts/backfill_reportseff_telemetry.py --stdin
+   ```
+
+4. **Get Rightsizing Recommendations for Proposed Simulation**:
    ```bash
    python -m telemetry rightsize --model Bu2026Fixed --n-transients 1000000
    ```
    Outputs exact `#SBATCH` directives (`--mem`, `--time`, `--cpus-per-task`) along with queue placement advice (e.g., fast backfill eligibility vs. high-memory node wait).
 
-4. **Automate via Hourly Cron or Background Daemon**:
-   - **System / Cluster Crontab**: Install an hourly cron job that auto-updates and commits telemetry changes:
+5. **Automate via Hourly Scrontab or Background Daemon**:
+   - **System / Cluster Scrontab**: Install an hourly cron job named `kn_telemetry_cron` that auto-updates and commits telemetry changes:
      ```bash
-     ./scripts/install_cron.sh --install     # Installs '0 * * * *' into user crontab
-     ./scripts/install_cron.sh --status      # Checks cron status and recent log
-     ./scripts/install_cron.sh --uninstall   # Removes telemetry cron entry
+     ./scripts/install_cron.sh --install     # Installs '#SCRON --job-name=kn_telemetry_cron' into user scrontab
+     ./scripts/install_cron.sh --status      # Checks scrontab status and recent log
+     ./scripts/install_cron.sh --uninstall   # Removes telemetry scrontab entry
      ```
    - **Background Daemon Runner** (alternative when user crontabs are restricted on cluster nodes):
      ```bash
@@ -309,4 +318,3 @@ To rightsize Slurm allocations, minimize queue wait times, and avoid OOM kills o
      ./scripts/run_telemetry_daemon.sh status # Checks daemon PID and tail log
      ./scripts/run_telemetry_daemon.sh stop   # Stops the daemon
      ```
->>>>>>> origin/main

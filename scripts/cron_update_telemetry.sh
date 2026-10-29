@@ -1,4 +1,8 @@
 #!/bin/bash
+#SBATCH --job-name=kn_telemetry_cron
+#SBATCH --time=00:15:00
+#SBATCH --mem=2G
+#SBATCH --cpus-per-task=1
 # ==============================================================================
 # PERIODIC CRON EXECUTION WRAPPER FOR JOB TELEMETRY TRACKER
 # ==============================================================================

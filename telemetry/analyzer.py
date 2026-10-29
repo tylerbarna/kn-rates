@@ -12,8 +12,16 @@ from telemetry.models import JobTelemetryRecord, RightsizingRecommendation
 class TelemetryAnalyzer:
     """Analyzes empirical job telemetry to model resource scaling and advise on rightsizing."""
 
+    VALID_ACTIVE_STATES = (
+        "COMPLETED", "RUNNING", "FAILED", "TIMEOUT",
+        "OUT_OF_MEMORY", "CANCELLED", "REQUEUED", "NODE_FAIL"
+    )
+
     def __init__(self, records: List[JobTelemetryRecord]):
-        self.records = [r for r in records if r.state in ("COMPLETED", "RUNNING", "FAILED")]
+        self.records = [
+            r for r in records
+            if any(str(r.state).startswith(st) for st in self.VALID_ACTIVE_STATES)
+        ]
 
     def analyze_queue_times(self) -> Dict[str, Any]:
         """Examine how queue wait times correlate with requested resources, submission time, and batch size."""
@@ -84,6 +92,61 @@ class TelemetryAnalyzer:
             "by_submission_hour": {k: _stats(v) for k, v in sorted(hourly_waits.items())},
             "by_day_of_week": {k: _stats(v) for k, v in dow_waits.items()},
             "by_batch_size": {k: _stats(v) for k, v in batch_waits.items()},
+        }
+
+    def analyze_efficiencies(self) -> Dict[str, Any]:
+        """Compute statistical distributions and waste metrics for Time, CPU, and Memory efficiencies."""
+        time_effs = [r.time_efficiency_pct for r in self.records if r.time_efficiency_pct > 0]
+        cpu_effs = [r.cpu_efficiency_pct for r in self.records if r.cpu_efficiency_pct > 0]
+        mem_effs = [r.mem_efficiency_pct for r in self.records if r.mem_efficiency_pct > 0]
+
+        def _eff_stats(arr: List[float]) -> Dict[str, float]:
+            if not arr:
+                return {"count": 0, "mean": 0.0, "median": 0.0, "min": 0.0, "max": 0.0, "p25": 0.0, "p75": 0.0}
+            s = sorted(arr)
+            n = len(s)
+            med = s[n // 2] if n % 2 != 0 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+            p25 = s[n // 4]
+            p75 = s[(3 * n) // 4]
+            return {
+                "count": n,
+                "mean": round(sum(s) / n, 2),
+                "median": round(med, 2),
+                "min": round(min(s), 2),
+                "max": round(max(s), 2),
+                "p25": round(p25, 2),
+                "p75": round(p75, 2),
+            }
+
+        # Efficiency by job state
+        by_state: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"time_eff": [], "cpu_eff": [], "mem_eff": []})
+        for r in self.records:
+            st = r.state.split()[0] if r.state else "UNKNOWN"
+            if r.time_efficiency_pct > 0:
+                by_state[st]["time_eff"].append(r.time_efficiency_pct)
+            if r.cpu_efficiency_pct > 0:
+                by_state[st]["cpu_eff"].append(r.cpu_efficiency_pct)
+            if r.mem_efficiency_pct > 0:
+                by_state[st]["mem_eff"].append(r.mem_efficiency_pct)
+
+        state_stats = {}
+        for st, metrics in by_state.items():
+            state_stats[st] = {
+                "time_eff": _eff_stats(metrics["time_eff"]),
+                "cpu_eff": _eff_stats(metrics["cpu_eff"]),
+                "mem_eff": _eff_stats(metrics["mem_eff"]),
+            }
+
+        total_wasted_core_hours = sum(r.wasted_core_hours for r in self.records)
+        total_wasted_mem_gb_hours = sum(r.wasted_mem_gb_hours for r in self.records)
+
+        return {
+            "time_efficiency": _eff_stats(time_effs),
+            "cpu_efficiency": _eff_stats(cpu_effs),
+            "memory_efficiency": _eff_stats(mem_effs),
+            "by_state": state_stats,
+            "total_wasted_core_hours": round(total_wasted_core_hours, 2),
+            "total_wasted_mem_gb_hours": round(total_wasted_mem_gb_hours, 2),
         }
 
     def fit_resource_scaling(self) -> Dict[str, Any]:
@@ -248,3 +311,112 @@ class TelemetryAnalyzer:
             queue_advice=queue_advice,
             confidence_notes=confidence,
         )
+
+    def analyze_suite_rightsizing(self, min_jobs: int = 20) -> Dict[str, Any]:
+        """Empirically rightsize simulation suites by balancing completed resource profiles against OOM failures."""
+        by_suite: Dict[str, List[JobTelemetryRecord]] = defaultdict(list)
+        for r in self.records:
+            s = r.suite
+            if s and s not in ("None", "Unknown", "Scripts", "Defunct", "Standalone / Benchmark"):
+                by_suite[s].append(r)
+
+        suite_recommendations: Dict[str, Any] = {}
+
+        for suite_name, job_list in sorted(by_suite.items()):
+            if len(job_list) < min_jobs:
+                continue
+
+            completed = [r for r in job_list if r.state.startswith("COMPLETED")]
+            oom = [r for r in job_list if r.state.startswith("OUT_OF_MEMORY")]
+            timeout = [r for r in job_list if r.state.startswith("TIMEOUT")]
+            cancelled = [r for r in job_list if r.state.startswith("CANCELLED")]
+
+            # Memory requested for OOM jobs
+            oom_mems = [r.req_mem_gb for r in oom if r.req_mem_gb > 0]
+            oom_floor = max(oom_mems) if oom_mems else 0.0
+
+            # Completed usage stats
+            comp_rss = sorted([r.used_max_rss_gb for r in completed if r.used_max_rss_gb > 0])
+            n_rss = len(comp_rss)
+            p50_rss = comp_rss[n_rss // 2] if n_rss > 0 else 0.0
+            p90_rss = comp_rss[int(n_rss * 0.90)] if n_rss > 0 else 0.0
+            p95_rss = comp_rss[int(n_rss * 0.95)] if n_rss > 0 else 0.0
+            max_rss = comp_rss[-1] if n_rss > 0 else 0.0
+
+            comp_time = sorted([r.used_walltime_sec for r in completed if r.used_walltime_sec > 0])
+            n_time = len(comp_time)
+            p50_time = comp_time[n_time // 2] if n_time > 0 else 0.0
+            p95_time = comp_time[int(n_time * 0.95)] if n_time > 0 else 0.0
+            max_time = comp_time[-1] if n_time > 0 else 0.0
+
+            comp_cpu = [r.cpu_efficiency_pct for r in completed if r.cpu_efficiency_pct > 0]
+            median_cpu = sorted(comp_cpu)[len(comp_cpu) // 2] if comp_cpu else 100.0
+
+            # Optimal memory recommendation:
+            # Must strictly clear the empirical OOM floor with 25% cushion AND cover 95th percentile completed RSS
+            raw_target_mem = max(oom_floor * 1.25, p95_rss * 1.25, 4.0)
+            standard_tiers = [8.0, 16.0, 32.0, 64.0, 96.0, 128.0, 256.0, 500.0, 750.0]
+            rec_mem = next((t for t in standard_tiers if t >= raw_target_mem), round(raw_target_mem))
+
+            # Optimal walltime recommendation:
+            # P95 elapsed time * 1.40 cushion, with 5-minute floor
+            rec_time_sec = max(p95_time * 1.40, 300.0)
+            h = int(rec_time_sec // 3600)
+            m = int((rec_time_sec % 3600) // 60)
+            s_rem = int(rec_time_sec % 60)
+            rec_time_str = f"{h:02d}:{m:02d}:{s_rem:02d}"
+
+            # Partition & Queue advice
+            if rec_mem <= 32.0 and rec_time_sec <= 7200.0:
+                partition = "msismall"
+                queue_advice = "FAST BACKFILL ELIGIBLE: <=32 GB RAM and <=2hr walltime qualifies for instant Slurm backfill scheduling."
+            elif rec_mem <= 128.0:
+                partition = "msismall"
+                queue_advice = "STANDARD COMPUTE TIER: Balanced placement on msismall standard dual-socket nodes."
+            elif rec_mem <= 256.0:
+                partition = "msismall"
+                queue_advice = "MEDIUM MEMORY TIER: Eligible on msismall 256GB nodes (~15-45 min typical queue wait)."
+            else:
+                partition = "msismall"
+                queue_advice = "HIGH MEMORY WARNING: Allocation >256 GB restricts scheduling to rare 755GB nodes."
+
+            # OOM risk narrative
+            oom_rate = (len(oom) / len(job_list)) * 100.0 if job_list else 0.0
+            if oom_floor > 0:
+                risk_notes = (
+                    f"Historical runs with <= {oom_floor:.0f} GB memory exhibited {len(oom):,} OOM kills "
+                    f"({oom_rate:.1f}% failure rate). The recommended {rec_mem:.0f} GB allocation clears the empirical "
+                    f"{max_rss:.1f} GB peak usage ceiling with a safe margin."
+                )
+            else:
+                eff_est = (p95_rss / rec_mem * 100.0) if rec_mem > 0 else 0.0
+                risk_notes = (
+                    f"Zero OOM failures observed across {len(job_list)} runs. "
+                    f"Recommended {rec_mem:.0f} GB provides optimal ~{eff_est:.1f}% memory efficiency."
+                )
+
+            suite_recommendations[suite_name] = {
+                "sample_size": len(job_list),
+                "completed_count": len(completed),
+                "oom_count": len(oom),
+                "timeout_count": len(timeout),
+                "cancelled_count": len(cancelled),
+                "oom_failure_rate_pct": round(oom_rate, 2),
+                "oom_memory_floor_gb": oom_floor,
+                "completed_rss_p50_gb": round(p50_rss, 2),
+                "completed_rss_p95_gb": round(p95_rss, 2),
+                "completed_rss_max_gb": round(max_rss, 2),
+                "completed_walltime_p50_min": round(p50_time / 60.0, 2),
+                "completed_walltime_p95_min": round(p95_time / 60.0, 2),
+                "completed_walltime_max_min": round(max_time / 60.0, 2),
+                "median_cpu_eff_pct": round(median_cpu, 2),
+                "recommended_mem_gb": rec_mem,
+                "recommended_walltime_sec": round(rec_time_sec, 1),
+                "recommended_walltime_str": rec_time_str,
+                "recommended_cpus": 4 if rec_mem <= 64.0 else 8,
+                "recommended_partition": partition,
+                "queue_advice": queue_advice,
+                "risk_notes": risk_notes,
+            }
+
+        return suite_recommendations
