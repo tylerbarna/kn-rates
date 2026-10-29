@@ -72,15 +72,6 @@ OUTPUT_DIR="${OUTPUT_DIR:-results/02_granular_criteria_sweep/candidates}"
 RANDOMIZE_PARAMS="${RANDOMIZE_PARAMS:-0}"
 FORCE_RERUN="${FORCE_RERUN:-0}"
 
-SCRATCH_DIR="${SCRATCH_DIR:-}"
-if [ -z "${SCRATCH_DIR}" ]; then
-    if [ -d "/scratch.global/${USER:-}" ]; then
-        SCRATCH_DIR="/scratch.global/${USER:-}/kn-rates/02_granular_criteria_sweep/candidates"
-    elif [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR}" ]; then
-        SCRATCH_DIR="${TMPDIR}/candidates"
-    fi
-fi
-
 ARGS=(
     --output-dir "${OUTPUT_DIR}"
     --mode "${MODE}"
@@ -97,11 +88,6 @@ if [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
         M_IDX=$((SLURM_ARRAY_TASK_ID % 3))
         ARGS+=(--model "${MODELS[$M_IDX]}")
     fi
-fi
-
-if [ -n "${SCRATCH_DIR}" ]; then
-    mkdir -p "${SCRATCH_DIR}"
-    ARGS+=(--scratch-dir "${SCRATCH_DIR}")
 fi
 
 if [ "${RANDOMIZE_PARAMS}" = "1" ]; then
