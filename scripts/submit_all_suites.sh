@@ -45,12 +45,14 @@ mkdir -p logs \
          logs/04_historical_andreoni_comparison \
          logs/05_sample_convergence \
          logs/06_inclination_effect \
+         logs/07_gw170817_rate_limits \
          results/01_large_scale_rate_limits \
          results/02_granular_criteria_sweep \
          results/03_prior_vs_at2017gfo \
          results/04_historical_andreoni_comparison \
          results/05_sample_convergence \
-         results/06_inclination_effect
+         results/06_inclination_effect \
+         results/07_gw170817_rate_limits
 
 # If invoked interactively (outside Slurm batch), duplicate output into a timestamped log
 if [ -z "${SLURM_JOB_ID:-}" ] && [ -t 1 ]; then
@@ -99,27 +101,37 @@ job3_id=$(sbatch --parsable scripts/03_run_prior_vs_at2017gfo_comparison.sh)
 echo "  --> Suite 03 Job ID: ${job3_id}"
 
 # 4. Submit Suite 06: Inclination Discrepancy Investigation (1 task, 128 GB)
-echo "[4/6] Submitting Suite 06 (Inclination Discrepancy Investigation, 1 task, 128 GB)..."
+echo "[4/7] Submitting Suite 06 (Inclination Discrepancy Investigation, 1 task, 128 GB)..."
 job6_id=$(sbatch --parsable scripts/06_run_inclination_investigation.sh)
 echo "  --> Suite 06 Job ID: ${job6_id}"
+
+# 5. Submit Suite 07: GW170817 Fixed-Parameter Rate Limits Ensemble (400 tasks: 100 x 1M for 4 archetypes, 128 GB each)
+echo "[5/7] Submitting Suite 07 (GW170817 Fixed Ensemble, 400 array tasks, 128 GB/task)..."
+job7_id=$(sbatch --parsable scripts/07_run_gw170817_rate_limits.sh)
+echo "  --> Suite 07 Job ID: ${job7_id} (Array 0-399)"
 
 # Submit Suite 01 Aggregation & Notebook Generation (depends on Suite 01 completion, 16 GB)
 echo "[+] Submitting Suite 01 Aggregation (afterany:${job1_id}, 16 GB)..."
 agg1_id=$(sbatch --parsable --dependency="afterany:${job1_id}" scripts/01_aggregate_and_build_distributions.sh)
 echo "  --> Suite 01 Aggregation Job ID: ${agg1_id} (queued on Suite 01 termination)"
 
-# 5. Submit Suite 04: Historical Andreoni Comparison (depends on Suite 01 Aggregation completion)
-echo "[5/6] Submitting Suite 04 (Historical Andreoni Comparison, afterany:${agg1_id})..."
+# Submit Suite 07 Aggregation & Suite 01 Comparison (depends on both Suite 07 array and Suite 01 Aggregation completion)
+echo "[+] Submitting Suite 07 Aggregation & Suite 01 Comparison (afterany:${job7_id},afterany:${agg1_id}, 16 GB)..."
+agg7_id=$(sbatch --parsable --dependency="afterany:${job7_id},afterany:${agg1_id}" scripts/07_aggregate_and_compare.sh)
+echo "  --> Suite 07 Aggregation & Comparison Job ID: ${agg7_id}"
+
+# 6. Submit Suite 04: Historical Andreoni Comparison (depends on Suite 01 Aggregation completion)
+echo "[6/7] Submitting Suite 04 (Historical Andreoni Comparison, afterany:${agg1_id})..."
 job4_id=$(sbatch --parsable --dependency="afterany:${agg1_id}" scripts/04_run_andreoni_benchmark_comparison.sh)
 echo "  --> Suite 04 Job ID: ${job4_id} (queued on Suite 01 Aggregation termination)"
 
-# 6. Submit Sweep Audit & Sensitivity Analysis (depends on Suite 02 completion, allocated 16 GB with full conda environment)
+# 7. Submit Sweep Audit & Sensitivity Analysis (depends on Suite 02 completion, allocated 16 GB with full conda environment)
 echo "[+] Submitting Sweep Audit & Sensitivity Analysis (afterany:${job2_id}, 16 GB)..."
 audit_job_id=$(sbatch --parsable --dependency="afterany:${job2_id}" scripts/02_run_audit_job.sh)
 echo "  --> Sweep Audit Job ID: ${audit_job_id} (queued on Suite 02 termination)"
 
-# 7. Submit Suite 05: Sample Size Convergence (10k vs 100k vs 1M vs 10M, runs after Suite 04)
-echo "[6/6] Submitting Suite 05 (Sample Size Convergence Grid, afterany:${job4_id})..."
+# 8. Submit Suite 05: Sample Size Convergence (10k vs 100k vs 1M vs 10M, runs after Suite 04)
+echo "[7/7] Submitting Suite 05 (Sample Size Convergence Grid, afterany:${job4_id})..."
 job5_id=$(sbatch --parsable --dependency="afterany:${job4_id}" scripts/05_run_sample_convergence.sh)
 echo "  --> Suite 05 Job ID: ${job5_id} (queued on Suite 04 termination)"
 
@@ -133,6 +145,8 @@ printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 01 Agg" "${agg1_id}" "1 
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 02" "${job2_id}" "4,560 tasks" "128 GB" "None (Immediate)"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 03" "${job3_id}" "1 task" "256 GB" "None (Immediate)"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 06" "${job6_id}" "1 task" "128 GB" "None (Immediate)"
+printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 07" "${job7_id}" "400 tasks" "128 GB" "None (Immediate)"
+printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 07 Agg" "${agg7_id}" "1 task" "16 GB" "afterany:${job7_id},${agg1_id}"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 04" "${job4_id}" "1 task" "256 GB" "afterany:${agg1_id}"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Sweep Audit" "${audit_job_id}" "1 task" "16 GB" "afterany:${job2_id}"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 05" "${job5_id}" "1 task" "750 GB" "afterany:${job4_id}"

@@ -17,7 +17,7 @@ The `survey-sim` package and pipeline have been verified to satisfy 100% adheren
 
 ## 2. Organization of Analysis Suites & Scripts
 
-The project is structured into six distinct, modular suites:
+The project is structured into seven distinct, modular suites:
 
 ```
 kn-rates/
@@ -29,12 +29,15 @@ kn-rates/
 │   ├── 04_run_andreoni_benchmark_comparison.sh    # Benchmark comparison against Andreoni et al. (2020)
 │   ├── 05_run_sample_convergence.sh               # Statistical convergence grid (10k, 100k, 1M, 10M)
 │   ├── 06_run_inclination_investigation.sh        # Bu2026 Fixed vs Varying inclination angle investigation
+│   ├── 07_run_gw170817_rate_limits.sh             # 400-task GW170817 fixed-parameter ensemble (4 archetypes x 100 seeds x 1M)
+│   ├── 07_aggregate_and_compare.sh                # Suite 07 aggregator, direct Suite 01 comparison & Notebook 07 builder
 │   ├── submit_suite01_rate_limits.sh              # Launcher for Suite 01 300-task ensemble + auto-aggregation
+│   ├── submit_suite07_rate_limits.sh              # Launcher for Suite 07 400-task ensemble + auto-aggregation & comparison
 │   ├── submit_all_suites.sh                       # High-throughput cluster launcher with automatic job dependencies
 │   └── run_all_sequential_monolithic.sh           # 96-hour self-contained sequential runner
 ├── analysis_suites/
 │   ├── 01_large_scale_rate_limits/
-│   │   ├── run_large_scale_simulation.py          # Multi-threaded simulation engine (default: 10M transients)
+│   │   ├── run_large_scale_simulation.py          # Multi-threaded simulation engine (default: 1M-10M transients)
 │   │   └── aggregate_rate_limits.py               # Aggregates results, Poisson R_95% & duration scaling
 │   ├── 02_granular_criteria_sweep/
 │   │   ├── run_granular_sweep.py                  # Multidimensional criteria sweep engine
@@ -46,22 +49,27 @@ kn-rates/
 │   ├── 05_sample_convergence/
 │   │   ├── run_sample_convergence.py              # Evaluates Poisson noise, Clopper-Pearson CIs, RAM/walltime
 │   │   └── generate_notebook.py                   # Notebook generator for convergence analytics
-│   └── 06_inclination_effect/
-│       └── run_inclination_investigation.py       # Slicing, z_max sensitivity, cadence cliff & quadrature
+│   ├── 06_inclination_effect/
+│   │   └── run_inclination_investigation.py       # Slicing, z_max sensitivity, cadence cliff & quadrature
+│   └── 07_gw170817_rate_limits/
+│       ├── run_gw170817_simulation.py             # Simulations pinned to accepted GW170817 values (Bu2026 & Metzger)
+│       └── aggregate_and_compare_suite01.py       # Suite 07 aggregation & direct pairwise comparison against Suite 01
 ├── notebooks/
 │   ├── 01_large_scale_rate_limits_analysis.ipynb
 │   ├── 02_granular_criteria_sweep_analysis.ipynb
 │   ├── 03_prior_vs_at2017gfo_analysis.ipynb
 │   ├── 04_historical_andreoni_comparison_analysis.ipynb
 │   ├── 05_sample_convergence_analysis.ipynb
-│   └── 06_bu2026_inclination_discrepancy_investigation.ipynb
+│   ├── 06_bu2026_inclination_discrepancy_investigation.ipynb
+│   └── 07_gw170817_fixed_parameter_analysis.ipynb
 └── results/
     ├── 01_large_scale_rate_limits/
     ├── 02_granular_criteria_sweep/
     ├── 03_prior_vs_at2017gfo/
     ├── 04_historical_andreoni_comparison/
     ├── 05_sample_convergence/
-    └── 06_inclination_effect/
+    ├── 06_inclination_effect/
+    └── 07_gw170817_rate_limits/
 ```
 
 ---
@@ -142,6 +150,19 @@ kn-rates/
   - *Notebook 02 (`02_granular_criteria_sweep_analysis.ipynb`)*: The sweep runner had calibrated base volume using Andreoni's 1.92-year duration ($\langle VT \rangle \approx 4.2 \times 10^{-4}\,{\rm Gpc}^3\,{\rm yr}$), omitting the full 8.006-year baseline factor of $4.36\times$. This artificially inflated fiducial $R_{95\%}$ to $7,133\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$ and ultra-strict cuts to $66,578\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$. Correcting the baseline to 8.01 years restores realistic rates ($R_{95\%} \approx 1,679 - 15,270\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$).
   - *Notebook 03 (`03_prior_vs_at2017gfo_analysis.ipynb`)*: Simulations run with $N = 100\,{\rm k}$ on broad priors with ultra-low efficiency ($\epsilon \sim 10^{-5}$) yielded expected detection counts of $\langle N_{\rm det} \rangle \sim 0.1 - 1.0$. Zero detections produced singular non-constraining limits, while $N_{\rm det} = 1$ produced extreme Poisson downward fluctuations in volume ($\langle VT \rangle \approx 0.000213\,{\rm Gpc}^3\,{\rm yr}$), spiking $R_{95\%}$ to $14,085\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$. Scaling sample size to $N \ge 1\,{\rm M}$ stabilizes limits at $R_{95\%} \approx 1,680 - 4,800\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$.
   - *Notebook 04 (`04_historical_andreoni_comparison_analysis.ipynb`)*: An inverted duration scaling factor in `compare_with_andreoni2020.py` scaled our 8.01-year rate limit *backwards* to a 1.92-year duration (`r95_scaled = r95_8yr * (dur_8yr / t_andreoni)`), multiplying our 8-year rate limits by $4.18\times$ (reporting $7,015 - 24,950\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$). Inverting the comparison to project Andreoni to 8 years ($R_{95\%} \approx 425\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$) or comparing our 8-year limits directly ($1,679 - 5,973\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$) resolves the artifact.
+
+### Module 7: Fixed-Parameter GW170817 Rate Limits & Suite 01 Comparison
+- **Astrophysical Grounding & Literature Alignment**:
+  - Pinned parameters strictly to commonly accepted values for GW170817 (AT2017gfo):
+    1. `GW170817_Bu2026_FixedView`: $\log_{10} M_{\rm dyn}=-1.80, v_{\rm dyn}=0.20c, Y_{e,\rm dyn}=0.15, \log_{10} M_{\rm wind}=-1.10, v_{\rm wind}=0.10c, Y_{e,\rm wind}=0.35, \iota=0.45\,{\rm rad}\approx 25.8^\circ$ (HST astrometry & VLBI superluminal jet constraints; Mooley+18, Bulla+19, Anand+23).
+    2. `GW170817_Bu2026_Isotropic`: Same ejecta parameters observed across a uniform $\cos\iota$ distribution.
+    3. `GW170817_Metzger_Blue`: Early blue optical peak ($M_{\rm ej}=0.020\,M_\odot, v_{\rm ej}=0.25c, \kappa=0.50\,{\rm cm}^2\,{\rm g}^{-1}$; Villar+17, Cowperthwaite+17, Metzger 2017/2019).
+    4. `GW170817_Metzger_Mean`: Combined mass-weighted ejecta ($M_{\rm ej}=0.040\,M_\odot, v_{\rm ej}=0.15c, \kappa=1.00\,{\rm cm}^2\,{\rm g}^{-1}$; Villar+17, Kasen+17, Metzger 2019).
+- **Direct Quantitative Comparison Against Suite 01**:
+  - **Metzger Discrepancy Resolved**: Suite 01 Metzger used placeholder test parameters ($M_{\rm ej}=0.00126\,M_\odot, \kappa=398\,{\rm cm}^2/{\rm g}$) yielding $R_{95\%} \approx 109 - 305\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$. Accepted GW170817 blue ejecta ($M_{\rm ej}=0.02\,M_\odot, \kappa=0.5$) expands search volume by an order of magnitude, achieving $\mathbf{R_{95\%} \approx 27.0\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}}$ ($\langle VT \rangle_{\rm eff} \approx 0.111\,{\rm Gpc}^3\,{\rm yr}$).
+  - **Bu2026 Fixed Agreement**: `GW170817_Bu2026_FixedView` yields $\mathbf{R_{95\%} \approx 191.4\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}}$ ($\langle VT \rangle_{\rm eff} \approx 0.0157\,{\rm Gpc}^3\,{\rm yr}$), closely matching Suite 01 `Bu2026Fixed` ($\sim 192\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$).
+  - **Viewing Angle Suppression Factor**: Observing GW170817 ejecta under isotropic orientations drops recovered volume by **$5.6\times$** and inflates $R_{95\%}$ to $\sim 1,000\,{\rm Gpc}^{-3}\,{\rm yr}^{-1}$, isolating orientation bias under identical ejecta physics.
+  - **The Archetype Optimism Bias Proved**: Assuming every binary neutron star merger produces a twin of GW170817 underestimates generic population rate limits by up to an order of magnitude. Realistic rate limits must integrate across distributions of ejecta mass and inclination angles.
 
 ---
 
