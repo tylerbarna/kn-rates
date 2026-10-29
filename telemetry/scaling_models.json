@@ -1,6 +1,6 @@
 {
   "last_updated": "",
-  "total_tracked_jobs": 30958,
+  "total_tracked_jobs": 31739,
   "scaling_models": {
     "Metzger": {
       "ram_gb_per_million": 25.556,
@@ -33,21 +33,21 @@
   "queue_characteristics": {
     "by_memory_tier": {
       "Standard (<= 32 GB)": {
-        "count": 11581,
-        "mean_min": 11.63,
+        "count": 11972,
+        "mean_min": 11.26,
         "median_min": 0.0,
         "max_min": 638.25
       },
       "Medium (33 - 128 GB)": {
-        "count": 8162,
-        "mean_min": 208.47,
-        "median_min": 71.5,
+        "count": 8461,
+        "mean_min": 203.35,
+        "median_min": 71.47,
         "max_min": 1075.12
       },
       "High-Memory (129 - 755 GB)": {
-        "count": 4632,
-        "mean_min": 1519.33,
-        "median_min": 677.57,
+        "count": 4721,
+        "mean_min": 1496.26,
+        "median_min": 631.05,
         "max_min": 3877.18
       }
     },
@@ -131,9 +131,9 @@
         "max_min": 3636.97
       },
       "20": {
-        "count": 48,
-        "mean_min": 64.8,
-        "median_min": 1.33,
+        "count": 437,
+        "mean_min": 111.2,
+        "median_min": 60.4,
         "max_min": 663.5
       },
       "21": {
@@ -141,6 +141,12 @@
         "mean_min": 52.3,
         "median_min": 49.35,
         "max_min": 638.85
+      },
+      "23": {
+        "count": 1,
+        "mean_min": 2.3,
+        "median_min": 2.3,
+        "max_min": 2.3
       }
     },
     "by_day_of_week": {
@@ -157,9 +163,9 @@
         "max_min": 1648.02
       },
       "Wed": {
-        "count": 358,
-        "mean_min": 19.59,
-        "median_min": 4.47,
+        "count": 748,
+        "mean_min": 70.19,
+        "median_min": 31.1,
         "max_min": 2744.95
       },
       "Fri": {
@@ -177,9 +183,9 @@
     },
     "by_batch_size": {
       "Single Task (1)": {
-        "count": 24359,
-        "mean_min": 364.23,
-        "median_min": 39.73,
+        "count": 25138,
+        "mean_min": 354.75,
+        "median_min": 37.17,
         "max_min": 3877.18
       },
       "Small Array (2 - 50)": {
