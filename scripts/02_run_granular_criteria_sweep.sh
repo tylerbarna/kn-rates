@@ -21,10 +21,10 @@
 # ==============================================================================
 # Resource allocations aligned with MSI msismall partition (3900 MB/core):
 #SBATCH -p msismall
-#SBATCH --time=71:00:00
+#SBATCH --time=18:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=256g
+#SBATCH --mem=64g
 #SBATCH --tmp=30g
 #SBATCH --array=0-4559
 #SBATCH --mail-type=BEGIN,END,FAIL
