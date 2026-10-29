@@ -8,6 +8,10 @@
 #   ./scripts/install_cron.sh --uninstall # Removes telemetry job from scrontab
 #   ./scripts/install_cron.sh --status    # Checks active cron status and recent log
 # ==============================================================================
+#SBATCH --job-name=telemetry_cron
+#SBATCH --time=00:10:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
 
 set -euo pipefail
 

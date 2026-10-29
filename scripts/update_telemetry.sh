@@ -6,6 +6,7 @@
 # telemetry/job_resource_registry.csv and telemetry/scaling_models.json,
 # and outputs an updated queue and rightsizing summary.
 # ==============================================================================
+#SBATCH --job-name=telemetry
 
 set -euo pipefail
 

@@ -8,6 +8,10 @@
 #   telemetry/job_resource_registry.csv and telemetry/scaling_models.json,
 #   and optionally auto-commits changes to git.
 # ==============================================================================
+#SBATCH --job-name=telemetry_cron
+#SBATCH --time=00:10:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
 
 set -uo pipefail
 
