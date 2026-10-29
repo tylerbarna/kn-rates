@@ -66,15 +66,15 @@ nb1_cells = [
 This notebook performs an exhaustive scientific analysis of large-scale Monte Carlo simulations conducted across the complete 8-year legacy dataset of the Zwicky Transient Facility (ZTF; March 2018 through March 2026, corresponding to 97 monthly observing epochs and 8.006 years).
 
 Simulations are evaluated for three canonical kilonova theoretical models:
-1. **`Metzger`**: Semi-analytic fast-ejecta model ($M_{\mathrm{ej}} = 0.00126\\,M_\\odot$, $v_{\mathrm{ej}} = 0.50c$, $\\kappa = 398\\,{\mathrm{cm}}^2\\,{\mathrm{g}}^{-1}$)
-2. **`Bu2026Fixed`**: Multi-component numerical model combining lanthanide-rich dynamical ejecta and lanthanide-poor disk wind ejecta evaluated via `Fiesta` neural surrogates at fixed viewing angle $\\iota = 0.45\\,{\mathrm{rad}} \\approx 26^\\circ$.
-3. **`Bu2026Vary`**: Multi-component numerical model with isotropic viewing angle distribution (uniform in $\\cos\\iota$).
+1. **`Metzger`**: Semi-analytic fast-ejecta model ($M_{\mathrm{ej}} = 0.00126\,M_\odot$, $v_{\mathrm{ej}} = 0.50c$, $\kappa = 398\,{\mathrm{cm}}^2\,{\mathrm{g}}^{-1}$)
+2. **`Bu2026Fixed`**: Multi-component numerical model combining lanthanide-rich dynamical ejecta and lanthanide-poor disk wind ejecta evaluated via `Fiesta` neural surrogates at fixed viewing angle $\iota = 0.45\,{\mathrm{rad}} \approx 26^\circ$.
+3. **`Bu2026Vary`**: Multi-component numerical model with isotropic viewing angle distribution (uniform in $\cos\iota$).
 
 ### Review of Commit Requirements Adherence
 As demonstrated in commit `b02ac55`:
 - **100.00% Adherence** achieved across all measurable selection rules:
-  - Minimum positive detections ($N_{\mathrm{pos}} \\ge N_{\mathrm{min}}$): 0 violations out of 397,529 audited sources.
-  - Maximum qualifying timespan ($t_{\mathrm{last}} - t_{\mathrm{first}} \\le \\Delta t_{\mathrm{max}}$): 0 violations.
+  - Minimum positive detections ($N_{\mathrm{pos}} \ge N_{\mathrm{min}}$): 0 violations out of 397,529 audited sources.
+  - Maximum qualifying timespan ($t_{\mathrm{last}} - t_{\mathrm{first}} \le \Delta t_{\mathrm{max}}$): 0 violations.
   - Minimum first-to-last time separation: 0 violations.
 - **Eradication of Surrogate Extrapolation Tails**: 0 detected sources with duration $>30$ days (eliminating neural surrogate unphysical artifacts)."""),
 
@@ -94,6 +94,40 @@ plt.rcParams.update({
     'figure.titlesize': 16,
     'figure.autolayout': True,
 })
+
+def automatic_log_break(values, min_factor=2.5, min_robust_score=3.0, pad_fraction=0.08):
+    '''Find a robust log-scale gap and return padded low/high axis limits.'''
+    values = np.asarray(values, dtype=float)
+    values = np.sort(values[np.isfinite(values) & (values > 0)])
+    if values.size < 4:
+        return None
+    log_values = np.log10(values)
+    gaps = np.diff(log_values)
+    positive_gaps = gaps[gaps > 0]
+    if positive_gaps.size == 0:
+        return None
+    index = int(np.argmax(gaps))
+    local_spacing = np.median(positive_gaps)
+    if gaps[index] < np.log10(min_factor) or gaps[index] < min_robust_score * local_spacing:
+        return None
+    low_end = 10 ** (log_values[index] + pad_fraction * gaps[index])
+    high_start = 10 ** (log_values[index + 1] - pad_fraction * gaps[index])
+    return ((float(values[0] / 1.05), float(low_end)),
+            (float(high_start), float(values[-1] * 1.05)))
+
+def add_break_marks(left_ax, right_ax, d=0.5, markersize=12):
+    '''Draw diagonal marks indicating a horizontal broken axis (break along x).'''
+    kwargs = dict(marker=[(-d, -1), (d, 1)], markersize=markersize,
+                  linestyle='none', color='k', mec='k', mew=1, clip_on=False)
+    left_ax.plot([1, 1], [0, 1], transform=left_ax.transAxes, **kwargs)
+    right_ax.plot([0, 0], [0, 1], transform=right_ax.transAxes, **kwargs)
+
+def add_vertical_break_marks(top_ax, bottom_ax, d=0.5, markersize=12):
+    '''Draw diagonal marks indicating a vertical broken axis (break along y).'''
+    kwargs = dict(marker=[(-1, -d), (1, d)], markersize=markersize,
+                  linestyle='none', color='k', mec='k', mew=1, clip_on=False)
+    top_ax.plot([0, 1], [0, 0], transform=top_ax.transAxes, **kwargs)
+    bottom_ax.plot([0, 1], [1, 1], transform=bottom_ax.transAxes, **kwargs)
 
 print("Environment initialized successfully.")"""),
 
@@ -132,6 +166,9 @@ print("Run counts by model family:")
 print(df['model'].value_counts())"""),
 
     md_cell(r"""## 2. Statistical Analysis of 8-Year ZTF Rate Limits
+
+### Automatic Broken-Axis Rule
+For each positive quantity on a log axis, the detail plots sort $x_i$ and identify the largest adjacent log-space gap $g_k = \log_{10}(x_{k+1}) - \log_{10}(x_k)$. A break is drawn only when $g_k \ge \log_{10}(2.5)$ and $g_k / \operatorname{median}(g_i > 0) \ge 3$, with an 8% logarithmic padding on each side. This dimensionless rule follows new simulation ranges while avoiding breaks caused by ordinary sampling noise.
 
 Under Poisson statistics for zero observed kilonova events ($N_{\mathrm{obs}} = 0$), the upper limit on the volumetric rate at confidence level $CL$ is given by:
 $$R_{CL} = \frac{-\ln(1 - CL)}{\langle VT \rangle_{\mathrm{eff}}}$$
@@ -209,9 +246,10 @@ axes[0].boxplot(data_to_plot, tick_labels=models, showmeans=True, patch_artist=T
                 medianprops=dict(color='red', linewidth=2),
                 meanprops=dict(marker='o', markeredgecolor='black', markerfacecolor='green'))
 axes[0].set_yscale('log')
-axes[0].set_ylabel(r'$R_{95\%}\;[\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}]$ (8-Year ZTF)')
+axes[0].set_ylabel(r'$R_{95\%}\;[\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}]$ (8-Year ZTF)', labelpad=12)
 axes[0].set_title('8-Year Volumetric Rate Limits (95% CL)')
 axes[0].grid(True, which='both', linestyle='--', alpha=0.5)
+plt.setp(axes[0].get_xticklabels(), rotation=25, ha='right')
 
 # Plot 2: Empirical Cumulative Distribution Functions (ECDF)
 for m, color in zip(models, ['#1f77b4', '#ff7f0e', '#2ca02c']):
@@ -221,13 +259,91 @@ for m, color in zip(models, ['#1f77b4', '#ff7f0e', '#2ca02c']):
 
 axes[1].set_xscale('log')
 axes[1].set_xlabel(r'$R_{95\%}\;[\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}]$')
-axes[1].set_ylabel('Cumulative Probability')
+axes[1].set_ylabel('Cumulative Probability', labelpad=10)
 axes[1].set_title('ECDF of Estimated Rate Limits')
 axes[1].legend(loc='lower right')
 axes[1].grid(True, which='both', linestyle='--', alpha=0.5)
+plt.setp(axes[1].get_xticklabels(), rotation=25, ha='right')
 
 plt.tight_layout()
-plt.show()"""),
+plt.show()
+
+# Detail view: the same plots with automatic broken axes when a robust gap exists.
+rate_break = automatic_log_break(df['R_95'])
+if rate_break is not None:
+    (rate_low, rate_low_end), (rate_high_start, rate_high) = rate_break
+    detail_fig = plt.figure(figsize=(13, 6), layout=None)
+    grid = detail_fig.add_gridspec(2, 3, width_ratios=[1.3, 1.0, 1.0],
+                                   height_ratios=[1, 1], hspace=0.10, wspace=0.08)
+
+    box_high = detail_fig.add_subplot(grid[0, 0])
+    box_low = detail_fig.add_subplot(grid[1, 0], sharex=box_high)
+
+    for box_ax in (box_high, box_low):
+        box_ax.boxplot(data_to_plot, tick_labels=models, showmeans=True, patch_artist=True,
+                       boxprops=dict(facecolor='lightblue', alpha=0.7),
+                       medianprops=dict(color='red', linewidth=2),
+                       meanprops=dict(marker='o', markeredgecolor='black', markerfacecolor='green'))
+        box_ax.set_yscale('log')
+        box_ax.grid(True, which='both', linestyle='--', alpha=0.4)
+
+    box_high.set_ylim(rate_high_start, rate_high)
+    box_low.set_ylim(rate_low, rate_low_end)
+
+    # Hide inner spines and ticks between box_high and box_low
+    box_high.spines['bottom'].set_visible(False)
+    box_low.spines['top'].set_visible(False)
+    box_high.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+    box_high.set_title('8-Year Volumetric Rate Limits (95% CL)', y=1.03, fontsize=13)
+
+    # Angle x-axis labels on boxplot
+    plt.setp(box_low.get_xticklabels(), rotation=25, ha='right')
+
+    # Place y-axis label with generous offset to prevent overlap with tick labels
+    box_high.set_ylabel(r'$R_{95\%}\;[\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}]$ (8-Year ZTF)', fontsize=12)
+    box_high.yaxis.set_label_coords(-0.20, 0.0)
+
+    add_vertical_break_marks(box_high, box_low)
+
+    # ECDF panels
+    ecdf_low = detail_fig.add_subplot(grid[:, 1])
+    ecdf_high = detail_fig.add_subplot(grid[:, 2], sharey=ecdf_low)
+
+    for m, color in zip(models, ['#1f77b4', '#ff7f0e', '#2ca02c']):
+        vals = np.sort(df[df['model'] == m]['R_95'].dropna())
+        ecdf = np.arange(1, len(vals) + 1) / len(vals)
+        ecdf_low.plot(vals, ecdf, label=f'{m} ({np.median(vals):.0f})', color=color, linewidth=2)
+        ecdf_high.plot(vals, ecdf, label=f'{m} ({np.median(vals):.0f})', color=color, linewidth=2)
+
+    for ecdf_ax in (ecdf_low, ecdf_high):
+        ecdf_ax.set_xscale('log')
+        ecdf_ax.grid(True, which='both', linestyle='--', alpha=0.4)
+
+    ecdf_low.set_xlim(rate_low, rate_low_end)
+    ecdf_high.set_xlim(rate_high_start, rate_high)
+
+    ecdf_low.spines['right'].set_visible(False)
+    ecdf_high.spines['left'].set_visible(False)
+    ecdf_high.tick_params(axis='y', which='both', left=False, labelleft=False)
+
+    # Angle x-axis ticks on ECDF
+    plt.setp(ecdf_low.get_xticklabels(), rotation=25, ha='right')
+    plt.setp(ecdf_high.get_xticklabels(), rotation=25, ha='right')
+
+    ecdf_low.set_ylabel('Cumulative Probability', labelpad=10)
+    ecdf_low.set_xlabel(r'$R_{95\%}\;[\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}]$ (lower regime)', fontsize=11)
+    ecdf_high.set_xlabel(r'$R_{95\%}\;[\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}]$ (upper regime)', fontsize=11)
+    ecdf_high.legend(loc='lower right', frameon=True, fontsize=10)
+
+    add_break_marks(ecdf_low, ecdf_high)
+
+    ecdf_low.set_title('ECDF of Estimated Rate Limits', x=1.04, y=1.03, fontsize=13)
+
+    detail_fig.suptitle(f'Automatic broken-axis detail (gap factor: {rate_high_start / rate_low_end:.1f}x)', y=0.98, fontsize=15)
+    detail_fig.subplots_adjust(left=0.14, right=0.98, bottom=0.18, top=0.87)
+    plt.show()
+else:
+    print('No robust rate gap found; the existing full-range plots remain the detailed view.')"""),
 
     code_cell(r"""# Visualization: Effective Search Volume (<VT>_eff) vs Detection Efficiency
 fig, ax = plt.subplots(figsize=(8, 5))
@@ -235,16 +351,188 @@ fig, ax = plt.subplots(figsize=(8, 5))
 for m, marker, color in zip(models, ['o', 's', '^'], ['#1f77b4', '#ff7f0e', '#2ca02c']):
     sub = df[df['model'] == m]
     ax.scatter(sub['overall_efficiency'], sub['effective_vt_gpc3_yr'] * 1e3,
-               label=m, alpha=0.6, edgecolors='none', s=40, color=color)
+               label=m, alpha=0.6, edgecolors='none', s=40, marker=marker, color=color)
 
 ax.set_xscale('log')
 ax.set_yscale('log')
 ax.set_xlabel(r'Overall Detection Efficiency $\epsilon$')
-ax.set_ylabel(r'Effective Volume-Time $\langle VT \rangle_{\mathrm{eff}}\;[10^{-3}\,\mathrm{Gpc}^3\,\mathrm{yr}]$')
+ax.set_ylabel(r'Effective Volume-Time $\langle VT \rangle_{\mathrm{eff}}\;[10^{-3}\,\mathrm{Gpc}^3\,\mathrm{yr}]$', labelpad=12)
 ax.set_title(r'Detection Efficiency vs. Effective Search Volume ($\langle VT \rangle_{\mathrm{eff}}$)')
 ax.legend()
 ax.grid(True, which='both', linestyle='--', alpha=0.5)
-plt.show()"""),
+plt.setp(ax.get_xticklabels(), rotation=25, ha='right')
+plt.show()
+
+# Detail view: independently detect gaps in efficiency and effective volume-time.
+efficiency_break = automatic_log_break(df['overall_efficiency'])
+vt_values = df['effective_vt_gpc3_yr'] * 1e3
+vt_break = automatic_log_break(vt_values)
+
+if efficiency_break is not None and vt_break is not None:
+    (x_low, x_low_end), (x_high_start, x_high) = efficiency_break
+    (y_low, y_low_end), (y_high_start, y_high) = vt_break
+    
+    x_widths = [np.log10(x_low_end / x_low), np.log10(x_high / x_high_start)]
+    y_heights = [np.log10(y_high / y_high_start), np.log10(y_low_end / y_low)]
+    
+    detail_fig = plt.figure(figsize=(10, 8), layout=None)
+    gs = detail_fig.add_gridspec(2, 2, width_ratios=x_widths, height_ratios=y_heights,
+                                 hspace=0.08, wspace=0.08)
+    
+    ax_tl = detail_fig.add_subplot(gs[0, 0])
+    ax_tr = detail_fig.add_subplot(gs[0, 1], sharey=ax_tl)
+    ax_bl = detail_fig.add_subplot(gs[1, 0], sharex=ax_tl)
+    ax_br = detail_fig.add_subplot(gs[1, 1], sharex=ax_tr, sharey=ax_bl)
+    
+    for ax_detail in (ax_tl, ax_tr, ax_bl, ax_br):
+        for m, marker, color in zip(models, ['o', 's', '^'], ['#1f77b4', '#ff7f0e', '#2ca02c']):
+            sub = df[df['model'] == m]
+            ax_detail.scatter(sub['overall_efficiency'], sub['effective_vt_gpc3_yr'] * 1e3,
+                              label=m, alpha=0.6, edgecolors='none', s=40, marker=marker, color=color)
+        ax_detail.set_xscale('log')
+        ax_detail.set_yscale('log')
+        ax_detail.grid(True, which='both', linestyle='--', alpha=0.4)
+        
+    ax_tl.set_xlim(x_low, x_low_end)
+    ax_tl.set_ylim(y_high_start, y_high)
+    ax_tr.set_xlim(x_high_start, x_high)
+    ax_tr.set_ylim(y_high_start, y_high)
+    ax_bl.set_xlim(x_low, x_low_end)
+    ax_bl.set_ylim(y_low, y_low_end)
+    ax_br.set_xlim(x_high_start, x_high)
+    ax_br.set_ylim(y_low, y_low_end)
+    
+    # Hide inner spines
+    ax_tl.spines['bottom'].set_visible(False)
+    ax_tl.spines['right'].set_visible(False)
+    ax_tr.spines['bottom'].set_visible(False)
+    ax_tr.spines['left'].set_visible(False)
+    ax_bl.spines['top'].set_visible(False)
+    ax_bl.spines['right'].set_visible(False)
+    ax_br.spines['top'].set_visible(False)
+    ax_br.spines['left'].set_visible(False)
+    
+    # Ticks along broken inner boundaries (both major and minor)
+    ax_tl.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+    ax_tr.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+    ax_tr.tick_params(axis='y', which='both', left=False, labelleft=False)
+    ax_br.tick_params(axis='y', which='both', left=False, labelleft=False)
+    
+    # Angle x-axis ticks
+    plt.setp(ax_bl.get_xticklabels(), rotation=35, ha='right')
+    plt.setp(ax_br.get_xticklabels(), rotation=35, ha='right')
+    
+    # Break marks along outer boundaries
+    d = 0.5
+    h_kwargs = dict(marker=[(-d, -1), (d, 1)], markersize=12, linestyle='none', color='k', mec='k', mew=1, clip_on=False)
+    v_kwargs = dict(marker=[(-1, -d), (1, d)], markersize=12, linestyle='none', color='k', mec='k', mew=1, clip_on=False)
+    
+    # Horizontal breaks (top and bottom edges)
+    ax_tl.plot([1], [1], transform=ax_tl.transAxes, **h_kwargs)
+    ax_tr.plot([0], [1], transform=ax_tr.transAxes, **h_kwargs)
+    ax_bl.plot([1], [0], transform=ax_bl.transAxes, **h_kwargs)
+    ax_br.plot([0], [0], transform=ax_br.transAxes, **h_kwargs)
+    
+    # Vertical breaks (left and right edges)
+    ax_tl.plot([0], [0], transform=ax_tl.transAxes, **v_kwargs)
+    ax_bl.plot([0], [1], transform=ax_bl.transAxes, **v_kwargs)
+    ax_tr.plot([1], [0], transform=ax_tr.transAxes, **v_kwargs)
+    ax_br.plot([1], [1], transform=ax_br.transAxes, **v_kwargs)
+    
+    # Axis labels
+    ax_bl.set_xlabel(r'Overall Detection Efficiency $\epsilon$ (lower regime)', fontsize=11)
+    ax_br.set_xlabel(r'Overall Detection Efficiency $\epsilon$ (upper regime)', fontsize=11)
+    
+    # Ample left margin and clear spacing between y-ticks and y-label to avoid any overlap
+    detail_fig.text(0.045, 0.50, r'Effective Volume-Time $\langle VT \rangle_{\mathrm{eff}}\;[10^{-3}\,\mathrm{Gpc}^3\,\mathrm{yr}]$',
+                    ha='center', va='center', rotation='vertical', fontsize=13)
+    
+    # Legend in empty top-left quadrant
+    handles, labels = ax_br.get_legend_handles_labels()
+    ax_tl.legend(handles, labels, loc='center', frameon=True, fontsize=11, title='Model Families')
+    ax_tl.text(0.5, 0.15, '(No simulations in\nthis parameter regime)', transform=ax_tl.transAxes,
+               ha='center', va='center', color='gray', style='italic', fontsize=10)
+    
+    detail_fig.suptitle('Automatic broken-axis detail: Detection Efficiency vs. Search Volume', y=0.97, fontsize=14)
+    detail_fig.subplots_adjust(left=0.18, right=0.96, bottom=0.16, top=0.91)
+    plt.show()
+
+elif vt_break is not None:
+    (y_low, y_low_end), (y_high_start, y_high) = vt_break
+    y_heights = [np.log10(y_high / y_high_start), np.log10(y_low_end / y_low)]
+    
+    detail_fig = plt.figure(figsize=(9, 7), layout=None)
+    gs = detail_fig.add_gridspec(2, 1, height_ratios=y_heights, hspace=0.08)
+    ax_top = detail_fig.add_subplot(gs[0, 0])
+    ax_bottom = detail_fig.add_subplot(gs[1, 0], sharex=ax_top)
+    
+    for ax_detail in (ax_top, ax_bottom):
+        for m, marker, color in zip(models, ['o', 's', '^'], ['#1f77b4', '#ff7f0e', '#2ca02c']):
+            sub = df[df['model'] == m]
+            ax_detail.scatter(sub['overall_efficiency'], sub['effective_vt_gpc3_yr'] * 1e3,
+                              label=m, alpha=0.6, edgecolors='none', s=40, marker=marker, color=color)
+        ax_detail.set_xscale('log')
+        ax_detail.set_yscale('log')
+        ax_detail.grid(True, which='both', linestyle='--', alpha=0.4)
+        
+    ax_top.set_ylim(y_high_start, y_high)
+    ax_bottom.set_ylim(y_low, y_low_end)
+    
+    ax_top.spines['bottom'].set_visible(False)
+    ax_bottom.spines['top'].set_visible(False)
+    ax_top.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
+    
+    add_vertical_break_marks(ax_top, ax_bottom)
+    
+    ax_bottom.set_xlabel(r'Overall Detection Efficiency $\epsilon$', fontsize=12)
+    plt.setp(ax_bottom.get_xticklabels(), rotation=25, ha='right')
+    
+    detail_fig.text(0.03, 0.5, r'Effective Volume-Time $\langle VT \rangle_{\mathrm{eff}}\;[10^{-3}\,\mathrm{Gpc}^3\,\mathrm{yr}]$',
+                    ha='center', va='center', rotation='vertical', fontsize=13)
+    ax_top.legend(loc='upper right', frameon=True)
+    detail_fig.suptitle('Automatic broken-axis detail for search volume', y=0.96, fontsize=14)
+    detail_fig.subplots_adjust(left=0.16, right=0.96, bottom=0.15, top=0.90)
+    plt.show()
+
+elif efficiency_break is not None:
+    (x_low, x_low_end), (x_high_start, x_high) = efficiency_break
+    x_widths = [np.log10(x_low_end / x_low), np.log10(x_high / x_high_start)]
+    
+    detail_fig = plt.figure(figsize=(10, 5), layout=None)
+    gs = detail_fig.add_gridspec(1, 2, width_ratios=x_widths, wspace=0.08)
+    ax_left = detail_fig.add_subplot(gs[0, 0])
+    ax_right = detail_fig.add_subplot(gs[0, 1], sharey=ax_left)
+    
+    for ax_detail in (ax_left, ax_right):
+        for m, marker, color in zip(models, ['o', 's', '^'], ['#1f77b4', '#ff7f0e', '#2ca02c']):
+            sub = df[df['model'] == m]
+            ax_detail.scatter(sub['overall_efficiency'], sub['effective_vt_gpc3_yr'] * 1e3,
+                              label=m, alpha=0.6, edgecolors='none', s=40, marker=marker, color=color)
+        ax_detail.set_xscale('log')
+        ax_detail.set_yscale('log')
+        ax_detail.grid(True, which='both', linestyle='--', alpha=0.4)
+        
+    ax_left.set_xlim(x_low, x_low_end)
+    ax_right.set_xlim(x_high_start, x_high)
+    
+    ax_left.spines['right'].set_visible(False)
+    ax_right.spines['left'].set_visible(False)
+    ax_right.tick_params(axis='y', which='both', left=False, labelleft=False)
+    
+    add_break_marks(ax_left, ax_right)
+    
+    ax_left.set_xlabel(r'Overall Detection Efficiency $\epsilon$ (lower regime)', fontsize=11)
+    ax_right.set_xlabel(r'Overall Detection Efficiency $\epsilon$ (upper regime)', fontsize=11)
+    plt.setp(ax_left.get_xticklabels(), rotation=25, ha='right')
+    plt.setp(ax_right.get_xticklabels(), rotation=25, ha='right')
+    ax_left.set_ylabel(r'Effective Volume-Time $\langle VT \rangle_{\mathrm{eff}}\;[10^{-3}\,\mathrm{Gpc}^3\,\mathrm{yr}]$', fontsize=12, labelpad=12)
+    ax_right.legend(loc='lower right', frameon=True)
+    detail_fig.suptitle('Automatic broken-axis detail for detection efficiency', y=0.96, fontsize=14)
+    detail_fig.subplots_adjust(left=0.16, right=0.96, bottom=0.18, top=0.88)
+    plt.show()
+
+else:
+    print('No robust efficiency or volume-time gap found; the existing full-range plot remains the detailed view.')"""),
 
     md_cell(r"""## 3. Scientific Conclusions and Astrophysical Interpretation
 
