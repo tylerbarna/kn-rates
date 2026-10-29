@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--glob",
         dest="pattern",
-        default="results/**/**/*.json",
+        default="results/01_large_scale_rate_limits/**/*.json",
         help="Glob pattern for result JSON files.",
     )
     parser.add_argument(
@@ -51,11 +51,11 @@ def parse_args() -> argparse.Namespace:
 
 def extract_model_from_path(file_path: str) -> str:
     """Infer the model identifier from file path or contents."""
-    if "Metzger" in file_path:
+    if "Metzger" in file_path or "metzger" in file_path:
         return "Metzger"
-    if "Bu2026Fixed" in file_path or "ztf_fixed" in file_path:
+    if "Bu2026Fixed" in file_path or "ztf_fixed" in file_path or "bu2026_fixed" in file_path:
         return "Bu2026Fixed"
-    if "Bu2026Vary" in file_path:
+    if "Bu2026Vary" in file_path or "bu2026_vary" in file_path:
         return "Bu2026Vary"
     return "Unknown"
 
@@ -113,6 +113,10 @@ def process_file(path: Path) -> List[Dict[str, Any]]:
             "rate_90_upper_limit": r90,
             "rate_95_upper_limit": r95,
             "rate_99_upper_limit": r99,
+            "rate_90_zero_events": r90,
+            "rate_95_zero_events": r95,
+            "rate_99_zero_events": r99,
+            "duration_scaled_95": r95_duration_scaled,
             "rate_95_duration_scaled_1_92yr": r95_duration_scaled,
             "andreoni_projected_8yr_r95": andreoni_proj_8yr,
             "is_poisson_sparse": n_det < 5,
@@ -146,6 +150,26 @@ def main():
     if df.empty:
         print("No valid simulation summaries found.")
         return
+
+    # Ensure cross-pipeline alias consistency
+    if "rate_95_upper_limit" not in df.columns and "rate_95_zero_events" in df.columns:
+        df["rate_95_upper_limit"] = df["rate_95_zero_events"]
+    if "rate_95_zero_events" not in df.columns and "rate_95_upper_limit" in df.columns:
+        df["rate_95_zero_events"] = df["rate_95_upper_limit"]
+    if "rate_90_upper_limit" not in df.columns and "rate_90_zero_events" in df.columns:
+        df["rate_90_upper_limit"] = df["rate_90_zero_events"]
+    if "rate_90_zero_events" not in df.columns and "rate_90_upper_limit" in df.columns:
+        df["rate_90_zero_events"] = df["rate_90_upper_limit"]
+    if "rate_99_upper_limit" not in df.columns and "rate_99_zero_events" in df.columns:
+        df["rate_99_upper_limit"] = df["rate_99_zero_events"]
+    if "rate_99_zero_events" not in df.columns and "rate_99_upper_limit" in df.columns:
+        df["rate_99_zero_events"] = df["rate_99_upper_limit"]
+    if "rate_95_duration_scaled_1_92yr" not in df.columns and "duration_scaled_95" in df.columns:
+        df["rate_95_duration_scaled_1_92yr"] = df["duration_scaled_95"]
+    if "duration_scaled_95" not in df.columns and "rate_95_duration_scaled_1_92yr" in df.columns:
+        df["duration_scaled_95"] = df["rate_95_duration_scaled_1_92yr"]
+    if "is_poisson_sparse" not in df.columns:
+        df["is_poisson_sparse"] = (df["n_detected"] < 5) if "n_detected" in df.columns else False
 
     out_csv = Path(args.output_csv)
     out_csv.parent.mkdir(parents=True, exist_ok=True)

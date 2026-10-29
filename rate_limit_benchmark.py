@@ -52,7 +52,10 @@ def summarize_result(path):
                 "effective_vt_gpc3_yr": effective_vt,
                 "rate_90_zero_events": rate_90,
                 "rate_95_zero_events": rate_95,
+                "rate_90_upper_limit": rate_90,
+                "rate_95_upper_limit": rate_95,
                 "duration_scaled_95": duration_scaled_95,
+                "rate_95_duration_scaled_1_92yr": duration_scaled_95,
                 "ratio_to_fixed_1775": duration_scaled_95 / PUBLISHED_FIXED_95,
                 "ratio_to_isotropic_4029": duration_scaled_95 / PUBLISHED_ISOTROPIC_95,
             }
