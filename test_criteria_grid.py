@@ -368,6 +368,45 @@ class TestFastCriteriaFilterAndCandidates(unittest.TestCase):
                 # Second point requires 4 detections, mock only has 3 -> fails (n_det = 0)
                 self.assertEqual(df["n_detected"].iloc[1], 0)
 
+    def test_candidate_file_discovery_layouts(self):
+        """Verify find_candidate_files discovers candidate files across all supported directory layouts."""
+        import tempfile
+        from fast_criteria_filter import find_candidate_files
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            suite_dir = Path(tmpdir) / "02_granular_criteria_sweep"
+            cand_dir = suite_dir / "candidates"
+            model_dir = cand_dir / "Bu2026Fixed"
+            model_dir.mkdir(parents=True, exist_ok=True)
+
+            f1 = model_dir / "candidates_Bu2026Fixed_fiducial.json"
+            f1_meta = model_dir / "candidates_Bu2026Fixed_fiducial.json.metadata.json"
+            f1.write_text("{}")
+            f1_meta.write_text("{}")
+
+            # Layout 1: direct model sub-directory inside candidates
+            found1 = find_candidate_files(cand_dir, "Bu2026Fixed")
+            self.assertEqual(len(found1), 1)
+            self.assertEqual(found1[0], f1)
+
+            # Layout 2: passing suite root directory (candidates/Bu2026Fixed/)
+            found2 = find_candidate_files(suite_dir, "Bu2026Fixed")
+            self.assertEqual(len(found2), 1)
+            self.assertEqual(found2[0], f1)
+
+            # Layout 3: flat candidate directory
+            flat_dir = Path(tmpdir) / "flat_candidates"
+            flat_dir.mkdir(parents=True, exist_ok=True)
+            f_flat = flat_dir / "candidates_Metzger_sample_0.json"
+            f_flat.write_text("{}")
+            found3 = find_candidate_files(flat_dir, "Metzger")
+            self.assertEqual(len(found3), 1)
+            self.assertEqual(found3[0], f_flat)
+
+            # Should return empty list if model does not exist
+            found_none = find_candidate_files(cand_dir, "NonExistentModel")
+            self.assertEqual(found_none, [])
+
 
 if __name__ == "__main__":
     unittest.main()

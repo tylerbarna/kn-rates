@@ -554,6 +554,61 @@ def compute_criteria_ranking(df: Any) -> Any:
     return make_df(ranking_data)
 
 
+def find_candidate_files(cand_dir: Union[str, Path], model_name: str) -> List[Path]:
+    """Discover candidate JSON files for a given model across multiple directory layouts.
+
+    Searches in priority order:
+      1. cand_dir / model_name / (e.g. results/02_granular_criteria_sweep/candidates/Bu2026Fixed/)
+      2. cand_dir / "candidates" / model_name / (if cand_dir is the suite root)
+      3. cand_dir / (flat layout, e.g. candidates_Bu2026Fixed_*.json)
+      4. cand_dir / "candidates" / (flat layout in candidates/)
+      5. cand_dir.parent / model_name /
+      6. cand_dir.parent / (flat layout in parent)
+
+    Filters out metadata JSONs (.metadata.json).
+    """
+    base = Path(cand_dir)
+    search_dirs = [
+        base / model_name,
+        base / "candidates" / model_name,
+        base,
+        base / "candidates",
+    ]
+    if base.parent != base:
+        search_dirs.extend([
+            base.parent / model_name,
+            base.parent,
+        ])
+
+    cand_files: List[Path] = []
+    seen = set()
+
+    for d in search_dirs:
+        if not d.is_dir():
+            continue
+
+        patterns = [
+            f"candidates_{model_name}_*.json",
+            f"candidates_{model_name}.json",
+            f"*{model_name}*.json",
+        ]
+        if d.name.lower() == model_name.lower():
+            patterns.insert(0, "candidates_*.json")
+
+        matched: List[Path] = []
+        for pat in patterns:
+            for p in sorted(d.glob(pat)):
+                if not p.name.endswith(".metadata.json") and p not in seen:
+                    seen.add(p)
+                    matched.append(p)
+
+        if matched:
+            cand_files = matched
+            break
+
+    return cand_files
+
+
 def main():
     args = parse_args()
     if np is None:
@@ -577,25 +632,20 @@ def main():
     all_ranking_dfs = []
 
     for model_name in target_models:
-        model_cand_dir = cand_dir / model_name
-        if not model_cand_dir.exists():
-            print(f"\n[SKIP] Candidate directory not found for {model_name}: {model_cand_dir}")
-            continue
-
-        # Discover candidate files
-        cand_files = sorted(model_cand_dir.glob("candidates_*.json"))
-        cand_files = [f for f in cand_files if not f.name.endswith(".metadata.json")]
-
+        cand_files = find_candidate_files(cand_dir, model_name)
         if not cand_files:
-            print(f"\n[SKIP] No candidate JSON files found in {model_cand_dir}")
+            print(f"\n[SKIP] No candidate files found for {model_name} in or under: {cand_dir}")
             continue
 
-        fiducial_file = model_cand_dir / f"candidates_{model_name}_fiducial.json"
-        is_ensemble = (len(cand_files) > 1) or (args.mode == "ensemble") or (not fiducial_file.exists())
+        fiducial_file = next((f for f in cand_files if "fiducial" in f.name), None)
+        if fiducial_file is None and args.mode == "fiducial" and len(cand_files) == 1:
+            fiducial_file = cand_files[0]
 
-        print(f"\nProcessing {model_name} ({len(cand_files)} candidate sample files detected; mode: {'ensemble' if is_ensemble else 'fiducial'})...")
+        is_ensemble = (len(cand_files) > 1) or (args.mode == "ensemble") or (fiducial_file is None)
 
-        if not is_ensemble and fiducial_file.exists():
+        print(f"\nProcessing {model_name} ({len(cand_files)} candidate sample file(s) detected; mode: {'ensemble' if is_ensemble else 'fiducial'})...")
+
+        if not is_ensemble and fiducial_file is not None and fiducial_file.exists():
             # Single fiducial run
             t0 = time.perf_counter()
             pool = CandidatePool(fiducial_file, model_name)
