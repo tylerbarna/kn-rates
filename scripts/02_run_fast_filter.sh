@@ -48,13 +48,6 @@ elif [ -d "${PROJECT_DIR}/.conda" ]; then
 fi
 
 CANDIDATES_DIR="${CANDIDATES_DIR:-results/02_granular_criteria_sweep/candidates}"
-# Auto-detect scratch storage candidate directory if available
-if [ -d "/scratch.global/${USER:-}/kn-rates/02_granular_criteria_sweep/candidates" ]; then
-    CANDIDATES_DIR="/scratch.global/${USER:-}/kn-rates/02_granular_criteria_sweep/candidates"
-elif [ -n "${TMPDIR:-}" ] && [ -d "${TMPDIR}/candidates" ]; then
-    CANDIDATES_DIR="${TMPDIR}/candidates"
-fi
-
 OUTPUT_DIR="${OUTPUT_DIR:-results/02_granular_criteria_sweep}"
 GRID_PRESET="${GRID_PRESET:-ultra_fine}"
 N_WORKERS="${N_WORKERS:-4}"
