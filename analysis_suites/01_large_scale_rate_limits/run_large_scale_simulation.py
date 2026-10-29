@@ -256,7 +256,7 @@ def build_population(
 def build_lightcurve_model(model_name: str):
     """Instantiate the lightcurve generator for the specified model family."""
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
-        return FiestaKNModel()
+        return FiestaKNModel(survey="ztf")
     if model_name == "Metzger":
         return MetzgerKNModel()
     raise ValueError(f"Unknown model: {model_name}")

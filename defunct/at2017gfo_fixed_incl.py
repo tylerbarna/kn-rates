@@ -53,7 +53,7 @@ det = DetectionCriteria(
 )
 
 # Bu2026 model
-model = FiestaKNModel()
+model = FiestaKNModel(survey="ztf")
 
 # Run pipeline
 N = 100000

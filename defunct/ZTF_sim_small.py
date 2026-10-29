@@ -94,7 +94,7 @@ det = DetectionCriteria(
 )
 
 # Bu2026 model
-model = FiestaKNModel()
+model = FiestaKNModel(survey="ztf")
 
 # Run pipeline in parallel
 n_sims = args.n_runs
