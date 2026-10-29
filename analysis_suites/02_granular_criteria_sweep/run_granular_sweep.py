@@ -431,14 +431,14 @@ def run_grid_point(
             log10_mej_wind=-1.1, v_ej_wind=0.10, ye_wind=0.35,
             inclination_em=0.45, vary_inclination=False, rate=1000.0, z_max=0.15
         )
-        model = FiestaKNModel()
+        model = FiestaKNModel(survey="ztf")
     elif model_name == "Bu2026Vary":
         pop = FixedBu2026KilonovaPopulation(
             log10_mej_dyn=-1.7, v_ej_dyn=0.20, ye_dyn=0.15,
             log10_mej_wind=-1.1, v_ej_wind=0.10, ye_wind=0.35,
             inclination_em=0.45, vary_inclination=True, rate=1000.0, z_max=0.30
         )
-        model = FiestaKNModel()
+        model = FiestaKNModel(survey="ztf")
     else:
         pop = FixedMetzgerKilonovaPopulation(
             mej=0.00126, vej=0.50, kappa=398.0, rate=1000.0, z_max=0.30

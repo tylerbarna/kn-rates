@@ -177,7 +177,7 @@ def main():
 
     print("Loading full 8-year ZTF survey dataset...")
     survey = load_ztf_survey(start="201803", end="202603", nside=64)
-    model = FiestaKNModel()
+    model = FiestaKNModel(survey="ztf")
 
     criteria_regimes = get_criteria_regimes()
     populations = get_population_configurations()

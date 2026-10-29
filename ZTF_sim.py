@@ -286,7 +286,7 @@ def _build_model(model_name: str):
         ValueError: If "model_name" is unsupported.
     """
     if model_name in {"Bu2026Fixed", "Bu2026Vary"}:
-        return FiestaKNModel()
+        return FiestaKNModel(survey="ztf")
     if model_name == "Metzger":
         return MetzgerKNModel()
     raise ValueError(f"Unsupported model: {model_name}")
