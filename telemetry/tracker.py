@@ -5,11 +5,12 @@ import csv
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 from typing import Any, Dict, List, Optional
 
 from telemetry.analyzer import TelemetryAnalyzer
-from telemetry.harvester import JobHarvester
+from telemetry.harvester import JobHarvester, infer_suite_from_job_name
 from telemetry.models import JobTelemetryRecord, RightsizingRecommendation
 
 
@@ -41,7 +42,7 @@ class JobTelemetryTracker:
                     job_id=row.get("job_id", ""),
                     array_task_id=row.get("array_task_id", ""),
                     job_name=row.get("job_name", ""),
-                    suite=row.get("suite", ""),
+                    suite=row.get("suite", "") or infer_suite_from_job_name(row.get("job_name", "")),
                     partition=row.get("partition", "msismall"),
                     node_list=row.get("node_list", ""),
                     submit_time=row.get("submit_time", ""),
@@ -56,13 +57,15 @@ class JobTelemetryTracker:
                     queue_wait_hours=float(row.get("queue_wait_hours", 0.0)),
                     req_cpus=int(row.get("req_cpus", 1)),
                     req_mem_gb=float(row.get("req_mem_gb", 0.0)),
-                    req_time_min=float(row.get("req_time_min", 0.0)),
-                    used_walltime_sec=float(row.get("used_walltime_sec", 0.0)),
-                    used_walltime_hours=float(row.get("used_walltime_hours", 0.0)),
-                    used_max_rss_gb=float(row.get("used_max_rss_gb", 0.0)),
-                    mem_efficiency_pct=float(row.get("mem_efficiency_pct", 0.0)),
-                    used_cpu_sec=float(row.get("used_cpu_sec", 0.0)),
-                    cpu_efficiency_pct=float(row.get("cpu_efficiency_pct", 0.0)),
+                    req_time_min=float(row.get("req_time_min", 0.0) or 0.0),
+                    used_walltime_sec=float(row.get("used_walltime_sec", 0.0) or 0.0),
+                    used_walltime_hours=float(row.get("used_walltime_hours", 0.0) or 0.0),
+                    time_efficiency_pct=float(row.get("time_efficiency_pct", 0.0) or 0.0),
+                    used_max_rss_gb=float(row.get("used_max_rss_gb", 0.0) or 0.0),
+                    mem_efficiency_pct=float(row.get("mem_efficiency_pct", 0.0) or 0.0),
+                    used_cpu_sec=float(row.get("used_cpu_sec", 0.0) or 0.0),
+                    cpu_efficiency_pct=float(row.get("cpu_efficiency_pct", 0.0) or 0.0),
+                    energy_joules=float(row.get("energy_joules", 0.0) or 0.0),
                     model=row.get("model", ""),
                     n_transients=int(row.get("n_transients", 0)),
                     chunk_size=int(row.get("chunk_size", 1)),
@@ -125,17 +128,86 @@ class JobTelemetryTracker:
         analyzer = TelemetryAnalyzer(all_records)
         scaling_fits = analyzer.fit_resource_scaling()
         queue_summary = analyzer.analyze_queue_times()
+        eff_summary = analyzer.analyze_efficiencies()
 
         telemetry_meta = {
-            "last_updated": r.submit_time if all_records else "",
+            "last_updated": all_records[-1].submit_time if all_records else "",
             "total_tracked_jobs": len(all_records),
             "scaling_models": scaling_fits,
             "queue_characteristics": queue_summary,
+            "efficiency_profile": eff_summary,
         }
         with open(self.scaling_path, "w", encoding="utf-8") as f:
             json.dump(telemetry_meta, f, indent=2)
 
         return all_records
+
+    def cross_match(
+        self,
+        input_text: Optional[str] = None,
+        input_file: Optional[Path] = None,
+        user: Optional[str] = None,
+        since: str = "now-3week",
+    ) -> Dict[str, Any]:
+        """Cross-match existing registry with reportseff data, updating efficiencies and adding new jobs."""
+        reportseff_records: List[JobTelemetryRecord] = []
+
+        if input_file and Path(input_file).exists():
+            text = Path(input_file).read_text(encoding="utf-8")
+            reportseff_records = self.harvester.parse_reportseff_output(text)
+        elif input_text:
+            reportseff_records = self.harvester.parse_reportseff_output(input_text)
+        elif shutil.which("reportseff"):
+            reportseff_records = self.harvester.harvest_reportseff(user=user, since=since)
+
+        existing = { (r.job_id, r.array_task_id): r for r in self.load_registry() }
+        matched_count = 0
+        added_count = 0
+
+        for r in reportseff_records:
+            key = (r.job_id, r.array_task_id)
+            if key in existing:
+                self.harvester._merge_records(existing[key], r)
+                matched_count += 1
+            else:
+                existing[key] = r
+                added_count += 1
+
+        all_records = list(existing.values())
+        for r in all_records:
+            r.compute_derived_metrics()
+
+        all_records.sort(key=lambda x: (x.submit_time or x.start_time or "9999", x.job_id, x.array_task_id))
+
+        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
+        fieldnames = list(JobTelemetryRecord("").to_dict().keys())
+        with open(self.registry_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for r in all_records:
+                writer.writerow(r.to_dict())
+
+        analyzer = TelemetryAnalyzer(all_records)
+        scaling_fits = analyzer.fit_resource_scaling()
+        queue_summary = analyzer.analyze_queue_times()
+        eff_summary = analyzer.analyze_efficiencies()
+
+        telemetry_meta = {
+            "last_updated": all_records[-1].submit_time if all_records else "",
+            "total_tracked_jobs": len(all_records),
+            "scaling_models": scaling_fits,
+            "queue_characteristics": queue_summary,
+            "efficiency_profile": eff_summary,
+        }
+        with open(self.scaling_path, "w", encoding="utf-8") as f:
+            json.dump(telemetry_meta, f, indent=2)
+
+        return {
+            "matched_updated": matched_count,
+            "new_jobs_added": added_count,
+            "total_registry_records": len(all_records),
+            "efficiency_profile": eff_summary,
+        }
 
     def generate_report(self) -> str:
         """Generate a formatted markdown telemetry and rightsizing summary report."""
@@ -146,12 +218,23 @@ class JobTelemetryTracker:
         analyzer = TelemetryAnalyzer(records)
         q_data = analyzer.analyze_queue_times()
         scaling = analyzer.fit_resource_scaling()
+        eff_data = analyzer.analyze_efficiencies()
 
         lines = [
             "# HPC Job Telemetry, Queue Dynamics & Resource Rightsizing Registry",
             f"**Total Tracked Jobs/Tasks:** {len(records)}",
             "",
-            "## 1. Queue Time Dynamics vs. Requested Resources & Scheduling",
+            "## 1. Resource Efficiency Profile (reportseff & kernel accounting)",
+            "| Metric | Mean | Median | 25th % | 75th % | Evaluated Jobs |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- |",
+            f"| **Time Efficiency (`TimeEff`)** | {eff_data['time_efficiency']['mean']:.1f}% | {eff_data['time_efficiency']['median']:.1f}% | {eff_data['time_efficiency']['p25']:.1f}% | {eff_data['time_efficiency']['p75']:.1f}% | {eff_data['time_efficiency']['count']} |",
+            f"| **CPU Efficiency (`CPUEff`)** | {eff_data['cpu_efficiency']['mean']:.1f}% | {eff_data['cpu_efficiency']['median']:.1f}% | {eff_data['cpu_efficiency']['p25']:.1f}% | {eff_data['cpu_efficiency']['p75']:.1f}% | {eff_data['cpu_efficiency']['count']} |",
+            f"| **Memory Efficiency (`MemEff`)** | {eff_data['memory_efficiency']['mean']:.1f}% | {eff_data['memory_efficiency']['median']:.1f}% | {eff_data['memory_efficiency']['p25']:.1f}% | {eff_data['memory_efficiency']['p75']:.1f}% | {eff_data['memory_efficiency']['count']} |",
+            "",
+            f"- **Cumulative Wasted Core-Hours**: {eff_data['total_wasted_core_hours']:.1f} core-hours",
+            f"- **Cumulative Wasted Memory Slack**: {eff_data['total_wasted_mem_gb_hours']:.1f} GB-hours",
+            "",
+            "## 2. Queue Time Dynamics vs. Requested Resources & Scheduling",
             "",
             "### By Requested Memory Tier:",
             "| Memory Tier | Count | Median Wait | Mean Wait | Max Wait |",
@@ -210,6 +293,22 @@ class JobTelemetryTracker:
                 f"`--cpus-per-task={rec.recommended_cpus}` | {rec.est_peak_ram_gb:.1f} GB | {rec.queue_advice[:45]}... |"
             )
 
+        lines.extend([
+            "",
+            "## 4. Empirical Rightsizing by Analysis Suite (Balancing Completed Runs & OOM Kills)",
+            "| Suite Family | Sample Size | OOM Rate | OOM Mem Floor | Completed P95 RSS | Rec. Memory | Rec. Walltime | Rec. CPUs | Queue Placement |",
+            "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        ])
+        suite_recs = analyzer.analyze_suite_rightsizing(min_jobs=20)
+        for s_name, s_data in suite_recs.items():
+            lines.append(
+                f"| **{s_name}** | {s_data['sample_size']:,} ({s_data['completed_count']:,} ok, {s_data['oom_count']:,} OOM) | "
+                f"{s_data['oom_failure_rate_pct']:.1f}% | {s_data['oom_memory_floor_gb']:.0f} GB | "
+                f"{s_data['completed_rss_p95_gb']:.1f} GB | `--mem={int(s_data['recommended_mem_gb'])}g` | "
+                f"`--time={s_data['recommended_walltime_str']}` | `--cpus-per-task={s_data['recommended_cpus']}` | "
+                f"{s_data['queue_advice'][:35]}... |"
+            )
+
         return "\n".join(lines)
 
 
@@ -224,9 +323,16 @@ def main():
     # Report command
     subparsers.add_parser("report", help="Display telemetry report and scaling fits")
 
+    # Cross-match command
+    p_cross = subparsers.add_parser("cross-match", help="Cross-match existing registry with reportseff data")
+    p_cross.add_argument("--file", help="Path to text file containing reportseff output")
+    p_cross.add_argument("--since", default="now-3week", help="Time filter for reportseff query")
+    p_cross.add_argument("--user", default=None, help="User to query in reportseff")
+
     # Rightsize command
     p_right = subparsers.add_parser("rightsize", help="Calculate recommended resources for a simulation")
     p_right.add_argument("--model", default="Bu2026Fixed", choices=["Metzger", "Bu2026Fixed", "Bu2026Vary"])
+    p_right.add_argument("--suite", default=None, help="Name of analysis suite family to rightsize")
     p_right.add_argument("--n-transients", type=int, default=1_000_000)
     p_right.add_argument("--cpus", type=int, default=None)
 
@@ -239,8 +345,83 @@ def main():
         print(f"Scaling models updated in {SCALING_MODELS_JSON}.")
     elif args.command == "report":
         print(tracker.generate_report())
+    elif args.command == "cross-match":
+        input_f = Path(args.file) if args.file else None
+        res = tracker.cross_match(input_file=input_f, user=args.user, since=args.since)
+        print("=" * 70)
+        print("REPORTSEFF CROSS-MATCH SUMMARY")
+        print("=" * 70)
+        print(f"Matched and Updated:     {res['matched_updated']} existing job records")
+        print(f"Newly Added Records:     {res['new_jobs_added']} jobs")
+        print(f"Total Registry Size:     {res['total_registry_records']} jobs")
+        print(f"Registry File:           {REGISTRY_CSV}")
+        print(f"Scaling Models:          {SCALING_MODELS_JSON}")
+        print("-" * 70)
+        p = res["efficiency_profile"]
+        print(f"Median Time Efficiency:  {p['time_efficiency']['median']:.1f}% ({p['time_efficiency']['count']} jobs)")
+        print(f"Median CPU Efficiency:   {p['cpu_efficiency']['median']:.1f}% ({p['cpu_efficiency']['count']} jobs)")
+        print(f"Median Memory Efficiency:{p['memory_efficiency']['median']:.1f}% ({p['memory_efficiency']['count']} jobs)")
+        print(f"Total Wasted Core-Hours: {p['total_wasted_core_hours']:.1f} core-hrs")
+        print(f"Total Memory Slack:      {p['total_wasted_mem_gb_hours']:.1f} GB-hrs")
+        print("=" * 70)
     elif args.command == "rightsize":
         analyzer = TelemetryAnalyzer(tracker.load_registry() or tracker.update())
+        if args.suite:
+            suite_data = analyzer.analyze_suite_rightsizing(min_jobs=5)
+            if args.suite.lower() == "all":
+                target_suites = suite_data
+            else:
+                matches = {k: v for k, v in suite_data.items() if args.suite.lower() in k.lower()}
+                if not matches:
+                    print(f"Error: No statistically significant data found for suite '{args.suite}'. Available: {list(suite_data.keys())}", file=sys.stderr)
+                    sys.exit(1)
+                target_suites = matches
+
+            for suite_label, match in target_suites.items():
+                print("=" * 78)
+                print(f"SLURM EMPIRICAL RIGHTSIZING: {suite_label}")
+                print("=" * 78)
+                print(f"Sample Size:             {match['sample_size']:,} jobs ({match['completed_count']:,} completed, {match['oom_count']:,} OOM, {match['timeout_count']:,} timeout)")
+                print(f"Historical OOM Rate:     {match['oom_failure_rate_pct']:.1f}%")
+                print(f"Historical OOM Mem Floor:{match['oom_memory_floor_gb']:.1f} GB (crashed at/below this allocation)")
+                print(f"Completed Peak RAM:      P50: {match['completed_rss_p50_gb']:.2f} GB | P95: {match['completed_rss_p95_gb']:.2f} GB | Max: {match['completed_rss_max_gb']:.2f} GB")
+                print(f"Completed Walltime:      P50: {match['completed_walltime_p50_min']:.1f} min | P95: {match['completed_walltime_p95_min']:.1f} min | Max: {match['completed_walltime_max_min']:.1f} min")
+                if match['timeout_floor_min'] > 0:
+                    print(f"Timeout Ceiling Floor:   {match['timeout_floor_min']:.1f} min (jobs failed when limit <= this)")
+                print(f"CPU Utilization Profile: Median CPUEff: {match['median_cpu_eff_pct']:.1f}% | Effective Cores P95: {match['effective_cores_p95']:.2f} (Allocated: ~{match['historical_req_cpus']})")
+                print(f"Concurrency Multiplier:  {match['concurrency_multiplier']:.1f}x simultaneous jobs on 128-core nodes")
+                print(f"Service Unit Savings:    ~{match['su_savings_pct']:.0f}% reduction in billed core-hours")
+                print("-" * 78)
+                print("RECOMMENDED SLURM SBATCH DIRECTIVES:")
+                print(f"  #SBATCH -p {match['recommended_partition']}")
+                print(f"  #SBATCH --mem={int(match['recommended_mem_gb'])}g")
+                print(f"  #SBATCH --time={match['recommended_walltime_str']}")
+                print(f"  #SBATCH --cpus-per-task={match['recommended_cpus']}")
+                print("-" * 78)
+                print("Queue Placement Strategy:")
+                print(f"  {match['queue_advice']}")
+                print("CPU Allocation Guidance:")
+                print(f"  {match['cpu_advice']}")
+                print("Walltime Sizing Guidance:")
+                print(f"  {match['walltime_advice']}")
+                print("Risk & Failure Mitigation Basis:")
+                print(f"  {match['risk_notes']}")
+                print("=" * 78)
+            return
+
+        # Default: if no specific suite requested and model is default, print all suites then model
+        suite_data = analyzer.analyze_suite_rightsizing(min_jobs=5)
+        if suite_data:
+            print("=" * 78)
+            print("SUITE RIGHTSIZING SUMMARY (Tri-Resource: RAM, Walltime, CPU Cores)")
+            print("=" * 78)
+            print(f"{'Suite Name':<32} | {'Mem Tier':<8} | {'Walltime':<10} | {'CPUs':<5} | {'Conc. Gain':<10} | {'OOM Rate':<8}")
+            print("-" * 78)
+            for s_name, d in suite_data.items():
+                print(f"{s_name[:32]:<32} | {int(d['recommended_mem_gb']):>4} GB   | {d['recommended_walltime_str']:<10} | {d['recommended_cpus']:<5} | {d['concurrency_multiplier']:>4.1f}x     | {d['oom_failure_rate_pct']:>5.1f}%")
+            print("=" * 78)
+            print("Tip: Run `python3 -m telemetry.tracker rightsize --suite '02'` for comprehensive suite details.\n")
+
         rec = analyzer.recommend_resources(args.model, args.n_transients, n_cpus=args.cpus)
         print("=" * 70)
         print(f"SLURM RESOURCE RIGHTSIZING RECOMMENDATION")

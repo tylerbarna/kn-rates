@@ -32,23 +32,28 @@ case "${ACTION}" in
 
         chmod +x "${CRON_SCRIPT}"
 
-        CRON_CMD="0 * * * * ${CRON_SCRIPT} --commit ${CRON_TAG}"
+        # Scrontab block with explicit Slurm directives so jobs are cleanly named in squeue
+        CRON_BLOCK="#SCRON --job-name=kn_telemetry_cron ${CRON_TAG}
+#SCRON --time=00:15:00 ${CRON_TAG}
+#SCRON --mem=2G ${CRON_TAG}
+#SCRON --cpus-per-task=1 ${CRON_TAG}
+0 * * * * ${CRON_SCRIPT} --commit ${CRON_TAG}"
 
         # Get existing scrontab excluding previous kn_rates telemetry entries
         EXISTING_CRON=$(scrontab -l 2>/dev/null | grep -v "${CRON_TAG}" || true)
 
         if [ -n "${EXISTING_CRON}" ]; then
-            NEW_CRONTAB="${EXISTING_CRON}"$'\n'"${CRON_CMD}"
+            NEW_CRONTAB="${EXISTING_CRON}"$'\n'"${CRON_BLOCK}"
         else
-            NEW_CRONTAB="${CRON_CMD}"
+            NEW_CRONTAB="${CRON_BLOCK}"
         fi
 
         echo "${NEW_CRONTAB}" | scrontab -
 
         echo "[+] Successfully installed scrontab entry:"
-        echo "    ${CRON_CMD}"
+        echo "${CRON_BLOCK}"
         echo ""
-        echo "Telemetry registry will update at the top of every hour."
+        echo "Telemetry registry will update at the top of every hour under job name 'kn_telemetry_cron'."
         echo "To monitor cron activity:"
         echo "  tail -f ${LOG_FILE}"
         echo "=============================================================================="
