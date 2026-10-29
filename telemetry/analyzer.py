@@ -331,6 +331,12 @@ class TelemetryAnalyzer:
             timeout = [r for r in job_list if r.state.startswith("TIMEOUT")]
             cancelled = [r for r in job_list if r.state.startswith("CANCELLED")]
 
+            # Timeout analysis for walltime lower bound
+            timeout_walls = [r.req_time_min * 60.0 for r in timeout if r.req_time_min > 0]
+            if not timeout_walls:
+                timeout_walls = [r.used_walltime_sec for r in timeout if r.used_walltime_sec > 0]
+            timeout_floor_sec = max(timeout_walls) if timeout_walls else 0.0
+
             # Memory requested for OOM jobs
             oom_mems = [r.req_mem_gb for r in oom if r.req_mem_gb > 0]
             oom_floor = max(oom_mems) if oom_mems else 0.0
@@ -352,6 +358,23 @@ class TelemetryAnalyzer:
             comp_cpu = [r.cpu_efficiency_pct for r in completed if r.cpu_efficiency_pct > 0]
             median_cpu = sorted(comp_cpu)[len(comp_cpu) // 2] if comp_cpu else 100.0
 
+            # CPU core utilization analysis:
+            # Effective cores used = req_cpus * (cpu_efficiency_pct / 100.0)
+            comp_cores_used = [
+                r.req_cpus * (r.cpu_efficiency_pct / 100.0)
+                for r in completed
+                if r.req_cpus > 0 and r.cpu_efficiency_pct > 0
+            ]
+            comp_cores_used.sort()
+            n_cores = len(comp_cores_used)
+            p50_cores = comp_cores_used[n_cores // 2] if n_cores > 0 else 1.0
+            p95_cores = comp_cores_used[int(n_cores * 0.95)] if n_cores > 0 else p50_cores
+            max_cores = comp_cores_used[-1] if n_cores > 0 else p50_cores
+
+            # Historical requested CPUs across the suite
+            req_cpus_list = [r.req_cpus for r in job_list if r.req_cpus > 0]
+            hist_req_cpus = round(sum(req_cpus_list) / len(req_cpus_list)) if req_cpus_list else 4
+
             # Optimal memory recommendation:
             # Must strictly clear the empirical OOM floor with 25% cushion AND cover 95th percentile completed RSS
             raw_target_mem = max(oom_floor * 1.25, p95_rss * 1.25, 4.0)
@@ -359,12 +382,32 @@ class TelemetryAnalyzer:
             rec_mem = next((t for t in standard_tiers if t >= raw_target_mem), round(raw_target_mem))
 
             # Optimal walltime recommendation:
-            # P95 elapsed time * 1.40 cushion, with 5-minute floor
-            rec_time_sec = max(p95_time * 1.40, 300.0)
+            # Must strictly exceed timeout ceiling (if any) and cover P95 completed elapsed time * 1.35
+            rec_time_sec = max(p95_time * 1.35, timeout_floor_sec * 1.30, 300.0)
+            rec_time_sec = float(int((rec_time_sec + 59) // 60) * 60)
             h = int(rec_time_sec // 3600)
             m = int((rec_time_sec % 3600) // 60)
             s_rem = int(rec_time_sec % 60)
             rec_time_str = f"{h:02d}:{m:02d}:{s_rem:02d}"
+
+            # Optimal CPU core recommendation:
+            # Cover P95 effective core demand with 25% headroom, mapped to standard core tiers (1, 2, 4, 8, 16)
+            target_cores = max(p95_cores * 1.25, 1.0)
+            standard_core_tiers = [1, 2, 4, 8, 16, 32, 64]
+            rec_cpus = next((c for c in standard_core_tiers if c >= target_cores), 4)
+
+            # Cluster Node Architecture & NUMA balance:
+            # Prevent allocating high memory on too few cores which leads to memory bus/NUMA starvation
+            if rec_mem >= 128.0 and rec_cpus < 8:
+                rec_cpus = 8
+            elif rec_mem >= 64.0 and rec_cpus < 4:
+                rec_cpus = 4
+            elif rec_mem >= 32.0 and rec_cpus < 2:
+                rec_cpus = 2
+
+            # Concurrency multiplier & Service Unit (core-hour) savings
+            concurrency_mult = round(hist_req_cpus / rec_cpus, 1) if (rec_cpus > 0 and hist_req_cpus > rec_cpus) else 1.0
+            su_savings_pct = round(max(0.0, (1.0 - (rec_cpus / hist_req_cpus)) * 100.0), 1) if hist_req_cpus > 0 else 0.0
 
             # Partition & Queue advice
             if rec_mem <= 32.0 and rec_time_sec <= 7200.0:
@@ -379,6 +422,33 @@ class TelemetryAnalyzer:
             else:
                 partition = "msismall"
                 queue_advice = "HIGH MEMORY WARNING: Allocation >256 GB restricts scheduling to rare 755GB nodes."
+
+            # CPU Advice
+            if median_cpu < 50.0:
+                cpu_advice = (
+                    f"BOTTLENECK DETECTED: Historical median CPU efficiency is {median_cpu:.1f}%, with effective demand "
+                    f"peaking at P95={p95_cores:.2f} cores (requested ~{hist_req_cpus} cores). Code is primarily single-threaded or I/O bound. "
+                    f"Rightsizing to --cpus-per-task={rec_cpus} saves ~{su_savings_pct:.0f}% Service Units and yields "
+                    f"a {concurrency_mult:.1f}x concurrency multiplier on cluster nodes."
+                )
+            else:
+                cpu_advice = (
+                    f"BALANCED CPU UTILIZATION: Historical median CPU efficiency is {median_cpu:.1f}% "
+                    f"(effective P95={p95_cores:.2f} cores). Recommended --cpus-per-task={rec_cpus} ensures optimal thread scaling."
+                )
+
+            # Walltime Advice
+            if timeout_floor_sec > 0:
+                walltime_advice = (
+                    f"TIMEOUT RISK MITIGATED: Historical timeouts occurred at <= {timeout_floor_sec/60.0:.1f} min. "
+                    f"Recommended {rec_time_str} clears both the timeout ceiling and completed P95 ({p95_time/60.0:.1f} min) "
+                    f"with a 35% safety buffer."
+                )
+            else:
+                walltime_advice = (
+                    f"OPTIMAL BACKFILL DURATION: Completed P95 is {p95_time/60.0:.1f} min. Recommended {rec_time_str} "
+                    f"provides safety while staying short enough to minimize backfill queue wait."
+                )
 
             # OOM risk narrative
             oom_rate = (len(oom) / len(job_list)) * 100.0 if job_list else 0.0
@@ -409,13 +479,22 @@ class TelemetryAnalyzer:
                 "completed_walltime_p50_min": round(p50_time / 60.0, 2),
                 "completed_walltime_p95_min": round(p95_time / 60.0, 2),
                 "completed_walltime_max_min": round(max_time / 60.0, 2),
+                "timeout_floor_min": round(timeout_floor_sec / 60.0, 2),
                 "median_cpu_eff_pct": round(median_cpu, 2),
+                "effective_cores_p50": round(p50_cores, 2),
+                "effective_cores_p95": round(p95_cores, 2),
+                "effective_cores_max": round(max_cores, 2),
+                "historical_req_cpus": hist_req_cpus,
+                "concurrency_multiplier": concurrency_mult,
+                "su_savings_pct": su_savings_pct,
                 "recommended_mem_gb": rec_mem,
                 "recommended_walltime_sec": round(rec_time_sec, 1),
                 "recommended_walltime_str": rec_time_str,
-                "recommended_cpus": 4 if rec_mem <= 64.0 else 8,
+                "recommended_cpus": rec_cpus,
                 "recommended_partition": partition,
                 "queue_advice": queue_advice,
+                "cpu_advice": cpu_advice,
+                "walltime_advice": walltime_advice,
                 "risk_notes": risk_notes,
             }
 

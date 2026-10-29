@@ -231,6 +231,76 @@ class TestTelemetryUnit(unittest.TestCase):
             self.assertIn("Memory Tier", report)
             self.assertIn("Rightsizing Recommendations", report)
 
+    def test_suite_rightsizing_tri_resource(self):
+        """Test empirical rightsizing across RAM, walltime, and CPU cores."""
+        # Create a mock suite with 25 completed jobs (low CPU efficiency, high memory) and 5 OOM kills
+        records = []
+        for i in range(25):
+            records.append(JobTelemetryRecord(
+                job_id=f"comp_{i}",
+                suite="Suite 99: Test Suite",
+                state="COMPLETED",
+                req_mem_gb=64.0,
+                used_max_rss_gb=40.0 + (i % 5),  # 40-44 GB
+                req_cpus=8,
+                used_walltime_sec=1800.0,  # 30 min
+                used_cpu_sec=1440.0,       # 10% CPUEff -> 0.8 effective cores
+                cpu_efficiency_pct=10.0,
+                req_time_min=120.0,
+            ))
+        for j in range(5):
+            records.append(JobTelemetryRecord(
+                job_id=f"oom_{j}",
+                suite="Suite 99: Test Suite",
+                state="OUT_OF_MEMORY",
+                req_mem_gb=32.0,  # OOM floor = 32 GB
+                used_max_rss_gb=32.0,
+                req_cpus=8,
+                req_time_min=120.0,
+            ))
+        for k in range(2):
+            records.append(JobTelemetryRecord(
+                job_id=f"timeout_{k}",
+                suite="Suite 99: Test Suite",
+                state="TIMEOUT",
+                req_mem_gb=64.0,
+                used_walltime_sec=3600.0,  # 60 min timeout
+                req_time_min=60.0,
+            ))
+
+        analyzer = TelemetryAnalyzer(records)
+        suite_recs = analyzer.analyze_suite_rightsizing(min_jobs=10)
+        self.assertIn("Suite 99: Test Suite", suite_recs)
+        rec = suite_recs["Suite 99: Test Suite"]
+
+        # Check memory rightsizing: OOM floor is 32GB, P95 RSS ~44GB -> recommended 64GB
+        self.assertEqual(rec["oom_memory_floor_gb"], 32.0)
+        self.assertEqual(rec["recommended_mem_gb"], 64.0)
+
+        # Check walltime rightsizing: timeout occurred at 60 min -> recommended must be > 60 min (clears timeout floor)
+        self.assertGreater(rec["recommended_walltime_sec"], 3600.0)
+        self.assertGreaterEqual(rec["timeout_floor_min"], 60.0)
+
+        # Check CPU rightsizing: 8 cores allocated but effective usage is ~0.8 cores
+        # Recommended CPUs should be rightsized (e.g. 4 due to 64GB NUMA ratio)
+        self.assertLessEqual(rec["recommended_cpus"], 4)
+        self.assertGreaterEqual(rec["concurrency_multiplier"], 2.0)
+        self.assertGreater(rec["su_savings_pct"], 0.0)
+
+    def test_notebook_cell_ids_validity(self):
+        """Verify that all notebook cells contain valid string IDs to prevent PR diff errors."""
+        import json
+        nb_path = Path(__file__).resolve().parent.parent / "notebooks" / "job_resource_usage_analysis.ipynb"
+        self.assertTrue(nb_path.exists())
+        with open(nb_path, "r", encoding="utf-8") as f:
+            nb = json.load(f)
+
+        for idx, cell in enumerate(nb["cells"]):
+            cell_id = cell.get("id")
+            self.assertIsNotNone(cell_id, f"Cell {idx} has None id (violates nbformat 4.5 schema)")
+            self.assertIsInstance(cell_id, str, f"Cell {idx} id is not a string: {cell_id}")
+            self.assertGreater(len(cell_id), 0, f"Cell {idx} id is empty")
+
 
 if __name__ == "__main__":
     unittest.main()

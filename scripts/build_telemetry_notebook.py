@@ -3,6 +3,7 @@
 
 import json
 from pathlib import Path
+import uuid
 
 
 def make_notebook(cells):
@@ -32,7 +33,7 @@ def make_notebook(cells):
 def md_cell(text):
     return {
         "cell_type": "markdown",
-        "id": None,
+        "id": f"cell_{uuid.uuid4().hex[:8]}",
         "metadata": {},
         "source": [line + "\n" for line in text.strip().split("\n")]
     }
@@ -42,7 +43,7 @@ def code_cell(code):
     return {
         "cell_type": "code",
         "execution_count": None,
-        "id": None,
+        "id": f"cell_{uuid.uuid4().hex[:8]}",
         "metadata": {},
         "outputs": [],
         "source": [line + "\n" for line in code.strip().split("\n")]
@@ -558,14 +559,30 @@ def calculate_rightsized_job(model: str, n_transients: int, cpus: int = None):
 calculate_rightsized_job(model="Bu2026Fixed", n_transients=2_500_000)"""))
 
     # Cell 16: Suite-Specific Rightsizing Markdown
-    cells.append(md_cell(r"""### 8. Suite-Specific Empirical Rightsizing & OOM Risk Analysis
+    cells.append(md_cell(r"""### 8. Empirical Tri-Resource Rightsizing (RAM, Walltime & CPU Cores)
 
-For analysis suites with a statistically significant sample size ($N \ge 20$), we determine the optimal resource directives by reconciling:
-1. **Empirical OOM Floor ($\mathrm{Mem}_{\mathrm{floor}}$)**: The highest memory tier where jobs crashed with `OUT_OF_MEMORY`. Allocations at or below this floor represent guaranteed or high-probability failure points.
-2. **Completed Usage Upper Bound ($P_{95}(\mathrm{MaxRSS})$)**: The 95th percentile physical memory footprint among completed simulations.
-3. **Optimal Safe Allocation**:
-   $$\mathrm{RecMem} = \max\Big(\mathrm{Mem}_{\mathrm{floor}} \times 1.25,\; P_{95}(\mathrm{MaxRSS}) \times 1.25\Big)$$
-   mapped to the nearest standard Slurm memory tier (e.g., 32 GB, 64 GB, 128 GB, 256 GB) to achieve **70%–85%** memory efficiency while eliminating OOM kills."""))
+For analysis suites with a statistically significant sample size ($N \ge 20$), empirical rightsizing eliminates cluster bottlenecks across all three allocation axes:
+
+1. **Memory Rightsizing (OOM Elimination & NUMA Optimization)**:
+   - **Empirical OOM Floor ($\mathrm{Mem}_{\mathrm{floor}}$)**: The highest memory tier where jobs crashed with `OUT_OF_MEMORY`. Allocations at or below this floor represent guaranteed or high-probability failure points.
+   - **Completed Usage Upper Bound ($P_{95}(\mathrm{MaxRSS})$)**: The 95th percentile physical memory footprint among completed simulations.
+   - **Optimal Allocation**:
+     $$\mathrm{RecMem} = \max\Big(\mathrm{Mem}_{\mathrm{floor}} \times 1.25,\; P_{95}(\mathrm{MaxRSS}) \times 1.25\Big)$$
+     mapped to the nearest standard cluster tier (e.g. 32 GB, 64 GB, 128 GB, 256 GB) to ensure **70%–85%** memory efficiency while completely eliminating OOM kills.
+
+2. **Walltime Optimization (Timeout Mitigation & Slurm Backfill Prioritization)**:
+   - Requesting excessive walltimes (e.g. 24 hours for a 2-hour job) severely degrades Slurm backfill priority, forcing jobs to wait hours for full node draining.
+   - **Empirical Timeout Ceiling**: We identify any historical `TIMEOUT` failure thresholds.
+   - **Optimal Allocation**:
+     $$\mathrm{RecTime} = \max\Big(P_{95}(\mathrm{Elapsed}) \times 1.35,\; \mathrm{Timeout}_{\mathrm{ceiling}} \times 1.30,\; 300\text{ s}\Big)$$
+     rounded to clean minutes. This guarantees safety against timeouts while preserving eligibility for rapid backfill scheduling.
+
+3. **CPU Core Rightsizing (Thread Scaling & Service Unit Conservation)**:
+   - Slurm accounting charges Service Units (SUs / core-hours) based on **reserved** cores ($\text{ReqCPUS} \times \text{Elapsed}$), not consumed CPU time.
+   - Using `reportseff` CPU efficiency, we calculate the real effective core demand:
+     $$\text{Cores}_{\text{eff}} = \text{ReqCPUS} \times \left(\frac{\text{CPUEff}}{100}\right)$$
+   - When jobs exhibit low CPU efficiency ($\sim 15\%$), reserving 8 or 16 cores wastes up to 85% of allocated Service Units on idle threads.
+   - Rightsizing cores to cover $P_{95}(\text{Cores}_{\text{eff}})$ prevents SU waste and dramatically increases node packing concurrency (up to $2\times$–$4\times$ simultaneous jobs on 128-core nodes)."""))
 
     # Cell 17: Suite Rightsizing Visualizations & Summary Table
     cells.append(code_cell(r"""if plt is not None and pd is not None:
@@ -579,7 +596,7 @@ For analysis suites with a statistically significant sample size ($N \ge 20$), w
         axis=1
     )
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5.2))
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 11))
 
     # Subplot 1: OOM Failure Probability vs Requested Memory for Significant Suites
     eval_suites = ["Suite 02: Granular Criteria Sweep", "Suite 01: Large-Scale Rate Limits"]
@@ -610,8 +627,8 @@ For analysis suites with a statistically significant sample size ($N \ge 20$), w
     ax1.axvline(32, color="orange", linestyle="--", linewidth=1.5, alpha=0.8, label="Historical 32 GB OOM Cliff")
     ax1.set_xlabel("Requested Memory Allocation (--mem) [GB]", fontweight="bold")
     ax1.set_ylabel("Empirical OOM Failure Rate [%]", fontweight="bold")
-    ax1.set_title("OOM Failure Probability vs. Allocated Memory Tier", fontweight="bold")
-    ax1.legend(loc="upper right", frameon=True, fontsize=9)
+    ax1.set_title("1. Memory Sizing: OOM Failure Probability vs Allocation Tier", fontweight="bold")
+    ax1.legend(loc="upper right", frameon=True, fontsize=8.5)
     ax1.grid(True, linestyle=":", alpha=0.6)
 
     # Subplot 2: MaxRSS for Completed Runs vs Allocation Ceiling
@@ -624,9 +641,38 @@ For analysis suites with a statistically significant sample size ($N \ge 20$), w
         ax2.axvline(64, color="forestgreen", linestyle="-.", linewidth=2, label="Recommended Alloc (64 GB) -> 0% OOM")
         ax2.set_xlabel("Peak Physical RAM Consumed (MaxRSS) [GB]", fontweight="bold")
         ax2.set_ylabel("Number of Completed Runs", fontweight="bold")
-        ax2.set_title("Suite 02 Completed MaxRSS vs. OOM Failure Cliff", fontweight="bold")
+        ax2.set_title("2. Memory Footprint: Suite 02 Completed MaxRSS Distribution", fontweight="bold")
         ax2.legend(loc="upper right", frameon=True, fontsize=8.5)
         ax2.grid(True, linestyle=":", alpha=0.6)
+
+    # Subplot 3: Completed Walltime Distribution vs Backfill Scheduling
+    valid_time = suite02_comp[suite02_comp["used_walltime_sec"] > 0]["used_walltime_sec"] / 60.0
+    if not valid_time.empty:
+        ax3.hist(valid_time, bins=np.linspace(0, 300, 31), color="#4C72B0", edgecolor="black", linewidth=0.7, alpha=0.8)
+        ax3.axvline(valid_time.median(), color="cyan", linestyle="-", linewidth=1.8, label=f"Median Elapsed ({valid_time.median():.1f} min)")
+        ax3.axvline(valid_time.quantile(0.95), color="orange", linestyle="-", linewidth=2, label=f"Completed P95 ({valid_time.quantile(0.95):.1f} min)")
+        ax3.axvline(235, color="forestgreen", linestyle="-.", linewidth=2, label="Recommended Time (03:55:00 / 235 min)")
+        ax3.set_xlabel("Elapsed Walltime [minutes]", fontweight="bold")
+        ax3.set_ylabel("Number of Completed Runs", fontweight="bold")
+        ax3.set_title("3. Walltime Sizing: Completed Runtime vs Backfill Thresholds", fontweight="bold")
+        ax3.legend(loc="upper right", frameon=True, fontsize=8.5)
+        ax3.grid(True, linestyle=":", alpha=0.6)
+
+    # Subplot 4: Effective CPU Core Utilization & Scaling
+    # Effective cores = ReqCPUS * (CPUEff / 100)
+    has_cpu_eff = suite02_comp[(suite02_comp["cpu_efficiency_pct"] > 0) & (suite02_comp["req_cpus"] > 0)].copy()
+    if not has_cpu_eff.empty:
+        has_cpu_eff["effective_cores"] = has_cpu_eff["req_cpus"] * (has_cpu_eff["cpu_efficiency_pct"] / 100.0)
+        ax4.hist(has_cpu_eff["effective_cores"], bins=np.linspace(0, 8, 17), color="#8172B3", edgecolor="black", linewidth=0.7, alpha=0.85)
+        ax4.axvline(has_cpu_eff["effective_cores"].quantile(0.95), color="orange", linestyle="-", linewidth=2,
+                    label=f"P95 Effective Cores ({has_cpu_eff['effective_cores'].quantile(0.95):.1f})")
+        ax4.axvline(8, color="crimson", linestyle="--", linewidth=1.8, label="Historical Allocation (8 Cores)")
+        ax4.axvline(4, color="forestgreen", linestyle="-.", linewidth=2, label="Recommended Allocation (4 Cores -> 2x Concurrency)")
+        ax4.set_xlabel("Effective Active Cores Utilized", fontweight="bold")
+        ax4.set_ylabel("Number of Jobs", fontweight="bold")
+        ax4.set_title("4. CPU Sizing: Effective Core Utilization & Slack", fontweight="bold")
+        ax4.legend(loc="upper right", frameon=True, fontsize=8.5)
+        ax4.grid(True, linestyle=":", alpha=0.6)
 
     plt.tight_layout()
     plt.show()
@@ -637,30 +683,37 @@ For analysis suites with a statistically significant sample size ($N \ge 20$), w
     analyzer = TelemetryAnalyzer(tracker.load_registry())
     suite_recs = analyzer.analyze_suite_rightsizing(min_jobs=20)
 
-    print("\n" + "=" * 90)
-    print("EMPIRICAL SUITE RIGHTSIZING TABLE (Statistically Significant Suites N >= 20)")
-    print("=" * 90)
+    print("\n" + "=" * 94)
+    print("EMPIRICAL TRI-RESOURCE SUITE RIGHTSIZING TABLE (Statistically Significant Suites N >= 20)")
+    print("=" * 94)
     for s_name, data in suite_recs.items():
         print(f"\nSuite: {s_name}")
-        print(f"  Tracked Jobs:          {data['sample_size']:,} ({data['completed_count']:,} completed, {data['oom_count']:,} OOM kills)")
+        print(f"  Tracked Jobs:          {data['sample_size']:,} ({data['completed_count']:,} completed, {data['oom_count']:,} OOM, {data['timeout_count']:,} timeout)")
         print(f"  Historical OOM Rate:   {data['oom_failure_rate_pct']:.1f}%")
         print(f"  OOM Memory Floor:      {data['oom_memory_floor_gb']:.1f} GB (crashed at or below this allocation)")
         print(f"  Completed Peak RSS:    Median {data['completed_rss_p50_gb']:.2f} GB | P95 {data['completed_rss_p95_gb']:.2f} GB | Max {data['completed_rss_max_gb']:.2f} GB")
-        print(f"  Completed Walltime:    Median {data['completed_walltime_p50_min']:.1f} min | P95 {data['completed_walltime_p95_min']:.1f} min")
+        print(f"  Completed Walltime:    Median {data['completed_walltime_p50_min']:.1f} min | P95 {data['completed_walltime_p95_min']:.1f} min | Max {data['completed_walltime_max_min']:.1f} min")
+        if data['timeout_floor_min'] > 0:
+            print(f"  Timeout Floor Limit:   {data['timeout_floor_min']:.1f} min")
+        print(f"  CPU Utilization:       Median CPUEff: {data['median_cpu_eff_pct']:.1f}% | Effective Cores P95: {data['effective_cores_p95']:.2f} (Allocated: ~{data['historical_req_cpus']})")
+        print(f"  Concurrency Multiplier:{data['concurrency_multiplier']:.1f}x simultaneous jobs on 128-core nodes")
+        print(f"  Service Unit Savings:  ~{data['su_savings_pct']:.0f}% reduction in billed core-hours")
         print(f"  RECOMMENDED SBATCH DIRECTIVES:")
         print(f"    #SBATCH -p {data['recommended_partition']}")
         print(f"    #SBATCH --mem={int(data['recommended_mem_gb'])}g")
         print(f"    #SBATCH --time={data['recommended_walltime_str']}")
         print(f"    #SBATCH --cpus-per-task={data['recommended_cpus']}")
-        print(f"  Queue Advice:          {data['queue_advice']}")
+        print(f"  Queue Strategy:        {data['queue_advice']}")
+        print(f"  CPU Strategy:          {data['cpu_advice']}")
+        print(f"  Walltime Strategy:     {data['walltime_advice']}")
         print(f"  Mitigation Notes:      {data['risk_notes']}")
-        print("-" * 90)
+        print("-" * 94)
 else:
     print("Matplotlib / Pandas not available in current environment; skipping graphical rendering.")"""))
 
     # Cell 18: Suite Rightsizer Function Code
     cells.append(code_cell(r"""def calculate_suite_rightsized_job(suite_name: str):
-    \"\"\"Interactive utility to lookup empirical rightsizing directives for an analysis suite.\"\"\"
+    \"\"\"Interactive utility to lookup empirical tri-resource rightsizing directives for an analysis suite.\"\"\"
     root = Path("..") if Path("../telemetry").exists() else Path(".")
     tracker = JobTelemetryTracker(project_root=root)
     analyzer = TelemetryAnalyzer(tracker.load_registry())
@@ -673,26 +726,35 @@ else:
         print(f"No statistically significant data found for '{suite_name}'. Available: {list(suite_recs.keys())}")
         return
 
-    print("=" * 72)
-    print(f"SLURM EMPIRICAL RIGHTSIZING: {label}")
-    print("=" * 72)
-    print(f"Sample Size:             {match['sample_size']:,} jobs ({match['completed_count']:,} completed, {match['oom_count']:,} OOM kills)")
+    print("=" * 76)
+    print(f"SLURM EMPIRICAL TRI-RESOURCE RIGHTSIZING: {label}")
+    print("=" * 76)
+    print(f"Sample Size:             {match['sample_size']:,} jobs ({match['completed_count']:,} completed, {match['oom_count']:,} OOM, {match['timeout_count']:,} timeout)")
     print(f"Historical OOM Rate:     {match['oom_failure_rate_pct']:.1f}%")
     print(f"Historical OOM Mem Floor:{match['oom_memory_floor_gb']:.1f} GB (crashed at/below this allocation)")
-    print(f"Completed Peak RAM (P95):{match['completed_rss_p95_gb']:.2f} GB (Max: {match['completed_rss_max_gb']:.2f} GB)")
-    print(f"Completed Walltime (P95):{match['completed_walltime_p95_min']:.1f} minutes")
-    print("-" * 72)
+    print(f"Completed Peak RAM:      P50: {match['completed_rss_p50_gb']:.2f} GB | P95: {match['completed_rss_p95_gb']:.2f} GB | Max: {match['completed_rss_max_gb']:.2f} GB")
+    print(f"Completed Walltime:      P50: {match['completed_walltime_p50_min']:.1f} min | P95: {match['completed_walltime_p95_min']:.1f} min | Max: {match['completed_walltime_max_min']:.1f} min")
+    if match['timeout_floor_min'] > 0:
+        print(f"Timeout Ceiling Floor:   {match['timeout_floor_min']:.1f} min")
+    print(f"CPU Utilization Profile: Median CPUEff: {match['median_cpu_eff_pct']:.1f}% | Effective Cores P95: {match['effective_cores_p95']:.2f}")
+    print(f"Concurrency Multiplier:  {match['concurrency_multiplier']:.1f}x simultaneous jobs on 128-core nodes")
+    print(f"Service Unit Savings:    ~{match['su_savings_pct']:.0f}% reduction in billed core-hours")
+    print("-" * 76)
     print("RECOMMENDED SLURM SBATCH DIRECTIVES:")
     print(f"  #SBATCH -p {match['recommended_partition']}")
     print(f"  #SBATCH --mem={int(match['recommended_mem_gb'])}g")
     print(f"  #SBATCH --time={match['recommended_walltime_str']}")
     print(f"  #SBATCH --cpus-per-task={match['recommended_cpus']}")
-    print("-" * 72)
+    print("-" * 76)
     print("Queue Placement Strategy:")
     print(f"  {match['queue_advice']}")
+    print("CPU Allocation Guidance:")
+    print(f"  {match['cpu_advice']}")
+    print("Walltime Sizing Guidance:")
+    print(f"  {match['walltime_advice']}")
     print("Risk & Failure Mitigation Basis:")
     print(f"  {match['risk_notes']}")
-    print("=" * 72)
+    print("=" * 76)
 
 # Demonstration: Rightsizing Suite 02 (Granular Criteria Sweep)
 calculate_suite_rightsized_job("Suite 02")"""))

@@ -299,11 +299,16 @@ To rightsize Slurm allocations, minimize queue wait times, and avoid OOM kills o
    reportseff -u $USER d=now-3week | python scripts/backfill_reportseff_telemetry.py --stdin
    ```
 
-4. **Get Rightsizing Recommendations for Proposed Simulation**:
-   ```bash
-   python -m telemetry rightsize --model Bu2026Fixed --n-transients 1000000
-   ```
-   Outputs exact `#SBATCH` directives (`--mem`, `--time`, `--cpus-per-task`) along with queue placement advice (e.g., fast backfill eligibility vs. high-memory node wait).
+4. **Get Empirical Tri-Resource Rightsizing Recommendations**:
+   - **For a Planned Simulation Count**:
+     ```bash
+     python -m telemetry rightsize --model Bu2026Fixed --n-transients 1000000
+     ```
+   - **For a Simulation Suite Family (Empirical OOM vs Completed vs Timeout Analysis)**:
+     ```bash
+     python -m telemetry rightsize --suite "02"   # Or --suite all
+     ```
+   Outputs exact `#SBATCH` directives (`-p`, `--mem`, `--time`, `--cpus-per-task`) along with queue placement advice (fast backfill eligibility vs. high-memory wait), thread scaling bottlenecks, Service Unit savings, and node concurrency multipliers.
 
 5. **Automate via Hourly Scrontab or Background Daemon**:
    - **System / Cluster Scrontab**: Install an hourly cron job named `kn_telemetry_cron` that auto-updates and commits telemetry changes:

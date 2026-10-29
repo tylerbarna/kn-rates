@@ -368,32 +368,59 @@ def main():
         analyzer = TelemetryAnalyzer(tracker.load_registry() or tracker.update())
         if args.suite:
             suite_data = analyzer.analyze_suite_rightsizing(min_jobs=5)
-            match = next((v for k, v in suite_data.items() if args.suite.lower() in k.lower()), None)
-            suite_label = next((k for k, v in suite_data.items() if args.suite.lower() in k.lower()), args.suite)
-            if not match:
-                print(f"Error: No statistically significant data found for suite '{args.suite}'. Available: {list(suite_data.keys())}", file=sys.stderr)
-                sys.exit(1)
-            print("=" * 70)
-            print(f"SLURM EMPIRICAL RIGHTSIZING: {suite_label}")
-            print("=" * 70)
-            print(f"Sample Size:             {match['sample_size']:,} jobs ({match['completed_count']:,} completed, {match['oom_count']:,} OOM kills)")
-            print(f"Historical OOM Rate:     {match['oom_failure_rate_pct']:.1f}%")
-            print(f"Historical OOM Mem Floor:{match['oom_memory_floor_gb']:.1f} GB (crashed at/below this allocation)")
-            print(f"Completed Peak RAM (P95):{match['completed_rss_p95_gb']:.2f} GB (Max: {match['completed_rss_max_gb']:.2f} GB)")
-            print(f"Completed Walltime (P95):{match['completed_walltime_p95_min']:.1f} minutes")
-            print("-" * 70)
-            print("RECOMMENDED SLURM SBATCH DIRECTIVES:")
-            print(f"  #SBATCH -p {match['recommended_partition']}")
-            print(f"  #SBATCH --mem={int(match['recommended_mem_gb'])}g")
-            print(f"  #SBATCH --time={match['recommended_walltime_str']}")
-            print(f"  #SBATCH --cpus-per-task={match['recommended_cpus']}")
-            print("-" * 70)
-            print("Queue Placement Strategy:")
-            print(f"  {match['queue_advice']}")
-            print("Risk & Failure Mitigation Basis:")
-            print(f"  {match['risk_notes']}")
-            print("=" * 70)
+            if args.suite.lower() == "all":
+                target_suites = suite_data
+            else:
+                matches = {k: v for k, v in suite_data.items() if args.suite.lower() in k.lower()}
+                if not matches:
+                    print(f"Error: No statistically significant data found for suite '{args.suite}'. Available: {list(suite_data.keys())}", file=sys.stderr)
+                    sys.exit(1)
+                target_suites = matches
+
+            for suite_label, match in target_suites.items():
+                print("=" * 78)
+                print(f"SLURM EMPIRICAL RIGHTSIZING: {suite_label}")
+                print("=" * 78)
+                print(f"Sample Size:             {match['sample_size']:,} jobs ({match['completed_count']:,} completed, {match['oom_count']:,} OOM, {match['timeout_count']:,} timeout)")
+                print(f"Historical OOM Rate:     {match['oom_failure_rate_pct']:.1f}%")
+                print(f"Historical OOM Mem Floor:{match['oom_memory_floor_gb']:.1f} GB (crashed at/below this allocation)")
+                print(f"Completed Peak RAM:      P50: {match['completed_rss_p50_gb']:.2f} GB | P95: {match['completed_rss_p95_gb']:.2f} GB | Max: {match['completed_rss_max_gb']:.2f} GB")
+                print(f"Completed Walltime:      P50: {match['completed_walltime_p50_min']:.1f} min | P95: {match['completed_walltime_p95_min']:.1f} min | Max: {match['completed_walltime_max_min']:.1f} min")
+                if match['timeout_floor_min'] > 0:
+                    print(f"Timeout Ceiling Floor:   {match['timeout_floor_min']:.1f} min (jobs failed when limit <= this)")
+                print(f"CPU Utilization Profile: Median CPUEff: {match['median_cpu_eff_pct']:.1f}% | Effective Cores P95: {match['effective_cores_p95']:.2f} (Allocated: ~{match['historical_req_cpus']})")
+                print(f"Concurrency Multiplier:  {match['concurrency_multiplier']:.1f}x simultaneous jobs on 128-core nodes")
+                print(f"Service Unit Savings:    ~{match['su_savings_pct']:.0f}% reduction in billed core-hours")
+                print("-" * 78)
+                print("RECOMMENDED SLURM SBATCH DIRECTIVES:")
+                print(f"  #SBATCH -p {match['recommended_partition']}")
+                print(f"  #SBATCH --mem={int(match['recommended_mem_gb'])}g")
+                print(f"  #SBATCH --time={match['recommended_walltime_str']}")
+                print(f"  #SBATCH --cpus-per-task={match['recommended_cpus']}")
+                print("-" * 78)
+                print("Queue Placement Strategy:")
+                print(f"  {match['queue_advice']}")
+                print("CPU Allocation Guidance:")
+                print(f"  {match['cpu_advice']}")
+                print("Walltime Sizing Guidance:")
+                print(f"  {match['walltime_advice']}")
+                print("Risk & Failure Mitigation Basis:")
+                print(f"  {match['risk_notes']}")
+                print("=" * 78)
             return
+
+        # Default: if no specific suite requested and model is default, print all suites then model
+        suite_data = analyzer.analyze_suite_rightsizing(min_jobs=5)
+        if suite_data:
+            print("=" * 78)
+            print("SUITE RIGHTSIZING SUMMARY (Tri-Resource: RAM, Walltime, CPU Cores)")
+            print("=" * 78)
+            print(f"{'Suite Name':<32} | {'Mem Tier':<8} | {'Walltime':<10} | {'CPUs':<5} | {'Conc. Gain':<10} | {'OOM Rate':<8}")
+            print("-" * 78)
+            for s_name, d in suite_data.items():
+                print(f"{s_name[:32]:<32} | {int(d['recommended_mem_gb']):>4} GB   | {d['recommended_walltime_str']:<10} | {d['recommended_cpus']:<5} | {d['concurrency_multiplier']:>4.1f}x     | {d['oom_failure_rate_pct']:>5.1f}%")
+            print("=" * 78)
+            print("Tip: Run `python3 -m telemetry.tracker rightsize --suite '02'` for comprehensive suite details.\n")
 
         rec = analyzer.recommend_resources(args.model, args.n_transients, n_cpus=args.cpus)
         print("=" * 70)
