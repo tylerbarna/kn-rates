@@ -407,6 +407,52 @@ class TestFastCriteriaFilterAndCandidates(unittest.TestCase):
             found_none = find_candidate_files(cand_dir, "NonExistentModel")
             self.assertEqual(found_none, [])
 
+    def test_vectorized_ensemble_aggregation_and_merge(self):
+        """Verify build_model_metrics_df and merge_model_csvs compute accurate statistics without OOM."""
+        import tempfile
+        import numpy as np
+        from fast_criteria_filter import build_model_metrics_df, merge_model_csvs
+
+        test_grid = [
+            {"snr_threshold": 5.0, "snr_threshold_secondary": 3.0, "min_detections": 2},
+            {"snr_threshold": 6.0, "snr_threshold_secondary": 4.0, "min_detections": 3},
+        ]
+
+        class DummyPool:
+            def __init__(self, model_name):
+                self.model_name = model_name
+                self.n_simulated = 1000000
+                self.vt_total = 10.0
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_dir = Path(tmpdir)
+            # Create mock counts matrix for 5 samples across 2 grid points
+            # Sample counts: [10, 12, 14, 8, 16] -> mean = 12, std = 3.162
+            counts_matrix = np.array([
+                [10, 20],
+                [12, 22],
+                [14, 24],
+                [8, 18],
+                [16, 26],
+            ], dtype=np.int32)
+
+            for model in ["Bu2026Fixed", "Bu2026Vary", "Metzger"]:
+                pool = DummyPool(model)
+                cand_files = [out_dir / f"cand_{i}.json" for i in range(5)]
+                df = build_model_metrics_df(test_grid, counts_matrix, pool, cand_files)
+                self.assertEqual(len(df), 2)
+                self.assertAlmostEqual(df["overall_efficiency_mean"].iloc[0], 12.0 / 1e6)
+                self.assertAlmostEqual(df["overall_efficiency_mean"].iloc[1], 22.0 / 1e6)
+                self.assertGreater(df["overall_efficiency_std"].iloc[0], 0.0)
+                self.assertEqual(df["n_samples"].iloc[0], 5)
+
+                df.to_csv(out_dir / f"granular_sweep_metrics_{model}.csv", index=False)
+
+            merged_df, _ = merge_model_csvs(out_dir)
+            self.assertIsNotNone(merged_df)
+            self.assertEqual(len(merged_df), 6)  # 3 models x 2 points
+            self.assertTrue((out_dir / "granular_sweep_metrics.csv").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

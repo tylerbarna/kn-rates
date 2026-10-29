@@ -70,6 +70,12 @@ class SimpleTable:
             writer.writeheader()
             writer.writerows(self.records)
 
+    @classmethod
+    def from_csv(cls, filepath: Union[str, Path]) -> "SimpleTable":
+        with open(filepath, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            return cls(list(reader))
+
     @property
     def iloc(self):
         class _ILoc:
@@ -207,6 +213,17 @@ def parse_args() -> argparse.Namespace:
         "--export-compact-jsons",
         action="store_true",
         help="Serialize individual compact sim_result JSONs for each grid point for downstream backward compatibility.",
+    )
+    parser.add_argument(
+        "--max-samples",
+        type=int,
+        default=None,
+        help="Optional cap on the number of candidate sample files to evaluate per model.",
+    )
+    parser.add_argument(
+        "--merge-only",
+        action="store_true",
+        help="Merge existing per-model sweep CSVs into unified tables without re-filtering candidates.",
     )
     return parser.parse_args()
 
@@ -464,26 +481,35 @@ def evaluate_grid_point_for_pool(args_tuple: Tuple[Dict[str, Any], Any]) -> Dict
     }
 
 
-def evaluate_grid_chunk(chunk_cfgs: List[Dict[str, Any]], pool: CandidatePool) -> List[Dict[str, Any]]:
-    """Process a chunk of criteria points sequentially for one candidate pool."""
-    results = []
-    for cfg in chunk_cfgs:
-        n_det = 0
-        for lc in pool.lightcurves:
+def evaluate_grid_chunk_counts(chunk_cfgs: List[Dict[str, Any]], pool: CandidatePool) -> np.ndarray:
+    """Process a chunk of criteria points sequentially and return an int32 array of detection counts."""
+    counts = np.zeros(len(chunk_cfgs), dtype=np.int32)
+    lcs = pool.lightcurves
+    for i, cfg in enumerate(chunk_cfgs):
+        n = 0
+        for lc in lcs:
             if evaluate_candidate_against_criteria(lc, cfg):
-                n_det += 1
-        eff = n_det / max(1, pool.n_simulated)
-        vt_eff = eff * pool.vt_total
-        r95 = (-math.log(0.05) / vt_eff) if vt_eff > 0 else math.nan
-        results.append({
-            "n_detected": n_det,
-            "n_simulated": pool.n_simulated,
-            "overall_efficiency": eff,
-            "effective_vt_gpc3_yr": vt_eff,
-            "rate_upper_95": r95,
-            **cfg,
-        })
-    return results
+                n += 1
+        counts[i] = n
+    return counts
+
+
+def run_filter_counts_for_pool(
+    pool: CandidatePool,
+    grid: List[Dict[str, Any]],
+    n_workers: int = 4,
+) -> np.ndarray:
+    """Evaluate an entire criteria grid against a candidate pool returning a 1D int32 detection counts array."""
+    total_pts = len(grid)
+    if n_workers <= 1 or total_pts < 50:
+        return evaluate_grid_chunk_counts(grid, pool)
+
+    chunk_size = math.ceil(total_pts / n_workers)
+    chunks = [grid[i : i + chunk_size] for i in range(0, total_pts, chunk_size)]
+    pool_args = [(c, pool) for c in chunks]
+    with mp.Pool(processes=min(n_workers, len(chunks))) as p:
+        chunk_results = p.starmap(evaluate_grid_chunk_counts, pool_args)
+    return np.concatenate(chunk_results)
 
 
 def run_filter_for_pool(
@@ -491,21 +517,121 @@ def run_filter_for_pool(
     grid: List[Dict[str, Any]],
     n_workers: int = 4,
 ) -> Any:
-    """Evaluate an entire criteria grid against a candidate pool using multiprocessing."""
-    total_pts = len(grid)
-    if n_workers <= 1 or total_pts < 50:
-        raw_results = evaluate_grid_chunk(grid, pool)
-    else:
-        chunk_size = math.ceil(total_pts / n_workers)
-        chunks = [grid[i : i + chunk_size] for i in range(0, total_pts, chunk_size)]
-        pool_args = [(c, pool) for c in chunks]
-        with mp.Pool(processes=min(n_workers, len(chunks))) as p:
-            chunk_results = p.starmap(evaluate_grid_chunk, pool_args)
-        raw_results = [item for sublist in chunk_results for item in sublist]
+    """Evaluate an entire criteria grid against a candidate pool and return a DataFrame (for backward compatibility)."""
+    counts = run_filter_counts_for_pool(pool, grid, n_workers=n_workers)
+    eff = counts.astype(np.float64) / max(1, pool.n_simulated)
+    vt_eff = eff * pool.vt_total
+    with np.errstate(divide="ignore", invalid="ignore"):
+        r95 = np.where(vt_eff > 0, -np.log(0.05) / vt_eff, np.nan)
 
-    for item in raw_results:
-        item["model"] = pool.model_name
-    return make_df(raw_results)
+    recs = []
+    for i, cfg in enumerate(grid):
+        recs.append({
+            "model": pool.model_name,
+            "n_detected": int(counts[i]),
+            "n_simulated": pool.n_simulated,
+            "overall_efficiency": float(eff[i]),
+            "effective_vt_gpc3_yr": float(vt_eff[i]),
+            "rate_upper_95": float(r95[i]),
+            **cfg,
+        })
+    return make_df(recs)
+
+
+def build_model_metrics_df(
+    grid: List[Dict[str, Any]],
+    counts_matrix: np.ndarray,
+    pool: CandidatePool,
+    cand_files: List[Path],
+) -> Any:
+    """Construct model metrics table from the aggregated counts matrix in a fast vectorized manner."""
+    n_samples = len(cand_files)
+    n_sim = float(pool.n_simulated)
+    vt_tot = float(pool.vt_total)
+
+    eff_matrix = counts_matrix.astype(np.float64) / max(1.0, n_sim)
+    vt_matrix = eff_matrix * vt_tot
+
+    mean_counts = np.mean(counts_matrix, axis=0)
+    mean_eff = np.mean(eff_matrix, axis=0)
+    std_eff = np.std(eff_matrix, axis=0, ddof=1) if n_samples > 1 else np.zeros_like(mean_eff)
+    mean_vt = np.mean(vt_matrix, axis=0)
+    std_vt = np.std(vt_matrix, axis=0, ddof=1) if n_samples > 1 else np.zeros_like(mean_vt)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mean_r95 = np.where(mean_vt > 0, -np.log(0.05) / mean_vt, np.nan)
+    sem_eff = std_eff / math.sqrt(n_samples) if n_samples > 1 else np.zeros_like(mean_eff)
+    sem_vt = std_vt / math.sqrt(n_samples) if n_samples > 1 else np.zeros_like(mean_vt)
+
+    if pd is not None:
+        df_model = pd.DataFrame(grid)
+        df_model["model"] = pool.model_name
+        df_model["n_detected"] = mean_counts
+        df_model["n_simulated"] = int(n_sim)
+        df_model["overall_efficiency"] = mean_eff
+        df_model["overall_efficiency_mean"] = mean_eff
+        df_model["overall_efficiency_std"] = std_eff
+        df_model["efficiency_sem"] = sem_eff
+        df_model["effective_vt_gpc3_yr"] = mean_vt
+        df_model["effective_vt_gpc3_yr_mean"] = mean_vt
+        df_model["effective_vt_gpc3_yr_std"] = std_vt
+        df_model["vt_sem"] = sem_vt
+        df_model["rate_upper_95"] = mean_r95
+        df_model["n_samples"] = n_samples
+        return df_model
+    else:
+        recs = []
+        for i, cfg in enumerate(grid):
+            recs.append({
+                "model": pool.model_name,
+                "n_detected": float(mean_counts[i]),
+                "n_simulated": int(n_sim),
+                "overall_efficiency": float(mean_eff[i]),
+                "overall_efficiency_mean": float(mean_eff[i]),
+                "overall_efficiency_std": float(std_eff[i]),
+                "efficiency_sem": float(sem_eff[i]),
+                "effective_vt_gpc3_yr": float(mean_vt[i]),
+                "effective_vt_gpc3_yr_mean": float(mean_vt[i]),
+                "effective_vt_gpc3_yr_std": float(std_vt[i]),
+                "vt_sem": float(sem_vt[i]),
+                "rate_upper_95": float(mean_r95[i]),
+                "n_samples": n_samples,
+                **cfg,
+            })
+        return SimpleTable(recs)
+
+
+def merge_model_csvs(out_dir: Path) -> Tuple[Optional[Any], Optional[Any]]:
+    """Merge existing per-model sweep CSVs in out_dir into unified tables."""
+    model_dfs = []
+    rank_dfs = []
+    for m in MODELS:
+        m_csv = out_dir / f"granular_sweep_metrics_{m}.csv"
+        r_csv = out_dir / f"criteria_sensitivity_ranking_{m}.csv"
+        if m_csv.exists():
+            df_m = pd.read_csv(m_csv) if pd is not None else SimpleTable.from_csv(m_csv)
+            model_dfs.append(df_m)
+            print(f"  Found {m_csv.name} ({len(df_m):,} rows)", flush=True)
+        if r_csv.exists():
+            df_r = pd.read_csv(r_csv) if pd is not None else SimpleTable.from_csv(r_csv)
+            rank_dfs.append(df_r)
+
+    if not model_dfs:
+        return None, None
+
+    combined_metrics_df = concat_dfs(model_dfs)
+    combined_metrics_csv = out_dir / "granular_sweep_metrics.csv"
+    combined_metrics_df.to_csv(combined_metrics_csv, index=False)
+    print(f"\n[COMPLETE] Unified criteria metrics across {len(model_dfs)} models saved to: {combined_metrics_csv} ({len(combined_metrics_df):,} rows)", flush=True)
+
+    combined_rank_df = None
+    if rank_dfs:
+        combined_rank_df = concat_dfs(rank_dfs)
+        combined_rank_csv = out_dir / "criteria_sensitivity_ranking.csv"
+        combined_rank_df.to_csv(combined_rank_csv, index=False)
+        print(f"[COMPLETE] Unified sensitivity rankings saved to: {combined_rank_csv}", flush=True)
+
+    return combined_metrics_df, combined_rank_df
 
 
 def compute_criteria_ranking(df: Any) -> Any:
@@ -618,14 +744,25 @@ def main():
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.merge_only:
+        print("=" * 80, flush=True)
+        print(f"MERGE-ONLY MODE: Combining per-model criteria sweep CSVs from {out_dir}", flush=True)
+        print("=" * 80, flush=True)
+        m_df, r_df = merge_model_csvs(out_dir)
+        if m_df is None:
+            sys.exit(f"Error: No per-model CSVs found to merge in {out_dir}")
+        return
+
     grid = get_grid_combinations(args.grid_preset)
-    print("=" * 80)
-    print("HIGH-PERFORMANCE CRITERIA FILTERING ENGINE (ALL 10 CRITERIA)")
-    print(f"Grid Preset:      {args.grid_preset} ({len(grid):,} valid criteria combinations)")
-    print(f"Candidates Root:  {cand_dir}")
-    print(f"Output Directory: {out_dir}")
-    print(f"Worker Processes: {args.n_workers}")
-    print("=" * 80)
+    print("=" * 80, flush=True)
+    print("HIGH-PERFORMANCE CRITERIA FILTERING ENGINE (ALL 10 CRITERIA)", flush=True)
+    print(f"Grid Preset:      {args.grid_preset} ({len(grid):,} valid criteria combinations)", flush=True)
+    print(f"Candidates Root:  {cand_dir}", flush=True)
+    print(f"Output Directory: {out_dir}", flush=True)
+    print(f"Worker Processes: {args.n_workers}", flush=True)
+    if args.max_samples is not None:
+        print(f"Max Samples:      {args.max_samples}", flush=True)
+    print("=" * 80, flush=True)
 
     target_models = MODELS if args.model == "all" else [args.model]
     all_model_dfs = []
@@ -634,8 +771,11 @@ def main():
     for model_name in target_models:
         cand_files = find_candidate_files(cand_dir, model_name)
         if not cand_files:
-            print(f"\n[SKIP] No candidate files found for {model_name} in or under: {cand_dir}")
+            print(f"\n[SKIP] No candidate files found for {model_name} in or under: {cand_dir}", flush=True)
             continue
+
+        if args.max_samples is not None and args.max_samples > 0:
+            cand_files = cand_files[:args.max_samples]
 
         fiducial_file = next((f for f in cand_files if "fiducial" in f.name), None)
         if fiducial_file is None and args.mode == "fiducial" and len(cand_files) == 1:
@@ -643,97 +783,34 @@ def main():
 
         is_ensemble = (len(cand_files) > 1) or (args.mode == "ensemble") or (fiducial_file is None)
 
-        print(f"\nProcessing {model_name} ({len(cand_files)} candidate sample file(s) detected; mode: {'ensemble' if is_ensemble else 'fiducial'})...")
+        print(f"\nProcessing {model_name} ({len(cand_files)} candidate sample file(s) detected; mode: {'ensemble' if is_ensemble else 'fiducial'})...", flush=True)
 
         if not is_ensemble and fiducial_file is not None and fiducial_file.exists():
             # Single fiducial run
             t0 = time.perf_counter()
             pool = CandidatePool(fiducial_file, model_name)
-            print(f"  Loaded {pool.n_candidates:,} candidates ({pool.n_simulated:,} simulated transients, V_total={pool.vt_total:.2f} Gpc^3 yr)")
-            df_model = run_filter_for_pool(pool, grid, n_workers=args.n_workers)
+            print(f"  Loaded {pool.n_candidates:,} candidates ({pool.n_simulated:,} simulated transients, V_total={pool.vt_total:.2f} Gpc^3 yr)", flush=True)
+            counts = run_filter_counts_for_pool(pool, grid, n_workers=args.n_workers)
+            counts_matrix = counts.reshape(1, -1)
+            df_model = build_model_metrics_df(grid, counts_matrix, pool, [fiducial_file])
             elapsed = time.perf_counter() - t0
-            print(f"  Evaluated {len(grid):,} points in {elapsed:.2f}s ({len(grid)/max(0.01, elapsed):.0f} points/sec)")
+            print(f"  Evaluated {len(grid):,} points in {elapsed:.2f}s ({len(grid)/max(0.01, elapsed):.0f} points/sec)", flush=True)
         else:
-            # Multi-sample ensemble run
-            sample_dfs = []
+            # Multi-sample ensemble run (vectorized aggregation across samples)
+            counts_matrix = np.zeros((len(cand_files), len(grid)), dtype=np.int32)
+            first_pool = None
+
             for s_idx, f in enumerate(cand_files):
                 t0 = time.perf_counter()
                 pool = CandidatePool(f, model_name)
-                df_s = run_filter_for_pool(pool, grid, n_workers=args.n_workers)
-                df_s["sample_id"] = s_idx
-                sample_dfs.append(df_s)
-                print(f"  [Sample {s_idx + 1}/{len(cand_files)}] {f.name} ({pool.n_candidates:,} cand) -> evaluated in {time.perf_counter() - t0:.2f}s")
+                if first_pool is None:
+                    first_pool = pool
+                counts = run_filter_counts_for_pool(pool, grid, n_workers=args.n_workers)
+                counts_matrix[s_idx] = counts
+                elapsed = time.perf_counter() - t0
+                print(f"  [Sample {s_idx + 1}/{len(cand_files)}] {f.name} ({pool.n_candidates:,} cand) -> evaluated in {elapsed:.2f}s", flush=True)
 
-            # Combine and compute ensemble statistics
-            df_all_samples = concat_dfs(sample_dfs)
-
-            # Group by criteria configuration
-            criteria_cols = [
-                "snr_threshold", "snr_threshold_secondary", "min_detections",
-                "min_detections_primary", "max_timespan_days", "min_time_separation_hours",
-                "min_rise_rate", "min_fade_rate", "min_galactic_lat", "require_fast_transient"
-            ]
-
-            if pd is not None and isinstance(df_all_samples, pd.DataFrame):
-                agg_dict = {
-                    "overall_efficiency": ["mean", "std", "median"],
-                    "effective_vt_gpc3_yr": ["mean", "std", "median"],
-                    "rate_upper_95": ["mean", "std", "median"],
-                    "n_detected": ["mean", "std"],
-                    "n_simulated": ["first"],
-                }
-                grouped = df_all_samples.groupby(criteria_cols).agg(agg_dict).reset_index()
-
-                # Flatten multi-index columns
-                grouped.columns = [
-                    f"{c[0]}_{c[1]}" if c[1] and c[1] != "first" else c[0]
-                    for c in grouped.columns
-                ]
-                grouped["overall_efficiency"] = grouped["overall_efficiency_mean"]
-                grouped["effective_vt_gpc3_yr"] = grouped["effective_vt_gpc3_yr_mean"]
-                grouped["rate_upper_95"] = grouped["rate_upper_95_mean"]
-                grouped["n_samples"] = len(cand_files)
-                grouped["efficiency_sem"] = grouped["overall_efficiency_std"] / math.sqrt(len(cand_files))
-                grouped["vt_sem"] = grouped["effective_vt_gpc3_yr_std"] / math.sqrt(len(cand_files))
-                grouped["model"] = model_name
-
-                df_model = grouped
-            else:
-                # Dict-based aggregation for environments without pandas
-                recs = getattr(df_all_samples, "records", df_all_samples)
-                grouped_map = {}
-                for r in recs:
-                    key = tuple(r[c] for c in criteria_cols)
-                    grouped_map.setdefault(key, []).append(r)
-
-                agg_recs = []
-                for key, r_list in grouped_map.items():
-                    effs = [x["overall_efficiency"] for x in r_list]
-                    vts = [x["effective_vt_gpc3_yr"] for x in r_list]
-                    r95s = [x["rate_upper_95"] for x in r_list if math.isfinite(x["rate_upper_95"])]
-                    m_eff = sum(effs) / len(effs)
-                    m_vt = sum(vts) / len(vts)
-                    m_r95 = sum(r95s) / len(r95s) if r95s else math.nan
-                    row = dict(zip(criteria_cols, key))
-                    row.update({
-                        "overall_efficiency": m_eff,
-                        "overall_efficiency_mean": m_eff,
-                        "overall_efficiency_std": float(np.std(effs)) if np is not None and len(effs) > 1 else 0.0,
-                        "effective_vt_gpc3_yr": m_vt,
-                        "effective_vt_gpc3_yr_mean": m_vt,
-                        "effective_vt_gpc3_yr_std": float(np.std(vts)) if np is not None and len(vts) > 1 else 0.0,
-                        "rate_upper_95": m_r95,
-                        "rate_upper_95_mean": m_r95,
-                        "n_samples": len(r_list),
-                        "model": model_name,
-                    })
-                    agg_recs.append(row)
-                df_model = make_df(agg_recs)
-
-            # Save full ensemble samples table
-            ensemble_file = out_dir / f"granular_sweep_ensemble_raw_{model_name}.csv"
-            df_all_samples.to_csv(ensemble_file, index=False)
-            print(f"  Saved raw multi-sample runs to: {ensemble_file}")
+            df_model = build_model_metrics_df(grid, counts_matrix, first_pool or pool, cand_files)
 
         # Compute criteria ranking for this model
         rank_df = compute_criteria_ranking(df_model)
@@ -742,29 +819,20 @@ def main():
 
         model_csv = out_dir / f"granular_sweep_metrics_{model_name}.csv"
         df_model.to_csv(model_csv, index=False)
-        print(f"  Saved {model_name} metrics to: {model_csv}")
+        print(f"  Saved {model_name} metrics to: {model_csv}", flush=True)
 
         rank_csv = out_dir / f"criteria_sensitivity_ranking_{model_name}.csv"
         rank_df.to_csv(rank_csv, index=False)
-        print(f"  Saved {model_name} sensitivity ranking to: {rank_csv}")
+        print(f"  Saved {model_name} sensitivity ranking to: {rank_csv}", flush=True)
 
         all_model_dfs.append(df_model)
 
     if not all_model_dfs:
-        print("\nNo model metrics were generated. Ensure candidates exist in:", cand_dir)
+        print("\nNo model metrics were generated. Ensure candidates exist in:", cand_dir, flush=True)
         sys.exit(1)
 
-    # Combine into unified tables across all models
-    combined_metrics_df = concat_dfs(all_model_dfs)
-    combined_metrics_csv = out_dir / "granular_sweep_metrics.csv"
-    combined_metrics_df.to_csv(combined_metrics_csv, index=False)
-    print(f"\n[COMPLETE] Unified criteria metrics across {len(target_models)} models saved to: {combined_metrics_csv} ({len(combined_metrics_df):,} rows)")
-
-    if all_ranking_dfs:
-        combined_rank_df = concat_dfs(all_ranking_dfs)
-        combined_rank_csv = out_dir / "criteria_sensitivity_ranking.csv"
-        combined_rank_df.to_csv(combined_rank_csv, index=False)
-        print(f"[COMPLETE] Unified sensitivity rankings saved to: {combined_rank_csv}")
+    # Attempt to merge all available model CSVs in out_dir into unified tables
+    merge_model_csvs(out_dir)
 
 
 if __name__ == "__main__":

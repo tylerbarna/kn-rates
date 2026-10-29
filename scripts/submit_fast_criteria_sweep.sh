@@ -84,10 +84,31 @@ cand_job_id=$(sbatch --parsable \
     scripts/02_run_fast_candidates_simulation.sh)
 
 # Chain fast filter job to run after candidate array completes
-filter_job_id=$(sbatch --parsable \
-    --dependency="afterany:${cand_job_id}" \
-    --export=ALL,GRID_PRESET="${GRID_PRESET}" \
-    scripts/02_run_fast_filter.sh)
+if [ "${MODE}" = "ensemble" ]; then
+    # 3-model parallel filter array (Tasks 0, 1, 2)
+    filter_job_id=$(sbatch --parsable \
+        --array="0-2" \
+        --dependency="afterany:${cand_job_id}" \
+        --export=ALL,GRID_PRESET="${GRID_PRESET}" \
+        scripts/02_run_fast_filter.sh)
+
+    # Chained instant merge job to unify per-model CSVs into granular_sweep_metrics.csv
+    merge_job_id=$(sbatch --parsable \
+        --dependency="afterok:${filter_job_id}" \
+        -p msismall --time=00:10:00 --cpus-per-task=1 --mem=8g \
+        --job-name=kn_crit_merge \
+        --output=logs/02_fast_criteria_sweep/merge_%j.log \
+        --wrap="
+            eval \"\$(conda shell.bash hook 2>/dev/null)\" && conda activate kn_rates_dev || conda activate simsurvey_no_gpu
+            python analysis_suites/02_granular_criteria_sweep/fast_criteria_filter.py --merge-only
+        ")
+else
+    filter_job_id=$(sbatch --parsable \
+        --dependency="afterany:${cand_job_id}" \
+        --export=ALL,GRID_PRESET="${GRID_PRESET}" \
+        scripts/02_run_fast_filter.sh)
+    merge_job_id="N/A (single task)"
+fi
 
 echo "=============================================================================="
 echo "FAST CRITERIA SWEEP PIPELINE SUBMITTED"
@@ -95,6 +116,9 @@ echo "  Mode:               ${MODE} (Models: Bu2026Fixed, Bu2026Vary, Metzger)"
 echo "  Grid Preset:        ${GRID_PRESET} (2,138,460 points)"
 echo "  Candidate Array ID: ${cand_job_id} (${TOTAL_TASKS} tasks, array: ${ARRAY_RANGE})"
 echo "  Filter Job ID:      ${filter_job_id} (chained afterany:${cand_job_id})"
+if [ "${MODE}" = "ensemble" ]; then
+    echo "  Merge Job ID:       ${merge_job_id} (chained afterok:${filter_job_id})"
+fi
 echo "  Logs:               logs/02_fast_criteria_sweep/"
 echo "  Results:            results/02_granular_criteria_sweep/"
 echo "=============================================================================="

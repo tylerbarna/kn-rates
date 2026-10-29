@@ -8,20 +8,20 @@
 #   ultra-fine detection criteria combinations in parallel, generating unified metrics CSVs.
 #
 # MSI msismall Resource Calibration:
-#   - Memory: 32 GB (in-memory candidate pool filtering across all 3 models)
-#   - Walltime: 01:00:00 (takes ~3-5 minutes to evaluate 2,138,460 points across 3 models)
-#   - CPU: 4 cores
+#   - Memory: 32 GB (in-memory vectorized candidate pool filtering)
+#   - Walltime: 04:00:00 (ample safety cushion for 100 samples across 2.14M points)
+#   - CPU: 16 cores (evaluates ~15,000-25,000 points/sec)
 # ==============================================================================
 #SBATCH -p msismall
-#SBATCH --time=01:00:00
+#SBATCH --time=04:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=16
 #SBATCH --mem=32g
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
 #SBATCH --job-name=kn_crit_filter
-#SBATCH --output=logs/02_fast_criteria_sweep/%x_%j.log
-#SBATCH --error=logs/02_fast_criteria_sweep/%x_%j.err
+#SBATCH --output=logs/02_fast_criteria_sweep/%x_%A_%a.log
+#SBATCH --error=logs/02_fast_criteria_sweep/%x_%A_%a.err
 
 set -euo pipefail
 
@@ -50,22 +50,39 @@ fi
 CANDIDATES_DIR="${CANDIDATES_DIR:-results/02_granular_criteria_sweep/candidates}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/02_granular_criteria_sweep}"
 GRID_PRESET="${GRID_PRESET:-ultra_fine}"
-N_WORKERS="${N_WORKERS:-4}"
+N_WORKERS="${N_WORKERS:-16}"
+MAX_SAMPLES="${MAX_SAMPLES:-}"
+
+MODEL="${MODEL:-all}"
+if [ -n "${SLURM_ARRAY_TASK_ID:-}" ]; then
+    MODELS=("Bu2026Fixed" "Bu2026Vary" "Metzger")
+    M_IDX=$((SLURM_ARRAY_TASK_ID % 3))
+    MODEL="${MODELS[$M_IDX]}"
+    echo "[INFO] Slurm Array Task ${SLURM_ARRAY_TASK_ID} mapped to Model: ${MODEL}"
+fi
 
 echo "=============================================================================="
 echo "LAUNCHING FAST CRITERIA FILTER & AGGREGATOR"
 echo "Candidates Dir:   ${CANDIDATES_DIR}"
 echo "Output Dir:       ${OUTPUT_DIR}"
 echo "Grid Preset:      ${GRID_PRESET}"
+echo "Model:            ${MODEL}"
 echo "Workers:          ${N_WORKERS}"
 echo "Date/Time:        $(date)"
 echo "=============================================================================="
 
-python analysis_suites/02_granular_criteria_sweep/fast_criteria_filter.py \
-    --candidates-dir "${CANDIDATES_DIR}" \
-    --output-dir "${OUTPUT_DIR}" \
-    --grid-preset "${GRID_PRESET}" \
-    --model all \
+ARGS=(
+    --candidates-dir "${CANDIDATES_DIR}"
+    --output-dir "${OUTPUT_DIR}"
+    --grid-preset "${GRID_PRESET}"
+    --model "${MODEL}"
     --n-workers "${N_WORKERS}"
+)
+
+if [ -n "${MAX_SAMPLES}" ]; then
+    ARGS+=(--max-samples "${MAX_SAMPLES}")
+fi
+
+python analysis_suites/02_granular_criteria_sweep/fast_criteria_filter.py "${ARGS[@]}"
 
 echo "Criteria filtering and multi-model aggregation finished at $(date)."
