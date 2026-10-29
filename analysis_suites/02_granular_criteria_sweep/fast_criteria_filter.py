@@ -228,6 +228,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+PRIM_THRESHOLDS = (3.5, 4.0, 4.5, 5.0, 5.5, 6.0)
+SEC_THRESHOLDS = (2.0, 2.5, 3.0, 3.5, 4.0)
+SPANS = (2.0, 7.0, 14.0, 28.0)
+LATS = (0.0, 5.0, 10.0, 15.0, 20.0)
+PRIM_MAP = {3.5: 0, 4.0: 1, 4.5: 2, 5.0: 3, 5.5: 4, 6.0: 5}
+
+
 class CandidatePool:
     """In-memory parsed and structured cache of candidate lightcurves for rapid filtering."""
 
@@ -285,6 +292,54 @@ class CandidatePool:
             snrs_list = [float(x) for x in snrs_arr]
             mags_list = [float(x) for x in mags_arr]
 
+            # Precompute candidate data across the 5 secondary SNR thresholds
+            qual_by_sec = {}
+            for sec in SEC_THRESHOLDS:
+                sec_th = sec - 1e-4
+                pts = [(times_list[k], snrs_list[k], mags_list[k]) for k in range(len(times_list)) if snrs_list[k] >= sec_th]
+                n_q = len(pts)
+                if n_q == 0:
+                    qual_by_sec[sec] = None
+                elif n_q == 1:
+                    qual_by_sec[sec] = (1, pts[0][1])
+                else:
+                    prim_counts = tuple(sum(1 for p in pts if p[1] >= (pt - 1e-4)) for pt in PRIM_THRESHOLDS)
+                    t_span = pts[-1][0] - pts[0][0]
+                    t_sep_hrs = t_span * 24.0
+
+                    mfade, mrise = 0.0, 0.0
+                    for k in range(n_q - 1):
+                        dt = pts[k+1][0] - pts[k][0]
+                        if dt > 1e-5:
+                            fr = (pts[k+1][2] - pts[k][2]) / dt
+                            if fr > mfade: mfade = fr
+                            if -fr > mrise: mrise = -fr
+
+                    sub_by_span = {}
+                    for sp in SPANS:
+                        sub_wins = []
+                        max_s = sp + 1e-4
+                        for i in range(n_q):
+                            t_start = pts[i][0]
+                            j = i
+                            while j < n_q and (pts[j][0] - t_start) <= max_s:
+                                j += 1
+                            sub_c = j - i
+                            if sub_c >= 2:
+                                sub_span_hrs = (pts[j - 1][0] - t_start) * 24.0
+                                sub_prim_counts = tuple(sum(1 for p in pts[i:j] if p[1] >= (pt - 1e-4)) for pt in PRIM_THRESHOLDS)
+                                sub_mfade, sub_mrise = 0.0, 0.0
+                                for k in range(i, j - 1):
+                                    dt = pts[k+1][0] - pts[k][0]
+                                    if dt > 1e-5:
+                                        fr = (pts[k+1][2] - pts[k][2]) / dt
+                                        if fr > sub_mfade: sub_mfade = fr
+                                        if -fr > sub_mrise: sub_mrise = -fr
+                                sub_wins.append((sub_c, sub_span_hrs, sub_prim_counts, sub_mfade, sub_mrise))
+                        sub_by_span[sp] = sub_wins
+
+                    qual_by_sec[sec] = (n_q, prim_counts, t_span, t_sep_hrs, mfade, mrise, sub_by_span)
+
             self.lightcurves.append({
                 "times": times_arr,
                 "snrs": snrs_arr,
@@ -295,7 +350,21 @@ class CandidatePool:
                 "abs_gal_lat": abs(gal_lat),
                 "max_snr": max(snrs_list) if snrs_list else 0.0,
                 "n_pts": len(times_arr),
+                "qual_by_sec": qual_by_sec,
             })
+
+        # Pre-index candidates by (secondary SNR threshold, minimum galactic latitude)
+        self.index_by_sec_lat = {}
+        for sec in SEC_THRESHOLDS:
+            for lat in LATS:
+                sub = []
+                lat_th = lat - 1e-4
+                for c in self.lightcurves:
+                    if c["abs_gal_lat"] >= lat_th:
+                        data = c["qual_by_sec"].get(sec)
+                        if data is not None:
+                            sub.append((c["max_snr"], data))
+                self.index_by_sec_lat[(sec, lat)] = sub
 
 
 def evaluate_candidate_against_criteria(lc: Dict[str, Any], cfg: Dict[str, Any]) -> bool:
@@ -482,15 +551,68 @@ def evaluate_grid_point_for_pool(args_tuple: Tuple[Dict[str, Any], Any]) -> Dict
 
 
 def evaluate_grid_chunk_counts(chunk_cfgs: List[Dict[str, Any]], pool: CandidatePool) -> np.ndarray:
-    """Process a chunk of criteria points sequentially and return an int32 array of detection counts."""
+    """Process a chunk of criteria points sequentially using precomputed candidate indices."""
     counts = np.zeros(len(chunk_cfgs), dtype=np.int32)
-    lcs = pool.lightcurves
-    for i, cfg in enumerate(chunk_cfgs):
-        n = 0
-        for lc in lcs:
-            if evaluate_candidate_against_criteria(lc, cfg):
-                n += 1
-        counts[i] = n
+    index = pool.index_by_sec_lat
+    prim_map = PRIM_MAP
+
+    for idx, cfg in enumerate(chunk_cfgs):
+        sec = cfg["snr_threshold_secondary"]
+        lat = cfg["min_galactic_lat"]
+        c_list = index.get((sec, lat))
+        if not c_list:
+            continue
+
+        p_idx = prim_map.get(cfg["snr_threshold"], 0)
+        p_th = cfg["snr_threshold"] - 1e-4
+        m_det = cfg["min_detections"]
+        m_prim = cfg["min_detections_primary"]
+        m_span = cfg["max_timespan_days"] + 1e-4
+        m_sep = cfg["min_time_separation_hours"] - 1e-4
+        m_fade = (cfg.get("min_fade_rate", 0.0) - 1e-4) if cfg.get("min_fade_rate", 0.0) > 0 else 0.0
+        m_rise = (cfg.get("min_rise_rate", 0.0) - 1e-4) if cfg.get("min_rise_rate", 0.0) > 0 else 0.0
+        req_f = cfg.get("require_fast_transient", True)
+        span_key = cfg["max_timespan_days"]
+
+        cnt = 0
+        for max_s, data in c_list:
+            if m_prim >= 1 and max_s < p_th:
+                continue
+            if data[0] == 1:
+                if m_det == 1 and m_prim <= 1 and (m_prim == 0 or data[1] >= p_th):
+                    cnt += 1
+                continue
+
+            n_q, prim_counts, t_span, t_sep_hrs, mfade, mrise, sub_by_span = data
+            if n_q < m_det or prim_counts[p_idx] < m_prim:
+                continue
+
+            if t_span <= m_span:
+                if t_sep_hrs < m_sep:
+                    continue
+                if req_f:
+                    if m_fade > 0.0 and mfade < m_fade:
+                        continue
+                    if m_rise > 0.0 and mrise < m_rise:
+                        continue
+                cnt += 1
+                continue
+
+            # Rolling sub-window check
+            sub_wins = sub_by_span.get(span_key)
+            if not sub_wins:
+                continue
+            for sub_c, sub_span_hrs, sub_prims, sub_mf, sub_mr in sub_wins:
+                if sub_c >= m_det and sub_span_hrs >= m_sep and sub_prims[p_idx] >= m_prim:
+                    if not req_f:
+                        cnt += 1
+                        break
+                    if (m_fade == 0.0 or sub_mf >= m_fade) and (m_rise == 0.0 or sub_mr >= m_rise):
+                        cnt += 1
+                        break
+
+        counts[idx] = cnt
+
     return counts
 
 
