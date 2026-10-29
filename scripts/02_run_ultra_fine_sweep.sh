@@ -20,7 +20,7 @@
 #   - Slurm Array Range:    0-4951
 # ==============================================================================
 #SBATCH -p msismall
-#SBATCH --time=24:00:00
+#SBATCH --time=71:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=256g
