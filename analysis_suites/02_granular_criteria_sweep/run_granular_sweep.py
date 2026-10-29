@@ -140,10 +140,32 @@ FINE_GRID = {
     "require_fast_transient": (True, False),
 }
 
-# Ultra-Fine Grid: 158,460 physically valid points across full scope.
-# Maximum granular exploration across all 10 parameters.
-# Automatically chunked into chunks of 35 points -> 4,528 tasks <= 5,000.
+# Ultra-Fine Grid: 2,138,460 physically valid points across full scope.
+# Maximum granular exploration across all 10 parameters with refined step sizes:
+# - Primary SNR: 3.5, 4.0, 4.5, 5.0, 5.5, 6.0 (step size 0.5)
+# - Secondary SNR: 2.0, 2.5, 3.0, 3.5, 4.0 (step size 0.5)
+# - Cadence Range: N_min in 1..5, N_prim in 1..3
+# - Temporal Window: 2.0, 7.0, 14.0, 28.0 days
+# - Asteroid Veto: 0.5, 1.0, 2.0, 3.0, 6.0 hours (includes 1.0h and 3.0h fiducial)
+# - Rise Rate: 0.0, 0.1, 0.2, 0.3, 0.5, 1.0 mag/day
+# - Fade Rate: 0.0 to 1.0 at 0.1 intervals (11 points: 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0)
+# - Galactic Lat: 0.0, 5.0, 10.0, 15.0, 20.0 deg (step size 5.0 deg, includes 15.0 deg fiducial)
+# Automatically chunked into chunks of 428 points -> 4,997 tasks <= 5,000.
 ULTRA_FINE_GRID = {
+    "snr_threshold": (3.5, 4.0, 4.5, 5.0, 5.5, 6.0),
+    "snr_threshold_secondary": (2.0, 2.5, 3.0, 3.5, 4.0),
+    "min_detections": (1, 2, 3, 4, 5),
+    "min_detections_primary": (1, 2, 3),
+    "max_timespan_days": (2.0, 7.0, 14.0, 28.0),
+    "min_time_separation_hours": (0.5, 1.0, 2.0, 3.0, 6.0),
+    "min_rise_rate": (0.0, 0.1, 0.2, 0.3, 0.5, 1.0),
+    "min_fade_rate": (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+    "min_galactic_lat": (0.0, 5.0, 10.0, 15.0, 20.0),
+    "require_fast_transient": (True, False),
+}
+
+# Legacy Ultra-Fine Grid: 158,460 physically valid points (preserved for backward compatibility).
+LEGACY_ULTRA_FINE_GRID = {
     "snr_threshold": (3.5, 4.0, 5.0, 6.0),
     "snr_threshold_secondary": (2.0, 2.5, 3.0, 3.5, 4.0),
     "min_detections": (1, 2, 3, 4, 5),
@@ -166,13 +188,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", default="Bu2026Fixed", choices=["Bu2026Fixed", "Bu2026Vary", "Metzger"])
     parser.add_argument(
         "--grid-preset",
-        default="broad",
-        choices=["broad", "fine", "ultra_fine", "canonical", "all_slices"],
+        default="ultra_fine",
+        choices=["ultra_fine", "broad", "fine", "canonical", "legacy_ultra_fine", "all_slices"],
         help=(
             "Grid configuration preset: "
+            "'ultra_fine' (2,138,460 points across all 10 criteria, default); "
             "'broad' (68,400 points, chunks of 15 -> 4,560 jobs <=5,000 MSI limit); "
             "'fine' (22,464 points, chunks of 5 -> 4,493 jobs); "
-            "'ultra_fine' (158,460 points, chunks of 35 -> 4,528 jobs); "
+            "'legacy_ultra_fine' (158,460 points, chunks of 35 -> 4,528 jobs); "
             "'canonical' (2,592 legacy points); "
             "'all_slices' (union of 1D marginal slices across all 10 criteria)."
         ),
@@ -262,6 +285,8 @@ def get_grid_combinations(preset: str = "broad") -> List[Dict[str, Any]]:
         raw_grid = FINE_GRID
     elif preset == "ultra_fine":
         raw_grid = ULTRA_FINE_GRID
+    elif preset == "legacy_ultra_fine":
+        raw_grid = LEGACY_ULTRA_FINE_GRID
     elif preset == "all_slices":
         fiducial = get_fiducial_criteria()
         seen = set()

@@ -9,34 +9,31 @@
 #   Separation, Rise Rate, Fade Rate, Absolute Galactic Latitude, and Fast-Transient
 #   Requirement) to investigate the parametric response of ZTF kilonova search volume.
 #
-# MSI HPC Scheduling Alignment:
-#   - Hard cluster limit: At most 5,000 jobs submitted at one time per user.
-#   - Multi-Point Chunking:
-#     Executes 15 points per array task, compressing 68,400 valid points across
-#     all 10 detection criteria into 4,560 array tasks (< 5,000 limit).
-#   - Job Array Configuration:
-#       #SBATCH --array=0-4559
-#     Submits 4,560 tasks covering all 68,400 points with chunk_size=15.
-#     No artificial concurrency throttling (%50 removed) so Slurm dispatches freely.
+# MSI HPC Scheduling Notice:
+#   - RETIRED: The legacy multi-point chunking array has been disabled to prevent
+#     exhausting MSI FairShare priorities.
+#   - REPLACEMENT: Use `scripts/submit_fast_criteria_sweep.sh` (3 tasks total).
 # ==============================================================================
 # Resource allocations aligned with MSI msismall partition (3900 MB/core):
 #SBATCH -p msismall
-#SBATCH --time=18:00:00
+#SBATCH --time=00:05:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=64g
-#SBATCH --tmp=30g
-#SBATCH --array=0-4559
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=barna314@umn.edu
-#SBATCH --job-name=kn_criteria_sweep
-#SBATCH --output=logs/02_granular_criteria_sweep/%x_%A_%a.log
-#SBATCH --error=logs/02_granular_criteria_sweep/%x_%A_%a.err
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4g
+#SBATCH --job-name=kn_crit_deprecated
+#SBATCH --output=logs/02_granular_criteria_sweep/%x_%j.log
+#SBATCH --error=logs/02_granular_criteria_sweep/%x_%j.err
 
 set -euo pipefail
 
-# Suppress CUPTI initialization warnings on CPU compute nodes
-export JAX_PLATFORMS=cpu
+# FairShare Protection Guard:
+echo "=============================================================================="
+echo "[DEPRECATED] 02_run_granular_criteria_sweep.sh has been disabled."
+echo "Submitting 4,560 monolithic simulation tasks severely degrades MSI FairShare scores."
+echo "Please use the high-performance 'Simulate-Once, Filter-Many' pipeline instead (3 tasks total):"
+echo "  bash scripts/submit_fast_criteria_sweep.sh --fiducial"
+echo "=============================================================================="
+exit 1
 
 PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "${PROJECT_DIR}"

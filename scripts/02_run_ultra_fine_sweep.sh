@@ -13,29 +13,30 @@
 #   - Excludes non-detections (reducing raw output from 1.05 TB to ~14 GB).
 #   - Synchronizes final summary CSVs back to results/02_granular_criteria_sweep/.
 #
-# Execution Architecture:
-#   - Total Valid Points:   158,460 points
-#   - Chunk Size:           32 points per array task
-#   - Total Array Tasks:    4,952 tasks (< 5,000 limit)
-#   - Slurm Array Range:    0-4951
+# MSI HPC Scheduling Notice:
+#   - RETIRED: The legacy 4,997-task array has been disabled to prevent
+#     exhausting MSI FairShare priorities.
+#   - REPLACEMENT: Use `scripts/submit_fast_criteria_sweep.sh` (3 tasks total).
 # ==============================================================================
 #SBATCH -p msismall
-#SBATCH --time=71:00:00
+#SBATCH --time=00:05:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=256g
-#SBATCH --tmp=20g
-#SBATCH --array=0-4951
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=barna314@umn.edu
-#SBATCH --job-name=kn_crit_ultrafine
-#SBATCH --output=logs/02_granular_criteria_sweep/%x_%A_%a.log
-#SBATCH --error=logs/02_granular_criteria_sweep/%x_%A_%a.err
+#SBATCH --mem=4g
+#SBATCH --job-name=kn_ultrafine_deprecated
+#SBATCH --output=logs/02_granular_criteria_sweep/%x_%j.log
+#SBATCH --error=logs/02_granular_criteria_sweep/%x_%j.err
 
 set -euo pipefail
 
-# Suppress CUPTI initialization warnings on CPU compute nodes
-export JAX_PLATFORMS=cpu
+# FairShare Protection Guard:
+echo "=============================================================================="
+echo "[DEPRECATED] 02_run_ultra_fine_sweep.sh has been disabled."
+echo "Submitting 4,997 tasks requesting 256 GB for 71 hours destroys your MSI FairShare score."
+echo "Please use the high-performance 'Simulate-Once, Filter-Many' pipeline instead (3 tasks total):"
+echo "  bash scripts/submit_fast_criteria_sweep.sh --fiducial"
+echo "=============================================================================="
+exit 1
 
 PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 cd "${PROJECT_DIR}"
@@ -72,7 +73,7 @@ N_TRANSIENTS="${N_TRANSIENTS:-1000000}"
 SLICE_PARAM="${SLICE_PARAM:-}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-results/02_granular_criteria_sweep}"
 GRID_PRESET="ultra_fine"
-CHUNK_SIZE="${CHUNK_SIZE:-32}"
+CHUNK_SIZE="${CHUNK_SIZE:-428}"
 MAX_TASKS="${MAX_TASKS:-5000}"
 FORCE_RERUN="${FORCE_RERUN:-0}"
 EXCLUDE_NON_DETECTIONS="${EXCLUDE_NON_DETECTIONS:-1}"
