@@ -33,16 +33,6 @@ echo "Execution Host:    $(hostname -f 2>/dev/null || hostname)"
 echo "Slurm Job ID:      ${SLURM_JOB_ID:-INTERACTIVE_SHELL}"
 echo "=============================================================================="
 
-array_job_id=$(sbatch --parsable scripts/run_detection_criteria_sweep.sh)
-quality_job_id=$(sbatch --parsable \
-  --dependency="afterany:${array_job_id}" \
-  scripts/run_detection_criteria_quality.sh)
-rate_limit_job_id=$(sbatch --parsable \
-  --dependency="afterany:${array_job_id}" \
-  scripts/run_rate_limit.sh)
-
-printf 'Submitted detection array: %s\n' "$array_job_id"
-printf 'Submitted quality audit: %s (afterany:%s)\n' "$quality_job_id" "$array_job_id"
-printf 'Submitted rate limit: %s (afterany:%s)\n' "$rate_limit_job_id" "$array_job_id"
-echo "Logs will be written to logs/detection_criteria_sweep_v2/"
-echo "=============================================================================="
+# Forward to fast criteria sweep pipeline to protect FairShare
+echo "[INFO] Forwarding to fast criteria sweep pipeline (3 tasks total to protect MSI FairShare)..."
+exec bash scripts/submit_fast_criteria_sweep.sh "$@"

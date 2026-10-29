@@ -24,7 +24,9 @@ kn-rates/
 ├── scripts/
 │   ├── 01_run_large_scale_rate_limits.sh          # 300-task ensemble (100 independent seeds x 1M per model)
 │   ├── 01_aggregate_and_build_distributions.sh    # Post-processing aggregator & Notebook 01 distribution builder
-│   ├── 02_run_granular_criteria_sweep.sh          # Granular detection criteria sweep script (2,592 array tasks)
+│   ├── submit_fast_criteria_sweep.sh              # Fast 3-model criteria sweep launcher (3 tasks total; protects FairShare)
+│   ├── 02_run_fast_candidates_simulation.sh       # Candidate generation script for fast criteria sweep
+│   ├── 02_run_fast_filter.sh                      # Fast in-memory criteria filter across 2.14M points
 │   ├── 03_run_prior_vs_at2017gfo_comparison.sh    # Comparison: broad prior vs AT2017gfo-like
 │   ├── 04_run_andreoni_benchmark_comparison.sh    # Benchmark comparison against Andreoni et al. (2020)
 │   ├── 05_run_sample_convergence.sh               # Statistical convergence grid (10k, 100k, 1M, 10M)
@@ -212,7 +214,7 @@ The scripts are calibrated against MSI shared partition limits and verified empi
 | Script / Suite | CPUs | Memory | Scratch (`--tmp`) | Walltime | Slurm Array Size | Total Active Cores |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **`01_run_large_scale_rate_limits.sh`** (100x1M) | 8 | **128 GB** (Zero OOM guarantee) | 30 GB | 04:00:00 | 300 tasks (100 x 1M/model) | 2,400 cores |
-| **`02_run_granular_criteria_sweep.sh`** | 4 | **128 GB** (Zero OOM guarantee) | 30 GB | 12:00:00 | 4,560 tasks (15 pts/task, 1M sources) | 4,560 cores |
+| **`submit_fast_criteria_sweep.sh`** (Suite 02) | 4 | **64 GB** | 30 GB | 03:00:00 | 3 tasks (Simulate-Once, Filter-Many across 3 models) | 12 cores |
 | **`03_run_prior_vs_at2017gfo_comparison.sh`** | 8 | **128 GB** | 30 GB | 02:00:00 | 1 task (1M sources) | 8 cores |
 | **`04_run_andreoni_benchmark_comparison.sh`** | 1 | **3,900 MB** ($1 \times 3900\,{\rm MB}$) | 5 GB | 00:30:00 | 1 task (queued) | 1 core |
 | **`05_run_sample_convergence.sh`** (Grid) | 16 | **750 GB** (supports 10M point) | 100 GB | 36:00:00 | 1 task (queued) | 16 cores |
@@ -242,10 +244,23 @@ If you prefer running everything in sequence inside a single Slurm allocation:
 sbatch scripts/run_all_sequential_monolithic.sh
 ```
 
-#### Option C: Submit Individual Suites Manually
+#### Option C: Fast 3-Model Criteria Sweep (Simulate-Once, Filter-Many)
+Execute the criteria sweep across all 3 models (`Bu2026Fixed`, `Bu2026Vary`, `Metzger`) across the updated **ultra-fine grid (2,138,460 valid points)** in minutes instead of weeks:
+```bash
+# Fiducial benchmark mode across all 3 models with ultra_fine grid (3 array tasks total, ~2 hours walltime):
+./scripts/submit_fast_criteria_sweep.sh --fiducial
+
+# Multi-sample ensemble mode (e.g. 20 samples x 1M per model = 60 array tasks):
+./scripts/submit_fast_criteria_sweep.sh --ensemble --samples 20
+
+# 100-sample ensemble mode (matching Suite 01 scale, 300 array tasks):
+./scripts/submit_fast_criteria_sweep.sh --ensemble --samples 100
+```
+
+#### Option D: Submit Individual Suites Manually
 ```bash
 sbatch scripts/01_run_large_scale_rate_limits.sh
-sbatch scripts/02_run_granular_criteria_sweep.sh
+bash scripts/submit_fast_criteria_sweep.sh --fiducial
 sbatch scripts/03_run_prior_vs_at2017gfo_comparison.sh
 sbatch scripts/04_run_andreoni_benchmark_comparison.sh
 sbatch scripts/05_run_sample_convergence.sh

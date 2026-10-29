@@ -8,15 +8,15 @@
 #
 # Execution Architecture:
 #   - Suite 01 (Rate Limits 100x1M Ensemble):  300 tasks (100 x 1M for Metzger, Bu2026Fixed, Bu2026Vary) [CONCURRENT, 128 GB/task]
-#   - Suite 02 (Granular Criteria Sweep):    4,560 tasks (68,400 points, 15 pts/task, 1M sources) [CONCURRENT, 128 GB/task]
+#   - Suite 02 (Fast Criteria Sweep, 3 models):    3 tasks (Simulate-Once 1M sources for all 3 models) [CONCURRENT, 64 GB/task]
 #   - Suite 03 (Prior vs AT2017gfo, 1M):         1 task  [CONCURRENT, 256 GB]
 #   - Suite 06 (Inclination Investigation):      1 task  [CONCURRENT, 128 GB]
 #   -----------------------------------------------------------------------
-#   Total Initial Concurrent Tasks:          4,862 tasks (< 5,000 submission limit)
+#   Total Initial Concurrent Tasks:            306 tasks (far below 5,000 submission limit)
 #   Total Walltime to Complete:              ~2-4 hours (all tasks execute concurrently)
 #   -----------------------------------------------------------------------
 #   - Suite 04 (Historical Andreoni Comp):       1 task  [QUEUED: afterany:Suite 01]
-#   - Sweep Audit & Aggregation:                 1 task  [QUEUED: afterany:Suite 02]
+#   - Suite 02 Fast Filter & Aggregation:        1 task  [QUEUED: afterany:Suite 02, filters 2.14M ultra-fine grid]
 #   - Suite 05 (Sample Size Convergence):        1 task  [QUEUED: afterany:Suite 04]
 # ==============================================================================
 # Slurm resource directives to route output cleanly into logs/ (preventing root pollution):
@@ -90,10 +90,10 @@ echo "[1/6] Submitting Suite 01 (100 x 1M Ensemble Rate Limits, 300 array tasks,
 job1_id=$(sbatch --parsable scripts/01_run_large_scale_rate_limits.sh)
 echo "  --> Suite 01 Job ID: ${job1_id} (Array 0-299)"
 
-# 2. Submit Suite 02: Granular Detection Criteria Sweep (4,560 array tasks, 15 points/task, 1M sources, 128 GB each)
-echo "[2/6] Submitting Suite 02 (Granular Criteria Sweep, 4,560 array tasks, 128 GB/task)..."
-job2_id=$(sbatch --parsable scripts/02_run_granular_criteria_sweep.sh)
-echo "  --> Suite 02 Job ID: ${job2_id} (Array 0-4559)"
+# 2. Submit Suite 02: Fast Granular Detection Criteria Sweep (3 array tasks: Bu2026Fixed, Bu2026Vary, Metzger)
+echo "[2/6] Submitting Suite 02 (Fast Simulate-Once 3-Model Candidate Sweep, 3 array tasks, 64 GB/task)..."
+job2_id=$(sbatch --parsable --array=0-2 --export=ALL,MODE=fiducial scripts/02_run_fast_candidates_simulation.sh)
+echo "  --> Suite 02 Candidate Simulation Job ID: ${job2_id} (Array 0-2: Bu2026Fixed, Bu2026Vary, Metzger)"
 
 # 3. Submit Suite 03: Broad Priors vs. AT2017gfo Archetype Comparison (1 task, 1M transients, 256 GB)
 echo "[3/6] Submitting Suite 03 (Broad Priors vs AT2017gfo Comparison, 1 task, 256 GB)..."
@@ -125,10 +125,10 @@ echo "[6/7] Submitting Suite 04 (Historical Andreoni Comparison, afterany:${agg1
 job4_id=$(sbatch --parsable --dependency="afterany:${agg1_id}" scripts/04_run_andreoni_benchmark_comparison.sh)
 echo "  --> Suite 04 Job ID: ${job4_id} (queued on Suite 01 Aggregation termination)"
 
-# 7. Submit Sweep Audit & Sensitivity Analysis (depends on Suite 02 completion, allocated 16 GB with full conda environment)
-echo "[+] Submitting Sweep Audit & Sensitivity Analysis (afterany:${job2_id}, 16 GB)..."
-audit_job_id=$(sbatch --parsable --dependency="afterany:${job2_id}" scripts/02_run_audit_job.sh)
-echo "  --> Sweep Audit Job ID: ${audit_job_id} (queued on Suite 02 termination)"
+# 7. Submit Suite 02 Fast Filter & Aggregation (depends on Suite 02 candidate simulation, allocated 32 GB with ultra_fine 2.14M grid)
+echo "[+] Submitting Suite 02 Fast Filter & Aggregation (afterany:${job2_id}, 32 GB, ultra_fine)..."
+audit_job_id=$(sbatch --parsable --dependency="afterany:${job2_id}" --export=ALL,GRID_PRESET=ultra_fine scripts/02_run_fast_filter.sh)
+echo "  --> Suite 02 Filter & Aggregation Job ID: ${audit_job_id} (queued on Suite 02 termination)"
 
 # 8. Submit Suite 05: Sample Size Convergence (10k vs 100k vs 1M vs 10M, runs after Suite 04)
 echo "[7/7] Submitting Suite 05 (Sample Size Convergence Grid, afterany:${job4_id})..."
@@ -142,16 +142,16 @@ printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite" "Job ID" "Tasks" "Memor
 echo "------------------------------------------------------------------------------"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 01" "${job1_id}" "300 tasks" "128 GB" "None (Immediate)"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 01 Agg" "${agg1_id}" "1 task" "16 GB" "afterany:${job1_id}"
-printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 02" "${job2_id}" "4,560 tasks" "128 GB" "None (Immediate)"
+printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 02" "${job2_id}" "3 tasks" "64 GB" "None (Immediate)"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 03" "${job3_id}" "1 task" "256 GB" "None (Immediate)"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 06" "${job6_id}" "1 task" "128 GB" "None (Immediate)"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 07" "${job7_id}" "400 tasks" "128 GB" "None (Immediate)"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 07 Agg" "${agg7_id}" "1 task" "16 GB" "afterany:${job7_id},${agg1_id}"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 04" "${job4_id}" "1 task" "256 GB" "afterany:${agg1_id}"
-printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Sweep Audit" "${audit_job_id}" "1 task" "16 GB" "afterany:${job2_id}"
+printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 02 Filter" "${audit_job_id}" "1 task" "32 GB" "afterany:${job2_id}"
 printf "%-12s | %-10s | %-14s | %-10s | %-28s\n" "Suite 05" "${job5_id}" "1 task" "750 GB" "afterany:${job4_id}"
 echo "------------------------------------------------------------------------------"
-echo "Total Active Concurrent Slots:            4,862 / 5,000 max queue limit"
+echo "Total Active Concurrent Slots:            306 / 5,000 max queue limit"
 echo "Estimated Time to Completion:             ~2 to 4 hours total wall-clock time"
 echo "OOM Protection:                           All memory allocations boosted to 128-256 GB"
 echo "Log Locations:                            logs/submit_all_*.log and logs/*/*.log"

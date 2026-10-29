@@ -1,18 +1,23 @@
 #!/bin/bash --login
 #SBATCH -p msismall
-#SBATCH --time=11:59:00
+#SBATCH --time=00:05:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --array=0-2591%2592
-#SBATCH --mem=100g
-#SBATCH --tmp=10g
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=barna314@umn.edu
-#SBATCH --output=logs/detection_criteria_sweep_v2/%x_%A.log
-#SBATCH --error=logs/detection_criteria_sweep_v2/%x_%A.err
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=4g
+#SBATCH --job-name=kn_crit_v2_deprecated
+#SBATCH --output=logs/detection_criteria_sweep_v2/%x_%j.log
+#SBATCH --error=logs/detection_criteria_sweep_v2/%x_%j.err
 
 set -euo pipefail
-cd /users/8/barna314/kn-rates/
+
+# FairShare Protection Guard:
+echo "=============================================================================="
+echo "[DEPRECATED] run_detection_criteria_sweep.sh has been disabled."
+echo "Submitting 2,592 monolithic simulation tasks severely degrades MSI FairShare scores."
+echo "Please use the high-performance 'Simulate-Once, Filter-Many' pipeline instead (3 tasks total):"
+echo "  bash scripts/submit_fast_criteria_sweep.sh --fiducial"
+echo "=============================================================================="
+exit 1
 
 module load conda
 module load hdf5
