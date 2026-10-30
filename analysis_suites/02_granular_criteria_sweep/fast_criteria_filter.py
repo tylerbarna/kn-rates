@@ -235,6 +235,61 @@ LATS = (0.0, 5.0, 10.0, 15.0, 20.0)
 PRIM_MAP = {3.5: 0, 4.0: 1, 4.5: 2, 5.0: 3, 5.5: 4, 6.0: 5}
 
 
+def pareto_prune_sub_windows(
+    sub_wins: List[Tuple[int, float, Tuple[int, ...], float, float]]
+) -> List[Tuple[int, float, Tuple[int, ...], float, float]]:
+    """Prune Pareto-dominated sub-windows with 100% exact mathematical and scientific rigor.
+
+    A sub-window A dominates B if A >= B across all 10 criteria evaluation dimensions:
+    detections, duration, primary detections (for all 6 thresholds), fade rate, and rise rate.
+    Because all 10 selection criteria cuts are monotonic lower bounds (x >= threshold),
+    if B satisfies a criteria configuration, A is mathematically guaranteed to satisfy it.
+    """
+    if len(sub_wins) <= 1:
+        return sub_wins
+
+    pruned = []
+    n = len(sub_wins)
+    for i in range(n):
+        b_c, b_sep, b_prims, b_mf, b_mr = sub_wins[i]
+        dominated = False
+        for j in range(n):
+            if i == j:
+                continue
+            a_c, a_sep, a_prims, a_mf, a_mr = sub_wins[j]
+            if (
+                a_c >= b_c
+                and a_sep >= b_sep
+                and a_mf >= b_mf
+                and a_mr >= b_mr
+                and a_prims[0] >= b_prims[0]
+                and a_prims[1] >= b_prims[1]
+                and a_prims[2] >= b_prims[2]
+                and a_prims[3] >= b_prims[3]
+                and a_prims[4] >= b_prims[4]
+                and a_prims[5] >= b_prims[5]
+            ):
+                if (
+                    a_c == b_c
+                    and a_sep == b_sep
+                    and a_mf == b_mf
+                    and a_mr == b_mr
+                    and a_prims == b_prims
+                ):
+                    if j < i:
+                        dominated = True
+                        break
+                else:
+                    dominated = True
+                    break
+        if not dominated:
+            pruned.append(sub_wins[i])
+
+    # Sort descending by detections, then duration so the strongest window is evaluated first
+    pruned.sort(key=lambda w: (w[0], w[1]), reverse=True)
+    return pruned
+
+
 class CandidatePool:
     """In-memory parsed and structured cache of candidate lightcurves for rapid filtering."""
 
@@ -336,7 +391,7 @@ class CandidatePool:
                                         if fr > sub_mfade: sub_mfade = fr
                                         if -fr > sub_mrise: sub_mrise = -fr
                                 sub_wins.append((sub_c, sub_span_hrs, sub_prim_counts, sub_mfade, sub_mrise))
-                        sub_by_span[sp] = sub_wins
+                        sub_by_span[sp] = pareto_prune_sub_windows(sub_wins)
 
                     qual_by_sec[sec] = (n_q, prim_counts, t_span, t_sep_hrs, mfade, mrise, sub_by_span)
 
@@ -600,7 +655,7 @@ def evaluate_grid_chunk_counts(chunk_cfgs: List[Dict[str, Any]], pool: Candidate
 
             # Rolling sub-window check
             sub_wins = sub_by_span.get(span_key)
-            if not sub_wins:
+            if not sub_wins or sub_wins[0][0] < m_det:
                 continue
             for sub_c, sub_span_hrs, sub_prims, sub_mf, sub_mr in sub_wins:
                 if sub_c >= m_det and sub_span_hrs >= m_sep and sub_prims[p_idx] >= m_prim:
@@ -919,10 +974,23 @@ def main():
             print(f"  Evaluated {len(grid):,} points in {elapsed:.2f}s ({len(grid)/max(0.01, elapsed):.0f} points/sec)", flush=True)
         else:
             # Multi-sample ensemble run (vectorized aggregation across samples)
-            counts_matrix = np.zeros((len(cand_files), len(grid)), dtype=np.int32)
+            chk_file = out_dir / f".checkpoint_{model_name}_{len(cand_files)}samples.npy"
+            if chk_file.exists():
+                try:
+                    counts_matrix = np.load(chk_file)
+                    print(f"  [RESUME] Found existing checkpoint: {chk_file.name}", flush=True)
+                except Exception:
+                    counts_matrix = np.zeros((len(cand_files), len(grid)), dtype=np.int32)
+            else:
+                counts_matrix = np.zeros((len(cand_files), len(grid)), dtype=np.int32)
+
             first_pool = None
 
             for s_idx, f in enumerate(cand_files):
+                if s_idx < len(counts_matrix) and np.any(counts_matrix[s_idx] > 0):
+                    print(f"  [Sample {s_idx + 1}/{len(cand_files)}] {f.name} -> loaded from checkpoint", flush=True)
+                    continue
+
                 t0 = time.perf_counter()
                 pool = CandidatePool(f, model_name)
                 if first_pool is None:
@@ -932,7 +1000,21 @@ def main():
                 elapsed = time.perf_counter() - t0
                 print(f"  [Sample {s_idx + 1}/{len(cand_files)}] {f.name} ({pool.n_candidates:,} cand) -> evaluated in {elapsed:.2f}s", flush=True)
 
-            df_model = build_model_metrics_df(grid, counts_matrix, first_pool or pool, cand_files)
+                # Persist checkpoint after each sample
+                try:
+                    np.save(chk_file, counts_matrix)
+                except Exception:
+                    pass
+
+            if first_pool is None:
+                first_pool = CandidatePool(cand_files[0], model_name)
+
+            df_model = build_model_metrics_df(grid, counts_matrix, first_pool, cand_files)
+            if chk_file.exists():
+                try:
+                    chk_file.unlink()
+                except Exception:
+                    pass
 
         # Compute criteria ranking for this model
         rank_df = compute_criteria_ranking(df_model)
