@@ -8,15 +8,15 @@
 #   ultra-fine detection criteria combinations in parallel, generating unified metrics CSVs.
 #
 # MSI msismall Resource Calibration:
-#   - Memory: 32 GB (in-memory vectorized candidate pool filtering)
-#   - Walltime: 04:00:00 (ample safety cushion for 100 samples across 2.14M points)
-#   - CPU: 16 cores (evaluates ~15,000-25,000 points/sec)
+#   - Memory: 64 GB (in-memory vectorized candidate pool filtering)
+#   - Walltime: 06:00:00 (ample safety cushion for 100 samples across 2.14M points)
+#   - CPU: 64 cores (evaluates ~50,000-80,000 points/sec)
 # ==============================================================================
 #SBATCH -p msismall
-#SBATCH --time=04:00:00
+#SBATCH --time=06:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=32g
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=64g
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=barna314@umn.edu
 #SBATCH --job-name=kn_crit_filter
@@ -50,7 +50,7 @@ fi
 CANDIDATES_DIR="${CANDIDATES_DIR:-results/02_granular_criteria_sweep/candidates}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/02_granular_criteria_sweep}"
 GRID_PRESET="${GRID_PRESET:-ultra_fine}"
-N_WORKERS="${N_WORKERS:-16}"
+N_WORKERS="${SLURM_CPUS_PER_TASK:-${N_WORKERS:-64}}"
 MAX_SAMPLES="${MAX_SAMPLES:-}"
 
 MODEL="${MODEL:-all}"
