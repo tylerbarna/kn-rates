@@ -99,7 +99,10 @@ def process_file(path: Path) -> List[Dict[str, Any]]:
         elif model == "Bu2026Vary":
             andreoni_proj_8yr = ANDREONI_ISOTROPIC_95 * (ANDREONI_DURATION_YRS / duration)
         else:
-            andreoni_proj_8yr = 1000.0 * (ANDREONI_DURATION_YRS / duration)
+            # No published Andreoni et al. (2020) limit exists for the Metzger model (previously a 1000.0 placeholder).
+            # NOTE: duration-scaled columns are kept only for backward compatibility; they assume VT proportional to
+            # survey time, which does not hold for ZTF. Use notebook 04 (epoch-resolved VT) for comparisons.
+            andreoni_proj_8yr = float("nan")
 
         rows.append({
             "file": str(path),

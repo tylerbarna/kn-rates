@@ -411,3 +411,8 @@ FodyWeavers.xsd
 *.DS_Store
 secret.txt
 Bu2025_raw_data.h5
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+snapshots/.collect.lock
+snapshots/.tmp_snapshot_*

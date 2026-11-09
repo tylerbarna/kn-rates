@@ -10,6 +10,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 from telemetry.analyzer import TelemetryAnalyzer
+from telemetry.fairshare import SNAPSHOT_RELPATH, capture_sshare_snapshot
 from telemetry.harvester import JobHarvester, infer_suite_from_job_name
 from telemetry.models import JobTelemetryRecord, RightsizingRecommendation
 
@@ -17,6 +18,30 @@ from telemetry.models import JobTelemetryRecord, RightsizingRecommendation
 REGISTRY_CSV = "telemetry/job_resource_registry.csv"
 SCALING_MODELS_JSON = "telemetry/scaling_models.json"
 EVENTS_JSONL = "telemetry/job_events.jsonl"
+
+
+def _s(row: Dict[str, Any], key: str) -> str:
+    """String cell ('' for missing / None / NaN)."""
+    val = row.get(key)
+    if val is None:
+        return ""
+    val = str(val).strip()
+    return "" if val.lower() == "nan" else val
+
+
+def _f(row: Dict[str, Any], key: str, default: float = 0.0) -> float:
+    """Float cell with a default for blanks / garbage (old registries may contain '')."""
+    try:
+        val = float(str(row.get(key, "")).strip())
+    except (TypeError, ValueError):
+        return default
+    return default if val != val else val
+
+
+def _i(row: Dict[str, Any], key: str, default: int = 0) -> int:
+    """Integer cell (accepts '3.0'); default for blanks / garbage."""
+    val = _f(row, key, float("nan"))
+    return default if val != val else int(val)
 
 
 class JobTelemetryTracker:
@@ -39,47 +64,65 @@ class JobTelemetryTracker:
             reader = csv.DictReader(f)
             for row in reader:
                 rec = JobTelemetryRecord(
-                    job_id=row.get("job_id", ""),
-                    array_task_id=row.get("array_task_id", ""),
-                    job_name=row.get("job_name", ""),
-                    suite=row.get("suite", "") or infer_suite_from_job_name(row.get("job_name", "")),
-                    partition=row.get("partition", "msismall"),
-                    node_list=row.get("node_list", ""),
-                    submit_time=row.get("submit_time", ""),
-                    start_time=row.get("start_time", ""),
-                    end_time=row.get("end_time", ""),
-                    submit_hour=int(row.get("submit_hour", -1)),
-                    submit_day_of_week=row.get("submit_day_of_week", ""),
-                    is_weekend=row.get("is_weekend", "False").lower() in ("true", "1"),
-                    concurrent_tasks=int(row.get("concurrent_tasks", 1)),
-                    queue_wait_sec=float(row.get("queue_wait_sec", 0.0)),
-                    queue_wait_min=float(row.get("queue_wait_min", 0.0)),
-                    queue_wait_hours=float(row.get("queue_wait_hours", 0.0)),
-                    req_cpus=int(row.get("req_cpus", 1)),
-                    req_mem_gb=float(row.get("req_mem_gb", 0.0)),
-                    req_time_min=float(row.get("req_time_min", 0.0) or 0.0),
-                    used_walltime_sec=float(row.get("used_walltime_sec", 0.0) or 0.0),
-                    used_walltime_hours=float(row.get("used_walltime_hours", 0.0) or 0.0),
-                    time_efficiency_pct=float(row.get("time_efficiency_pct", 0.0) or 0.0),
-                    used_max_rss_gb=float(row.get("used_max_rss_gb", 0.0) or 0.0),
-                    mem_efficiency_pct=float(row.get("mem_efficiency_pct", 0.0) or 0.0),
-                    used_cpu_sec=float(row.get("used_cpu_sec", 0.0) or 0.0),
-                    cpu_efficiency_pct=float(row.get("cpu_efficiency_pct", 0.0) or 0.0),
-                    energy_joules=float(row.get("energy_joules", 0.0) or 0.0),
-                    model=row.get("model", ""),
-                    n_transients=int(row.get("n_transients", 0)),
-                    chunk_size=int(row.get("chunk_size", 1)),
-                    output_storage_mb=float(row.get("output_storage_mb", 0.0)),
-                    state=row.get("state", "COMPLETED"),
-                    exit_code=row.get("exit_code", "0:0"),
-                    data_source=row.get("data_source", "registry"),
+                    job_id=_s(row, "job_id"),
+                    array_task_id=_s(row, "array_task_id"),
+                    job_name=_s(row, "job_name"),
+                    suite=_s(row, "suite") or infer_suite_from_job_name(_s(row, "job_name")),
+                    partition=_s(row, "partition") or "msismall",
+                    node_list=_s(row, "node_list"),
+                    submit_time=_s(row, "submit_time"),
+                    start_time=_s(row, "start_time"),
+                    end_time=_s(row, "end_time"),
+                    submit_hour=_i(row, "submit_hour", -1),
+                    submit_day_of_week=_s(row, "submit_day_of_week"),
+                    is_weekend=_s(row, "is_weekend").lower() in ("true", "1"),
+                    concurrent_tasks=_i(row, "concurrent_tasks", 1),
+                    queue_wait_sec=_f(row, "queue_wait_sec"),
+                    queue_wait_min=_f(row, "queue_wait_min"),
+                    queue_wait_hours=_f(row, "queue_wait_hours"),
+                    req_cpus=_i(row, "req_cpus", 1),
+                    req_mem_gb=_f(row, "req_mem_gb"),
+                    req_time_min=_f(row, "req_time_min"),
+                    used_walltime_sec=_f(row, "used_walltime_sec"),
+                    used_walltime_hours=_f(row, "used_walltime_hours"),
+                    time_efficiency_pct=_f(row, "time_efficiency_pct"),
+                    used_max_rss_gb=_f(row, "used_max_rss_gb"),
+                    mem_efficiency_pct=_f(row, "mem_efficiency_pct"),
+                    used_cpu_sec=_f(row, "used_cpu_sec"),
+                    cpu_efficiency_pct=_f(row, "cpu_efficiency_pct"),
+                    energy_joules=_f(row, "energy_joules"),
+                    model=_s(row, "model"),
+                    n_transients=_i(row, "n_transients", 0),
+                    chunk_size=_i(row, "chunk_size", 1),
+                    output_storage_mb=_f(row, "output_storage_mb"),
+                    state=_s(row, "state") or "COMPLETED",
+                    exit_code=_s(row, "exit_code") or "0:0",
+                    data_source=_s(row, "data_source") or "registry",
                 )
                 rec.compute_derived_metrics()
                 records.append(rec)
         return records
 
-    def update(self, start_date: str = "2026-01-01") -> List[JobTelemetryRecord]:
-        """Harvest metrics, merge with registry and passive events, and write updated files."""
+    def capture_fairshare(self) -> Optional[List[Dict[str, str]]]:
+        """Append an ``sshare -u $USER -l -P`` snapshot to telemetry/fairshare_snapshots.csv.
+
+        Optional and failure-tolerant: returns ``None`` (and writes nothing) when ``sshare``
+        is not installed or fails, e.g. when running locally instead of on MSI.
+        """
+        try:
+            return capture_sshare_snapshot(project_root=self.project_root)
+        except Exception as exc:  # never let the optional hook break a harvest
+            sys.stderr.write(f"Warning: fairshare snapshot failed: {exc}\n")
+            return None
+
+    def update(self, start_date: str = "2026-01-01", capture_fairshare: bool = True) -> List[JobTelemetryRecord]:
+        """Harvest metrics, merge with registry and passive events, and write updated files.
+
+        When ``capture_fairshare`` is true and ``sshare`` exists on this machine, a FairShare
+        snapshot is also appended to ``telemetry/fairshare_snapshots.csv``.
+        """
+        if capture_fairshare:
+            self.capture_fairshare()
         existing_records = { (r.job_id, r.array_task_id): r for r in self.load_registry() }
         harvested = self.harvester.harvest_all(start_date=start_date)
 
@@ -319,6 +362,11 @@ def main():
     # Update command
     p_up = subparsers.add_parser("update", help="Harvest logs and sacct to update registry CSV")
     p_up.add_argument("--start-date", default="2026-01-01", help="Start date for sacct harvest")
+    p_up.add_argument("--no-fairshare", action="store_true",
+                      help="Do not append an sshare FairShare snapshot (skipped automatically without sshare)")
+
+    # Fairshare snapshot command
+    subparsers.add_parser("fairshare", help="Append an `sshare -u $USER -l -P` snapshot to telemetry/fairshare_snapshots.csv")
 
     # Report command
     subparsers.add_parser("report", help="Display telemetry report and scaling fits")
@@ -340,9 +388,20 @@ def main():
     tracker = JobTelemetryTracker()
 
     if args.command == "update" or args.command is None:
-        recs = tracker.update(start_date=getattr(args, "start_date", "2026-01-01"))
+        recs = tracker.update(start_date=getattr(args, "start_date", "2026-01-01"),
+                              capture_fairshare=not getattr(args, "no_fairshare", False))
         print(f"Updated {REGISTRY_CSV} with {len(recs)} tracked job records.")
         print(f"Scaling models updated in {SCALING_MODELS_JSON}.")
+    elif args.command == "fairshare":
+        rows = tracker.capture_fairshare()
+        if rows is None:
+            print("sshare not available (or failed); no FairShare snapshot written.")
+        else:
+            print(f"Appended {len(rows)} sshare rows to {SNAPSHOT_RELPATH}.")
+            for r in rows:
+                if r.get("user"):
+                    print(f"  account={r.get('account')} user={r.get('user')} FairShare={r.get('fairshare')} "
+                          f"EffectvUsage={r.get('effective_usage')}")
     elif args.command == "report":
         print(tracker.generate_report())
     elif args.command == "cross-match":

@@ -70,4 +70,6 @@ python analysis_suites/03_prior_vs_at2017gfo/compare_priors_at2017gfo.py \
     --seed "${SEED}" \
     --output-dir "${OUTPUT_DIR}"
 
+bash scripts/update_results_snapshot.sh || echo "[WARN] snapshot update failed; previous snapshot kept"
+
 echo "Comparison suite completed successfully at $(date)."

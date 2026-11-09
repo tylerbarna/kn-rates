@@ -123,23 +123,12 @@ python analysis_suites/03_prior_vs_at2017gfo/compare_priors_at2017gfo.py \
     --output-dir results/03_prior_vs_at2017gfo
 
 # ------------------------------------------------------------------------------
-# STEP 4: Historical Comparison with Andreoni et al. (2020)
+# STEP 4: Update the results snapshot (Suites 04-06 analyses are done in notebooks from the snapshot)
 # ------------------------------------------------------------------------------
-echo -e "\n>>> [4/5] Running Suite 04: Historical Andreoni Benchmark Comparison..."
-python analysis_suites/04_historical_andreoni_comparison/compare_with_andreoni2020.py \
-    --rate-limit-csv results/01_large_scale_rate_limits/rate_limit_summary.csv \
-    --output-dir results/04_historical_andreoni_comparison
-
-# ------------------------------------------------------------------------------
-# STEP 5: Sample Size Convergence Analysis across 10k, 100k, 1M, and 10M Grid
-# ------------------------------------------------------------------------------
-echo -e "\n>>> [5/5] Running Suite 05: Sample Size Convergence (10k, 100k, 1M, 10M)..."
-python analysis_suites/05_sample_convergence/run_sample_convergence.py \
-    --output-dir results/05_sample_convergence \
-    --seed 20261020 \
-    --n-realizations 10
+echo -e "\n>>> Updating results snapshot..."
+bash scripts/update_results_snapshot.sh || echo "[WARN] snapshot update failed; previous snapshot kept"
 
 echo "=============================================================================="
-echo "ALL 5 SUITES COMPLETED SUCCESSFULLY"
+echo "ALL SIMULATION SUITES COMPLETED SUCCESSFULLY"
 echo "Finished at: $(date)"
 echo "=============================================================================="
