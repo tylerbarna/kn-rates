@@ -235,6 +235,52 @@ LATS = (0.0, 5.0, 10.0, 15.0, 20.0)
 PRIM_MAP = {3.5: 0, 4.0: 1, 4.5: 2, 5.0: 3, 5.5: 4, 6.0: 5}
 
 
+def band_wls_rates(pts, dedup_days: float = 2.0 / 24.0, min_seg_span: float = 0.01):
+    """Per-band rise/fade rates mirroring survey_sim's fast-transient test.
+
+    For each band: flux-average points closer than ``dedup_days``, split at the brightest
+    point and fit weighted least-squares slopes (sigma = 1.0857/SNR) to the pre-peak (rise)
+    and post-peak (fade) segments (>= 2 points spanning > ``min_seg_span`` d).
+    Returns (max fade slope [mag/d, >0 = fading], max rise rate [mag/d, >0 = brightening]).
+    """
+    by_band: Dict[str, List[Tuple[float, float, float]]] = {}
+    for p in pts:
+        by_band.setdefault(p[3], []).append((p[0], p[1], p[2]))
+    best_fade, best_rise = 0.0, 0.0
+    for rows in by_band.values():
+        rows.sort()
+        binned = []  # (t, mag, snr)
+        k = 0
+        while k < len(rows):
+            grp = [rows[k]]
+            while k + 1 < len(rows) and rows[k + 1][0] - grp[0][0] <= dedup_days:
+                k += 1
+                grp.append(rows[k])
+            fl = np.array([10 ** (-0.4 * g[2]) for g in grp])
+            sn = np.array([g[1] for g in grp])
+            t = float(np.mean([g[0] for g in grp]))
+            binned.append((t, float(-2.5 * np.log10(fl.mean())), float(np.sqrt(np.sum(sn ** 2)))))
+            k += 1
+        if len(binned) < 2:
+            continue
+        ipk = int(np.argmin([b[1] for b in binned]))
+        for seg, is_fade in ((binned[ipk:], True), (binned[:ipk + 1], False)):
+            if len(seg) < 2 or seg[-1][0] - seg[0][0] <= min_seg_span:
+                continue
+            t = np.array([s_[0] for s_ in seg]); m = np.array([s_[1] for s_ in seg])
+            w = (np.array([s_[2] for s_ in seg]) / 1.0857) ** 2
+            tw = np.sum(w * t) / np.sum(w); mw = np.sum(w * m) / np.sum(w)
+            den = np.sum(w * (t - tw) ** 2)
+            if den <= 0:
+                continue
+            slope = float(np.sum(w * (t - tw) * (m - mw)) / den)
+            if is_fade:
+                best_fade = max(best_fade, slope)
+            else:
+                best_rise = max(best_rise, -slope)
+    return best_fade, best_rise
+
+
 def pareto_prune_sub_windows(
     sub_wins: List[Tuple[int, float, Tuple[int, ...], float, float]]
 ) -> List[Tuple[int, float, Tuple[int, ...], float, float]]:
@@ -306,7 +352,18 @@ class CandidatePool:
         if "params" in meta and "z_max" in meta["params"]:
             self.z_max = float(meta["params"]["z_max"])
 
-        self.vt_total = total_survey_vt_gpc3_yr(self.z_max)
+        # VT per unit efficiency from survey_sim's own normalisation of the loose run
+        # (full-sky injection, 4*pi, 1/(1+z), engine cosmology). The old hard-coded
+        # V_c x 0.6687 x T formula double-counted the sky footprint.
+        rs = (self.data.get("rate_summaries") or [{}])[0]
+        eff_loose = float(rs.get("n_detected", 0)) / max(float(rs.get("n_simulated", 1)), 1.0)
+        if eff_loose > 0 and float(rs.get("effective_vt_gpc3_yr", 0)) > 0:
+            self.vt_total = float(rs["effective_vt_gpc3_yr"]) / eff_loose
+        else:
+            self.vt_total = total_survey_vt_gpc3_yr(self.z_max)
+            print(f"  [warn] {filepath.name}: no loose-run VT; falling back to analytic normalisation", flush=True)
+        loose = meta.get("loose_criteria", {})
+        self.loose_min_galactic_lat = float(loose.get("min_galactic_lat", 0.0))
 
         # Parse source arrays into flat NumPy arrays for fast vectorized checks
         sources = self.data.get("detected_sources", [])
@@ -320,6 +377,7 @@ class CandidatePool:
             p_errs = [float(e) for e in src.get("photometry_errs", []) if math.isfinite(float(e))]
             p_snrs = [float(s) for s in src.get("photometry_snrs", []) if math.isfinite(float(s))]
             p_bands = [str(b) for b in src.get("photometry_bands", [])]
+            p_errs_all = [float(e) for e in src.get("photometry_errs", [])]
 
             # If snrs not directly serialized, calculate snr = 1.08574 / mag_err
             if not p_snrs and p_errs:
@@ -336,12 +394,15 @@ class CandidatePool:
             times_arr = np.array(p_times, dtype=np.float64)
             snrs_arr = np.array(p_snrs, dtype=np.float64)
             mags_arr = np.array(p_mags, dtype=np.float64) if p_mags else np.zeros_like(times_arr)
+            bands_arr = np.array(p_bands if len(p_bands) == len(times_arr) else ["x"] * len(times_arr))
 
             # Pre-sort by time
             sort_idx = np.argsort(times_arr)
             times_arr = times_arr[sort_idx]
             snrs_arr = snrs_arr[sort_idx]
             mags_arr = mags_arr[sort_idx]
+            bands_arr = bands_arr[sort_idx]
+            bands_list = [str(x) for x in bands_arr]
 
             times_list = [float(x) for x in times_arr]
             snrs_list = [float(x) for x in snrs_arr]
@@ -351,7 +412,7 @@ class CandidatePool:
             qual_by_sec = {}
             for sec in SEC_THRESHOLDS:
                 sec_th = sec - 1e-4
-                pts = [(times_list[k], snrs_list[k], mags_list[k]) for k in range(len(times_list)) if snrs_list[k] >= sec_th]
+                pts = [(times_list[k], snrs_list[k], mags_list[k], bands_list[k]) for k in range(len(times_list)) if snrs_list[k] >= sec_th]
                 n_q = len(pts)
                 if n_q == 0:
                     qual_by_sec[sec] = None
@@ -362,37 +423,9 @@ class CandidatePool:
                     t_span = pts[-1][0] - pts[0][0]
                     t_sep_hrs = t_span * 24.0
 
-                    mfade, mrise = 0.0, 0.0
-                    for k in range(n_q - 1):
-                        dt = pts[k+1][0] - pts[k][0]
-                        if dt > 1e-5:
-                            fr = (pts[k+1][2] - pts[k][2]) / dt
-                            if fr > mfade: mfade = fr
-                            if -fr > mrise: mrise = -fr
+                    mfade, mrise = band_wls_rates(pts)
 
-                    sub_by_span = {}
-                    for sp in SPANS:
-                        sub_wins = []
-                        max_s = sp + 1e-4
-                        for i in range(n_q):
-                            t_start = pts[i][0]
-                            j = i
-                            while j < n_q and (pts[j][0] - t_start) <= max_s:
-                                j += 1
-                            sub_c = j - i
-                            if sub_c >= 2:
-                                sub_span_hrs = (pts[j - 1][0] - t_start) * 24.0
-                                sub_prim_counts = tuple(sum(1 for p in pts[i:j] if p[1] >= (pt - 1e-4)) for pt in PRIM_THRESHOLDS)
-                                sub_mfade, sub_mrise = 0.0, 0.0
-                                for k in range(i, j - 1):
-                                    dt = pts[k+1][0] - pts[k][0]
-                                    if dt > 1e-5:
-                                        fr = (pts[k+1][2] - pts[k][2]) / dt
-                                        if fr > sub_mfade: sub_mfade = fr
-                                        if -fr > sub_mrise: sub_mrise = -fr
-                                sub_wins.append((sub_c, sub_span_hrs, sub_prim_counts, sub_mfade, sub_mrise))
-                        sub_by_span[sp] = pareto_prune_sub_windows(sub_wins)
-
+                    sub_by_span = {}  # rolling sub-windows removed: survey_sim applies the span cut to all detections
                     qual_by_sec[sec] = (n_q, prim_counts, t_span, t_sep_hrs, mfade, mrise, sub_by_span)
 
             self.lightcurves.append({
@@ -608,6 +641,11 @@ def evaluate_grid_point_for_pool(args_tuple: Tuple[Dict[str, Any], Any]) -> Dict
 def evaluate_grid_chunk_counts(chunk_cfgs: List[Dict[str, Any]], pool: CandidatePool) -> np.ndarray:
     """Process a chunk of criteria points sequentially using precomputed candidate indices."""
     counts = np.zeros(len(chunk_cfgs), dtype=np.int32)
+    for cfg in chunk_cfgs:
+        if cfg["min_galactic_lat"] < pool.loose_min_galactic_lat - 1e-6:
+            raise ValueError(
+                f"grid point |b|>={cfg['min_galactic_lat']} is looser than the candidates' simulated cut "
+                f"|b|>={pool.loose_min_galactic_lat}; positions are not stored, so it cannot be evaluated")
     index = pool.index_by_sec_lat
     prim_map = PRIM_MAP
 
@@ -645,13 +683,13 @@ def evaluate_grid_chunk_counts(chunk_cfgs: List[Dict[str, Any]], pool: Candidate
             if t_span <= m_span:
                 if t_sep_hrs < m_sep:
                     continue
-                if req_f:
-                    if m_fade > 0.0 and mfade < m_fade:
-                        continue
-                    if m_rise > 0.0 and mrise < m_rise:
+                if req_f and (m_fade > 0.0 or m_rise > 0.0):
+                    # survey_sim semantics: fast if it fades fast enough OR rises fast enough
+                    if not ((m_fade > 0.0 and mfade >= m_fade) or (m_rise > 0.0 and mrise >= m_rise)):
                         continue
                 cnt += 1
                 continue
+            continue  # span exceeds the window: rejected (no rolling sub-window in survey_sim)
 
             # Rolling sub-window check
             sub_wins = sub_by_span.get(span_key)
