@@ -1,101 +1,66 @@
 #!/usr/bin/env python3
-"""Execute code cells in Jupyter Notebooks and populate output fields."""
+"""Execute project notebooks in place with a real Jupyter kernel (nbclient).
 
-import base64
-import io
-import json
+Usage::
+
+    python execute_notebooks.py                       # all notebooks in notebooks/
+    python execute_notebooks.py notebooks/01_*.ipynb  # selected notebooks
+    python execute_notebooks.py --timeout 1800 --keep-going
+
+Notebooks are executed with ``notebooks/`` as the working directory (they locate the
+repository root and the results snapshot themselves).  A notebook that raises is
+reported and, unless ``--keep-going`` is given, stops the run with exit status 1;
+the failing notebook is still written so the traceback can be inspected.
+"""
+
+from __future__ import annotations
+
+import argparse
 import sys
-import traceback
-from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+import nbformat
+from nbclient import NotebookClient
+from nbclient.exceptions import CellExecutionError
+
+ROOT = Path(__file__).resolve().parent
 
 
-def execute_notebook(nb_path: Path):
-    print(f"Executing {nb_path}...")
-    with open(nb_path) as f:
-        nb = json.load(f)
+def execute_notebook(nb_path: Path, timeout: int = 1800, kernel: str = "python3") -> bool:
+    nb_path = Path(nb_path)
+    print(f"Executing {nb_path} ...", flush=True)
+    nb = nbformat.read(nb_path, as_version=4)
+    client = NotebookClient(nb, timeout=timeout, kernel_name=kernel,
+                            resources={"metadata": {"path": str(nb_path.resolve().parent)}})
+    ok = True
+    try:
+        client.execute()
+    except CellExecutionError as exc:
+        ok = False
+        print(f"  FAILED: {str(exc).splitlines()[-1] if str(exc) else exc}", flush=True)
+    nbformat.write(nb, nb_path)
+    print(f"  {'ok' if ok else 'written with errors'}: {nb_path}", flush=True)
+    return ok
 
-    namespace = {}
-    exec_count = 1
 
-    for idx, cell in enumerate(nb["cells"]):
-        if cell["cell_type"] != "code":
-            continue
-
-        code_text = "".join(cell["source"])
-        stdout_buf = io.StringIO()
-        stderr_buf = io.StringIO()
-        outputs = []
-
-        # Clear matplotlib figures before running
-        plt.close("all")
-
-        try:
-            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
-                exec(code_text, namespace)
-
-            out_text = stdout_buf.getvalue()
-            err_text = stderr_buf.getvalue()
-
-            if out_text:
-                outputs.append({
-                    "name": "stdout",
-                    "output_type": "stream",
-                    "text": [line + "\n" for line in out_text.splitlines()]
-                })
-            if err_text:
-                outputs.append({
-                    "name": "stderr",
-                    "output_type": "stream",
-                    "text": [line + "\n" for line in err_text.splitlines()]
-                })
-
-            # Check if any matplotlib figures were generated
-            fig_nums = plt.get_fignums()
-            for fnum in fig_nums:
-                fig = plt.figure(fnum)
-                img_buf = io.BytesIO()
-                fig.savefig(img_buf, format="png", bbox_inches="tight")
-                img_buf.seek(0)
-                b64_data = base64.b64encode(img_buf.read()).decode("ascii")
-                outputs.append({
-                    "data": {
-                        "image/png": b64_data,
-                        "text/plain": [f"<Figure size {fig.get_size_inches()[0]*100:.0f}x{fig.get_size_inches()[1]*100:.0f} with {len(fig.axes)} Axes>"]
-                    },
-                    "metadata": {},
-                    "output_type": "display_data"
-                })
-                plt.close(fig)
-
-        except Exception as e:
-            tb = traceback.format_exc()
-            print(f"Error in cell {idx} of {nb_path}: {e}")
-            outputs.append({
-                "ename": type(e).__name__,
-                "evalue": str(e),
-                "output_type": "error",
-                "traceback": tb.splitlines()
-            })
-
-        cell["execution_count"] = exec_count
-        cell["outputs"] = outputs
-        exec_count += 1
-
-    with open(nb_path, "w") as f:
-        json.dump(nb, f, indent=2)
-    print(f"Successfully executed and saved {nb_path}")
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("notebooks", nargs="*", help="notebook paths (default: notebooks/*.ipynb)")
+    ap.add_argument("--timeout", type=int, default=1800, help="per-cell timeout in seconds")
+    ap.add_argument("--keep-going", action="store_true", help="continue after a failing notebook")
+    args = ap.parse_args(argv)
+    targets = [Path(p) for p in args.notebooks] or sorted((ROOT / "notebooks").glob("*.ipynb"))
+    failed = []
+    for nb in targets:
+        if not execute_notebook(nb, args.timeout):
+            failed.append(nb)
+            if not args.keep_going:
+                break
+    if failed:
+        print("Failed notebooks:", *map(str, failed), sep="\n  ")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        target_nbs = [Path(arg) for arg in sys.argv[1:]]
-    else:
-        target_nbs = sorted(Path("notebooks").glob("*.ipynb"))
-
-    for nb in target_nbs:
-        execute_notebook(nb)
+    sys.exit(main())

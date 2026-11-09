@@ -42,6 +42,26 @@ def get_path_size_mb(path: Optional[os.PathLike]) -> float:
     return round(total_bytes / (1024.0 * 1024.0), 3)
 
 
+def slurm_env_mem_gb(env: Dict[str, str], cpus: int = 1) -> float:
+    """Requested memory (GB) from Slurm's job environment.
+
+    ``SLURM_MEM_PER_NODE`` / ``SLURM_MEM_PER_CPU`` are plain integers in **megabytes**
+    (``parse_memory_to_gb`` would read a bare number as bytes), and the per-CPU value must
+    be multiplied by the allocated CPUs.
+    """
+    def _mb(val: Optional[str]) -> float:
+        if not val:
+            return 0.0
+        val = val.strip()
+        return parse_memory_to_gb(val + "M" if val.isdigit() else val)
+
+    per_node = _mb(env.get("SLURM_MEM_PER_NODE"))
+    if per_node > 0:
+        return per_node
+    per_cpu = _mb(env.get("SLURM_MEM_PER_CPU"))
+    return round(per_cpu * max(1, int(cpus)), 3) if per_cpu > 0 else 0.0
+
+
 class JobResourceTracker(AbstractContextManager):
     """Context manager for passively instrumenting job resource consumption and parameters."""
 
@@ -66,10 +86,11 @@ class JobResourceTracker(AbstractContextManager):
         self.job_id = os.environ.get("SLURM_JOB_ID", str(os.getpid()))
         self.array_task_id = os.environ.get("SLURM_ARRAY_TASK_ID", "")
         self.partition = os.environ.get("SLURM_JOB_PARTITION", "msismall")
-        self.req_cpus = int(os.environ.get("SLURM_CPUS_PER_TASK", 1))
-        
-        raw_mem = os.environ.get("SLURM_MEM_PER_NODE") or os.environ.get("SLURM_MEM_PER_CPU", "0")
-        self.req_mem_gb = parse_memory_to_gb(raw_mem)
+        try:
+            self.req_cpus = max(1, int(os.environ.get("SLURM_CPUS_PER_TASK", 1)))
+        except ValueError:
+            self.req_cpus = 1
+        self.req_mem_gb = slurm_env_mem_gb(os.environ, self.req_cpus)
 
         self._t0: float = 0.0
         self._start_iso: str = ""

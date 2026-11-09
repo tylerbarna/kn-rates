@@ -72,11 +72,9 @@ python analysis_suites/01_large_scale_rate_limits/aggregate_rate_limits.py \
 cp "${OUTPUT_CSV}" results/rate_limit_benchmark.csv 2>/dev/null || true
 echo "      Synced canonical benchmark to results/rate_limit_benchmark.csv"
 
-# 2. Update historical comparison with Andreoni (2020)
-echo "[2/3] Updating comparative analysis with Andreoni et al. (2020)..."
-python analysis_suites/04_historical_andreoni_comparison/compare_with_andreoni2020.py \
-    --rate-limit-csv "${OUTPUT_CSV}" \
-    --output-dir "results/04_historical_andreoni_comparison"
+# 2. Update the version-controlled results snapshot (validated, atomic; never fails this job)
+echo "[2/3] Updating results snapshot (snapshots/knrates_results_latest.zip)..."
+bash scripts/update_results_snapshot.sh || echo "[WARN] snapshot update failed; previous snapshot kept"
 
 # 3. Execute Notebook 01 to populate rich boxplots, ECDFs, and scatter plots
 echo "[3/3] Re-executing Notebook 01 to generate populated distribution plots..."

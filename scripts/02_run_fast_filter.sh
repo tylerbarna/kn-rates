@@ -85,4 +85,6 @@ fi
 
 python analysis_suites/02_granular_criteria_sweep/fast_criteria_filter.py "${ARGS[@]}"
 
+bash scripts/update_results_snapshot.sh || echo "[WARN] snapshot update failed; previous snapshot kept"
+
 echo "Criteria filtering and multi-model aggregation finished at $(date)."

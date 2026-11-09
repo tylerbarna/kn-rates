@@ -121,7 +121,14 @@ class JobTelemetryRecord:
 
     @staticmethod
     def _parse_iso(val: str) -> Optional[datetime]:
-        if not val or val in ("Unknown", "N/A", "NONE"):
+        """Parse sacct ISO (``2026-10-20T20:41:25``), plain and ``date``-style timestamps.
+
+        Returns ``None`` for blanks and Slurm placeholders (``None``, ``Unknown``, ``N/A``).
+        """
+        if val is None:
+            return None
+        val = str(val).strip().rstrip(".")
+        if not val or val.upper() in ("UNKNOWN", "N/A", "NONE", "NAN", "NAT", "INVALID"):
             return None
         # Handle ISO strings with T separator e.g. 2026-10-20T20:41:25
         clean = re.sub(r"^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})", r"\1 \2", val)
