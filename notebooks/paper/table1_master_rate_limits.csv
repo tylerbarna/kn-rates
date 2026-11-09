@@ -1,0 +1,9 @@
+Model Configuration,Ejecta Physics,Efficiency,<VT>_eff [Gpc^3 yr],R_95% [Gpc^-3 yr^-1],R_95% (1.92 yr Equiv),Ratio to Andreoni
+GW170817 Bu2026 Fixed (Polar 26°),"M_dyn=0.016, M_wind=0.079, v=0.20c",1.85e-3,0.01565,191.4,799.5,0.45x
+GW170817 Bu2026 Isotropic,"Same ejecta, cos(iota) in [0, 1]",6.14e-4,0.00515,581.7,2429.7,0.60x
+GW170817 Metzger Blue Peak,"M_ej=0.02, v=0.25c, kappa=0.50",1.32e-2,0.11085,27.0,112.9,0.06x
+GW170817 Metzger Mean Ejecta,"M_ej=0.04, v=0.15c, kappa=1.00",4.61e-3,0.03925,76.3,318.8,0.18x
+NR Prior Bu2026 Fixed (10M),"Continuous prior, iota=26°",1.70e-3,0.01427,210.0 ± 1.6,877.2,0.49x
+NR Prior Bu2026 Vary (10M),"Continuous prior, cos(iota) in [0, 1]",7.10e-5,0.00359,834.3 ± 31.6,3485.1,0.86x
+Andreoni et al. (2020) Published Fixed,Kasen/Bulla (1.92 yr baseline),--,--,1775.0,1775.0,1.00x
+Andreoni et al. (2020) Published Isotropic,Bulla angle-averaged (1.92 yr),--,--,4029.0,4029.0,1.00x
