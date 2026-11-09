@@ -78,7 +78,7 @@ LOOSE_BOUNDING_CRITERIA = {
     "min_time_separation_hours": 0.0,  # Below grid minimum of 0.5 hours
     "min_rise_rate": 0.0,              # Inactive (0.0 mag/day)
     "min_fade_rate": 0.0,              # Inactive (0.0 mag/day)
-    "min_galactic_lat": 0.0,           # Full sky (no galactic plane cut)
+    "min_galactic_lat": 15.0,          # survey_sim does not serialise positions, so the |b| cut is applied by the engine here (fiducial value); the sweep cannot vary |b|
     "require_fast_transient": False,   # Disabled
 }
 
@@ -196,7 +196,7 @@ def build_population_instance(
     if rng is None and np is not None:
         rng = np.random.default_rng()
 
-    z_max = 0.15 if model_name in {"Bu2026Fixed", "Bu2026Vary"} else 0.30
+    z_max = 0.15
 
     if randomize_params and rng is not None:
         bounds = get_model_bounds(model_name, z_max=z_max)
@@ -233,7 +233,7 @@ def build_population_instance(
         model = FiestaKNModel(survey="ztf")
     else:  # Metzger
         params = dict(
-            mej=0.00126, vej=0.50, kappa=398.0, rate=rate, z_max=0.30
+            mej=0.00126, vej=0.50, kappa=398.0, rate=rate, z_max=0.15
         )
         pop = FixedMetzgerKilonovaPopulation(**params)
         model = MetzgerKNModel()

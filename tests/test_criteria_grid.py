@@ -102,13 +102,13 @@ class TestGranularCriteriaGrid(unittest.TestCase):
         self.assertLessEqual(n_tasks, 5000)
 
     def test_ultra_fine_preset_chunking_compliance(self):
-        """Verify the ultra-fine grid (2,138,460 points) satisfies <= 5,000 tasks with chunk_size=428."""
+        """Verify the ultra-fine grid (427,692 points; |b| fixed at 15 deg) satisfies <= 5,000 tasks."""
         grid = get_grid_combinations("ultra_fine")
         total = len(grid)
-        self.assertEqual(total, 2138460)
+        self.assertEqual(total, 427692)
         chunk_size, n_tasks = calculate_chunking(total, chunk_size=35, max_tasks=5000)
-        self.assertEqual(chunk_size, 428)
-        self.assertEqual(n_tasks, 4997)
+        self.assertEqual(chunk_size, 86)
+        self.assertEqual(n_tasks, 4974)
         self.assertLessEqual(n_tasks, 5000)
 
     def test_legacy_ultra_fine_preset_chunking_compliance(self):
@@ -241,8 +241,10 @@ class TestFastCriteriaFilterAndCandidates(unittest.TestCase):
         # min_time_separation_hours == 0
         self.assertEqual(LOOSE_BOUNDING_CRITERIA["min_time_separation_hours"], 0.0)
 
-        # min_galactic_lat == 0
-        self.assertEqual(LOOSE_BOUNDING_CRITERIA["min_galactic_lat"], 0.0)
+        # |b| is applied by survey_sim at candidate generation (positions are not stored), so it must
+        # equal the single |b| value of the ultra-fine sweep grid
+        self.assertEqual(LOOSE_BOUNDING_CRITERIA["min_galactic_lat"], 15.0)
+        self.assertEqual(set(get_grid_combinations("ultra_fine") and [c["min_galactic_lat"] for c in get_grid_combinations("ultra_fine")]), {15.0})
 
         # require_fast_transient is False
         self.assertFalse(LOOSE_BOUNDING_CRITERIA["require_fast_transient"])
