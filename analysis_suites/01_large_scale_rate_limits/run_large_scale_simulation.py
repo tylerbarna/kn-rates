@@ -3,7 +3,8 @@
 
 This module executes high-statistics Monte Carlo simulations ($N \\ge 10^5-10^6$
 transients per realization) across three canonical kilonova models:
-- Metzger: Semi-analytic 1-component model with fiducial lanthanide-free opacity
+- Metzger: one-zone survey_sim Metzger model grid-fit to AT2017gfo photometry (an empirical AT2017gfo template;
+  kappa=398 is NOT a physical grey opacity, see docs/review_2026-11.md section 5)
 - Bu2026Fixed: 2-component numerical model (dynamical + wind) at fixed viewing angle (0.45 rad)
 - Bu2026Vary: 2-component numerical model with isotropic viewing angle distribution (flat in cos iota)
 
