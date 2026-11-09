@@ -88,7 +88,7 @@ done
 if [ "${COMMIT_FLAG}" = "1" ] && command -v git &>/dev/null; then
     if ! git diff --quiet telemetry/job_resource_registry.csv telemetry/scaling_models.json 2>/dev/null; then
         echo "Detected changes in telemetry files. Committing to version control..."
-        git add telemetry/job_resource_registry.csv telemetry/scaling_models.json
+        git add telemetry/job_resource_registry.csv telemetry/scaling_models.json $( [ -f telemetry/fairshare_snapshots.csv ] && echo telemetry/fairshare_snapshots.csv )
         git commit -m "chore(telemetry): auto-update job resource registry [skip ci]" || true
         echo "Committed updated registry at $(date)."
     else

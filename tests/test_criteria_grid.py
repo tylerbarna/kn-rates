@@ -6,7 +6,7 @@ from pathlib import Path
 
 # Import the granular sweep functions
 import sys
-sys.path.insert(0, str(Path(__file__).parent / "analysis_suites" / "02_granular_criteria_sweep"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "analysis_suites" / "02_granular_criteria_sweep"))
 
 from run_granular_sweep import (
     EXPANDED_CRITERIA_BOUNDS,
@@ -157,7 +157,7 @@ class TestGranularCriteriaGrid(unittest.TestCase):
 
     def test_slurm_script_directives(self):
         """Verify fast candidate simulation script has safe array directives protecting FairShare."""
-        script_path = Path(__file__).parent / "scripts" / "02_run_fast_candidates_simulation.sh"
+        script_path = Path(__file__).resolve().parents[1] / "scripts" / "02_run_fast_candidates_simulation.sh"
         self.assertTrue(script_path.exists())
         content = script_path.read_text()
 
@@ -170,7 +170,7 @@ class TestGranularCriteriaGrid(unittest.TestCase):
         self.assertLessEqual(max_idx + 1, 60, "Fast criteria simulation array tasks must be <= 60 to protect FairShare!")
 
         # Verify legacy script is safely disabled with deprecation exit
-        legacy_path = Path(__file__).parent / "scripts" / "02_run_granular_criteria_sweep.sh"
+        legacy_path = Path(__file__).resolve().parents[1] / "defunct" / "deprecated_scripts" / "02_run_granular_criteria_sweep.sh"
         self.assertTrue(legacy_path.exists())
         self.assertIn("DEPRECATED", legacy_path.read_text())
 
