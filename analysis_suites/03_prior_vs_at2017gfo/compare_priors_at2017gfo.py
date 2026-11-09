@@ -31,6 +31,7 @@ import pandas as pd
 
 from survey_sim import (
     DetectionCriteria,
+    Bu2026KilonovaPopulation,
     FixedBu2026KilonovaPopulation,
     SimulationPipeline,
     SurveyStore,
@@ -127,25 +128,18 @@ def get_population_configurations() -> Dict[str, Dict[str, Any]]:
             "inclination_em": 0.45,
             "vary_inclination": True,   # Uniform in cos(iota)
             "rate": 1000.0,
-            "z_max": 0.25,
+            "z_max": 0.15,
             "randomize": False,
             "description": "AT2017gfo ejecta masses with isotropic (angle-averaged) viewing distribution",
         },
-        # 3. Broad Prior - Fixed Viewing Angle
-        "BroadPrior_FixedView": {
+        # 3. Broad population: parameters drawn PER TRANSIENT by survey_sim's Bu2026KilonovaPopulation
+        #    (uniform over the surrogate training box, isotropic viewing angle). The former BroadPrior_FixedView /
+        #    BroadPrior_Isotropic drew ONE parameter set per run and are retired.
+        "BroadPopulation_Isotropic": {
             "rate": 1000.0,
-            "z_max": 0.20,
-            "vary_inclination": False,
-            "randomize": True,
-            "description": "Randomized ejecta parameters across physical prior bounds, fixed iota=26 deg",
-        },
-        # 4. Broad Prior - Full Isotropic Parameter Swath
-        "BroadPrior_Isotropic": {
-            "rate": 1000.0,
-            "z_max": 0.30,
-            "vary_inclination": True,
-            "randomize": True,
-            "description": "Full multidimensional prior: ejecta masses, velocities, Y_e, and cos(iota) randomized",
+            "z_max": 0.15,
+            "per_transient": True,
+            "description": "Per-transient draws: ejecta masses, velocities, Y_e (uniform over surrogate training box) and isotropic cos(iota)",
         },
     }
 
@@ -207,7 +201,9 @@ def main():
                 rng = np.random.default_rng(seed)
 
                 # Build population
-                if pop_cfg["randomize"]:
+                if pop_cfg.get("per_transient"):
+                    pop = Bu2026KilonovaPopulation(rate=pop_cfg["rate"], z_max=pop_cfg["z_max"])
+                elif pop_cfg.get("randomize"):
                     sample_kwargs = sample_random_broad_params(rng, pop_cfg["vary_inclination"])
                     sample_kwargs["rate"] = pop_cfg["rate"]
                     sample_kwargs["z_max"] = pop_cfg["z_max"]
@@ -215,7 +211,7 @@ def main():
                 else:
                     pop_kwargs = {
                         k: v for k, v in pop_cfg.items()
-                        if k not in ["randomize", "description"]
+                        if k not in ["randomize", "description", "per_transient"]
                     }
                     pop = FixedBu2026KilonovaPopulation(**pop_kwargs)
 
