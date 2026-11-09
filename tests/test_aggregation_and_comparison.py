@@ -1,6 +1,7 @@
 """Unit tests for rate limit aggregation and Andreoni (2020) comparison logic."""
 
 import importlib
+import importlib.util
 import json
 import math
 from pathlib import Path
@@ -20,7 +21,14 @@ except ImportError:
     sys.modules["numpy"] = MagicMock()
 
 agg_module = importlib.import_module("analysis_suites.01_large_scale_rate_limits.aggregate_rate_limits")
-comp_module = importlib.import_module("analysis_suites.04_historical_andreoni_comparison.compare_with_andreoni2020")
+# Suite 04's script was retired to defunct/superseded_suites/ (its comparison is now done in notebook 04);
+# keep testing its helper from there.
+_spec = importlib.util.spec_from_file_location(
+    "compare_with_andreoni2020",
+    Path(__file__).resolve().parents[1] / "defunct" / "superseded_suites" / "04_historical_andreoni_comparison"
+    / "compare_with_andreoni2020.py")
+comp_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(comp_module)
 import rate_limit_benchmark
 
 

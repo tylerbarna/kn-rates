@@ -6,6 +6,7 @@ import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from telemetry.classify import classify_job
 from telemetry.models import JobTelemetryRecord, RightsizingRecommendation
 
 
@@ -17,11 +18,46 @@ class TelemetryAnalyzer:
         "OUT_OF_MEMORY", "CANCELLED", "REQUEUED", "NODE_FAIL"
     )
 
-    def __init__(self, records: List[JobTelemetryRecord]):
-        self.records = [
+    def __init__(self, records: List[JobTelemetryRecord], dedupe: bool = True):
+        active = [
             r for r in records
             if any(str(r.state).startswith(st) for st in self.VALID_ACTIVE_STATES)
         ]
+        #: every active record, including reportseff array-task rows (used for CPU efficiency)
+        self.all_records = active
+        #: one record per real execution (duplicate reportseff / task-log rows removed)
+        self.records = self.dedupe_records(active) if dedupe else active
+
+    @staticmethod
+    def dedupe_records(records: List[JobTelemetryRecord]) -> List[JobTelemetryRecord]:
+        """Drop rows that duplicate a sacct row of the same execution.
+
+        reportseff keys array tasks as ``<master>_<task>`` while sacct keys every task by
+        its raw job id, so the same task appears twice; task-log rows are keyed by the raw
+        id with the task index and carry no resource data.
+        """
+        sacct_ids = {r.job_id for r in records if r.data_source == "sacct"}
+        nonarray_ids = {r.job_id for r in records if not r.array_task_id and r.data_source in ("sacct", "reportseff")}
+        out = []
+        for r in records:
+            if r.data_source in ("script_configuration", "metadata_json"):
+                continue  # templates / local runs, not Slurm executions
+            if r.data_source == "reportseff" and r.array_task_id and r.job_id in sacct_ids:
+                continue
+            if r.data_source == "task_log" and r.job_id in nonarray_ids:
+                continue
+            out.append(r)
+        return out
+
+    @staticmethod
+    def cpu_efficiency_is_reliable(r: JobTelemetryRecord) -> bool:
+        """False for legacy sacct rows whose CPU time was CPUTimeRAW (= allocation)."""
+        if r.cpu_efficiency_pct <= 0:
+            return False
+        if r.data_source == "reportseff":
+            return True
+        alloc = r.used_walltime_sec * max(r.req_cpus, 1)
+        return not (alloc > 0 and r.used_cpu_sec >= 0.995 * alloc)
 
     def analyze_queue_times(self) -> Dict[str, Any]:
         """Examine how queue wait times correlate with requested resources, submission time, and batch size."""
@@ -46,6 +82,10 @@ class TelemetryAnalyzer:
         }
 
         for r in self.records:
+            # Records without real submit/start timestamps (e.g. reportseff-only rows) carry
+            # the default 0.0 wait and would bias every statistic towards zero.
+            if not (JobTelemetryRecord._parse_iso(r.submit_time) and JobTelemetryRecord._parse_iso(r.start_time)):
+                continue
             wait_min = r.queue_wait_min
             if wait_min < 0:
                 continue
@@ -97,7 +137,8 @@ class TelemetryAnalyzer:
     def analyze_efficiencies(self) -> Dict[str, Any]:
         """Compute statistical distributions and waste metrics for Time, CPU, and Memory efficiencies."""
         time_effs = [r.time_efficiency_pct for r in self.records if r.time_efficiency_pct > 0]
-        cpu_effs = [r.cpu_efficiency_pct for r in self.records if r.cpu_efficiency_pct > 0]
+        # CPU efficiency: reportseff rows (incl. array tasks) + sacct rows with real TotalCPU
+        cpu_effs = [r.cpu_efficiency_pct for r in self.all_records if self.cpu_efficiency_is_reliable(r)]
         mem_effs = [r.mem_efficiency_pct for r in self.records if r.mem_efficiency_pct > 0]
 
         def _eff_stats(arr: List[float]) -> Dict[str, float]:
@@ -124,7 +165,7 @@ class TelemetryAnalyzer:
             st = r.state.split()[0] if r.state else "UNKNOWN"
             if r.time_efficiency_pct > 0:
                 by_state[st]["time_eff"].append(r.time_efficiency_pct)
-            if r.cpu_efficiency_pct > 0:
+            if self.cpu_efficiency_is_reliable(r):
                 by_state[st]["cpu_eff"].append(r.cpu_efficiency_pct)
             if r.mem_efficiency_pct > 0:
                 by_state[st]["mem_eff"].append(r.mem_efficiency_pct)
@@ -218,6 +259,12 @@ class TelemetryAnalyzer:
         """Calculate optimal requested memory, walltime, and partition for a proposed job."""
         scaling = self.fit_resource_scaling()
         fit = scaling.get(model) or scaling.get("Global")
+
+        # A fit with a non-positive slope (e.g. a handful of same-N points) is unphysical
+        if fit and (fit["ram_gb_per_million"] <= 0 or fit["walltime_sec_per_million"] <= 0):
+            global_fit = scaling.get("Global")
+            ok = global_fit and global_fit["ram_gb_per_million"] > 0 and global_fit["walltime_sec_per_million"] > 0
+            fit = global_fit if ok else None
 
         if fit:
             ram_per_m = fit["ram_gb_per_million"]
@@ -314,11 +361,33 @@ class TelemetryAnalyzer:
 
     def analyze_suite_rightsizing(self, min_jobs: int = 20) -> Dict[str, Any]:
         """Empirically rightsize simulation suites by balancing completed resource profiles against OOM failures."""
+        # Group by the canonical numbered-suite label (telemetry.classify) so inconsistent
+        # registry labels ("Suite 05" vs "Suite 05: Sample Convergence") merge and legacy /
+        # exploratory runs mislabelled as numbered suites are excluded.
         by_suite: Dict[str, List[JobTelemetryRecord]] = defaultdict(list)
         for r in self.records:
-            s = r.suite
-            if s and s not in ("None", "Unknown", "Scripts", "Defunct", "Standalone / Benchmark"):
-                by_suite[s].append(r)
+            jc = classify_job(r.job_name, suite=r.suite, when=(r.submit_time, r.start_time, r.end_time),
+                              data_source=r.data_source, partition=r.partition, job_id=r.job_id)
+            if jc.category == "numbered" and jc.suite_id:
+                by_suite[jc.group].append(r)
+
+        # reportseff array-task rows (deduplicated out of self.records) per numbered suite
+        master_suite = {}
+        master_cpus: Dict[str, int] = {}
+        for label, recs in by_suite.items():
+            for r in recs:
+                if not r.array_task_id:
+                    master_suite[r.job_id] = label
+                    master_cpus[r.job_id] = r.req_cpus
+        kept = {id(r) for r in self.records}
+        rs_tasks: Dict[str, List[JobTelemetryRecord]] = defaultdict(list)
+        for r in self.all_records:
+            if id(r) not in kept and r.data_source == "reportseff" and r.job_id in master_suite:
+                if r.state.startswith("COMPLETED"):
+                    rs_tasks[master_suite[r.job_id]].append(r)
+
+        def rs_by_master_completed(label: str) -> List[JobTelemetryRecord]:
+            return rs_tasks.get(label, [])
 
         suite_recommendations: Dict[str, Any] = {}
 
@@ -355,15 +424,20 @@ class TelemetryAnalyzer:
             p95_time = comp_time[int(n_time * 0.95)] if n_time > 0 else 0.0
             max_time = comp_time[-1] if n_time > 0 else 0.0
 
-            comp_cpu = [r.cpu_efficiency_pct for r in completed if r.cpu_efficiency_pct > 0]
+            # CPU efficiency is only trustworthy from reportseff (array tasks are duplicate rows
+            # dropped from self.records, so look them up in all_records by master job id, and
+            # take the core count from the sacct master row).
+            comp_cpu_recs = [r for r in completed if self.cpu_efficiency_is_reliable(r)]
+            comp_cpu_recs += [r for r in rs_by_master_completed(suite_name) if self.cpu_efficiency_is_reliable(r)]
+            comp_cpu = [r.cpu_efficiency_pct for r in comp_cpu_recs]
             median_cpu = sorted(comp_cpu)[len(comp_cpu) // 2] if comp_cpu else 100.0
 
             # CPU core utilization analysis:
             # Effective cores used = req_cpus * (cpu_efficiency_pct / 100.0)
             comp_cores_used = [
-                r.req_cpus * (r.cpu_efficiency_pct / 100.0)
-                for r in completed
-                if r.req_cpus > 0 and r.cpu_efficiency_pct > 0
+                master_cpus.get(r.job_id, r.req_cpus) * (r.cpu_efficiency_pct / 100.0)
+                for r in comp_cpu_recs
+                if r.req_cpus > 0
             ]
             comp_cores_used.sort()
             n_cores = len(comp_cores_used)

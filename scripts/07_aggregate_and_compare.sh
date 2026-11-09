@@ -67,7 +67,12 @@ python analysis_suites/07_gw170817_rate_limits/aggregate_and_compare_suite01.py 
     --suite01-fallback-csv "${SUITE01_FALLBACK}" \
     --output-dir "${SUITE07_DIR}"
 
-echo "Building and rendering Notebook 07..."
-python build_notebooks.py --notebooks 07 2>/dev/null || python build_notebooks.py
+echo "Updating results snapshot and re-executing Notebook 07..."
+bash scripts/update_results_snapshot.sh || echo "[WARN] snapshot update failed; previous snapshot kept"
+python -c "
+from pathlib import Path
+import execute_notebooks
+execute_notebooks.execute_notebook(Path('notebooks/07_gw170817_fixed_parameter_analysis.ipynb'))
+" || echo "[WARN] notebook 07 execution failed"
 
 echo "Suite 07 aggregation and Suite 01 comparative analysis completed successfully."

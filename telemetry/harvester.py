@@ -11,6 +11,7 @@ import shutil
 import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
+from telemetry.classify import canonical_suite_name
 from telemetry.models import JobTelemetryRecord
 
 
@@ -85,31 +86,29 @@ def parse_percentage(val: Optional[str]) -> float:
 
 
 def infer_suite_from_job_name(job_name: Optional[str]) -> str:
-    """Infer analysis suite family from standard Slurm job submission name."""
+    """Registry ``suite`` string for a Slurm job name.
+
+    Delegates to :func:`telemetry.classify.canonical_suite_name` so the harvester and the
+    analyses share one set of rules: numbered-suite jobs get ``"Suite NN: Label"``, telemetry
+    cron jobs ``"Telemetry Infrastructure"`` and everything else (preliminary/legacy runs,
+    interactive sessions) ``""``.  Use :func:`telemetry.classify.classify_job` for the full
+    classification (category / group).
+    """
     if not job_name:
         return ""
-    name = job_name.lower()
-    if any(k in name for k in ("criteria_sweep", "crit_ultrafine", "crit_audit", "detection_criteria")):
-        return "Suite 02: Granular Criteria Sweep"
-    if any(k in name for k in ("marathon", "rate_limits_1m", "sim_1m_random", "rate_limits_10m", "1m_random")):
-        return "Suite 01: Large-Scale Rate Limits"
-    if any(k in name for k in ("at2017gfo", "prior_vs_at2017gfo")):
-        return "Suite 03: Prior vs AT2017gfo"
-    if any(k in name for k in ("andreoni", "historical_andreoni")):
-        return "Suite 04: Historical Andreoni Comparison"
-    if any(k in name for k in ("sample_convergence", "convergence")):
-        return "Suite 05: Sample Convergence"
-    if any(k in name for k in ("inclination", "bu2026_inclination")):
-        return "Suite 06: Inclination Effect"
-    if any(k in name for k in ("gw170817",)):
-        return "Suite 07: GW170817 Rate Limits"
-    if any(k in name for k in ("cron", "telemetry")):
-        return "Telemetry Infrastructure"
-    return ""
+    return canonical_suite_name(job_name)
 
 
 class JobHarvester:
     """Collects historical job metrics from Slurm sacct, execution logs, and metadata."""
+
+    #: Sources whose resource / scheduling fields are guesses that sacct should override.
+    GUESSED_SOURCES = ("slurm_submission_log", "script_configuration", "task_log", "misc_log", "metadata_json")
+    SACCT_AUTHORITATIVE_FIELDS = (
+        "job_name", "suite", "partition", "node_list", "submit_time", "start_time", "end_time",
+        "req_cpus", "req_mem_gb", "req_time_min", "used_walltime_sec", "used_max_rss_gb",
+        "used_cpu_sec", "state", "exit_code",
+    )
 
     def __init__(self, project_root: Optional[Path] = None):
         self.project_root = project_root or Path.cwd()
@@ -396,12 +395,10 @@ class JobHarvester:
             except ValueError:
                 elapsed_sec = parse_slurm_time_to_seconds(elapsed_raw)
 
-            try:
-                cpu_sec = float(cpu_time_raw) if cpu_time_raw else 0.0
-            except ValueError:
-                cpu_sec = parse_slurm_time_to_seconds(cpu_time_raw)
-
-            # Check optional TotalCPU and Timelimit fields
+            # NOTE: CPUTimeRAW is *allocated* core-seconds (Elapsed x AllocCPUS), not CPU time
+            # actually used, so it must not be stored as used_cpu_sec (doing so produced a
+            # spurious 100% CPU efficiency for most sacct rows).  Only TotalCPU is used.
+            cpu_sec = 0.0
             req_time_min = 0.0
             if len(parts) > 14 and parts[14]:
                 actual_cpu_sec = parse_slurm_time_to_seconds(parts[14])
@@ -809,7 +806,14 @@ class JobHarvester:
         return records
 
     def harvest_known_benchmarks(self) -> List[JobTelemetryRecord]:
-        """Seed verified empirical cluster benchmarks from codebase references."""
+        """Seed reference benchmarks from codebase constants.
+
+        WARNING: these four records are hard-coded constants, not sacct harvests (their job
+        IDs, node names and dates do not match the cluster's accounting; e.g. 14237734 mirrors
+        the real ``sim_msilarge_10M_multimodel.sh`` job 14296175).  The analysis loader
+        (:mod:`telemetry.frame`) flags them as ``is_seeded`` and excludes them from usage
+        accounting; they are kept only to anchor :meth:`TelemetryAnalyzer.fit_resource_scaling`.
+        """
         return [
             # Verified MSI Agate 10M Benchmark
             JobTelemetryRecord(
@@ -920,6 +924,19 @@ class JobHarvester:
                 target.req_time_min = source.req_time_min
             target.data_source = "reportseff"
             return
+
+        # sacct is authoritative for scheduling and resource fields.  Records seeded from
+        # submission logs / script templates contain *guessed* names, requests and an
+        # mtime-derived submit time; previously only empty fields were filled, so those
+        # guesses survived the merge (e.g. job 4118182 kept the name "kn_criteria_sweep"
+        # and a submit time two days after it actually started).
+        # A newer sacct harvest also refreshes an older sacct record (RUNNING -> COMPLETED,
+        # end time, MaxRSS), which previously never happened because the fields were non-empty.
+        if source.data_source == "sacct" and target.data_source in self.GUESSED_SOURCES + ("sacct", "reportseff"):
+            for key in self.SACCT_AUTHORITATIVE_FIELDS:
+                val = getattr(source, key)
+                if val not in ("", None) and not (isinstance(val, (int, float)) and val <= 0 and key != "exit_code"):
+                    setattr(target, key, val)
 
         for key, val in source.__dict__.items():
             current = getattr(target, key)
