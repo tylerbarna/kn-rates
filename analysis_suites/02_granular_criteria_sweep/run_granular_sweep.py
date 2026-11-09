@@ -160,7 +160,7 @@ ULTRA_FINE_GRID = {
     "min_time_separation_hours": (0.5, 1.0, 2.0, 3.0, 6.0),
     "min_rise_rate": (0.0, 0.1, 0.2, 0.3, 0.5, 1.0),
     "min_fade_rate": (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
-    "min_galactic_lat": (0.0, 5.0, 10.0, 15.0, 20.0),
+    "min_galactic_lat": (15.0,),  # |b| fixed: candidates carry no positions (see simulate_candidates.py)
     "require_fast_transient": (True, False),
 }
 
