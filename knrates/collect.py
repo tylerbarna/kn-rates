@@ -291,6 +291,11 @@ def collect_simulation_suite(ctx: Context, suite_id: str, subdir: str,
     return out
 
 
+# Populations that were intentionally retired; their disappearance is not a partial write.
+# Suite 03 "BroadPrior_*" drew ONE parameter set per realisation and were replaced by the per-transient
+# BroadPopulation_Isotropic (compare_priors_at2017gfo.py, Nov 2026).
+RETIRED_POPULATIONS = {"suite03_runs": {"BroadPrior_FixedView", "BroadPrior_Isotropic"}}
+
 # Bump a suite's version whenever its collector output changes, so cached tables are rebuilt.
 COLLECTOR_VERSIONS = {"suite01": 1, "suite07": 1, "suite03": 2, "suite02": 2, "models": 1}
 
@@ -592,6 +597,9 @@ def validate_tables(tables: Dict[str, pd.DataFrame], previous=None) -> Tuple[Dic
                 new = tables[name].groupby(key).size()
                 for m, n_old in old.items():
                     n_new = int(new.get(m, 0))
+                    if n_new == 0 and m in RETIRED_POPULATIONS.get(name, ()):
+                        warnings.append(f"{name}: retired population {m} dropped ({n_old} runs in previous snapshot)")
+                        continue
                     if n_new < n_old:
                         errors.append(f"{name}: {m} has {n_new} runs, previous snapshot had {n_old} "
                                       f"(refusing to replace good data with a partial set; use --allow-shrink)")
