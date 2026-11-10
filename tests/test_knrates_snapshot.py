@@ -108,3 +108,20 @@ def test_rejects_impossible_counts(tmp_path):
     f.write_text(json.dumps(d))
     _, _, errors = collect.build(res)
     assert any("n_detected > n_simulated" in e for e in errors)
+
+
+def test_retired_population_may_disappear_but_others_may_not():
+    from types import SimpleNamespace
+    import pandas as pd
+
+    def s3(pops):
+        return pd.DataFrame([dict(population_type=p, criteria_regime="Baseline_ZTFReST", run_idx=i)
+                             for p, n in pops.items() for i in range(n)])
+
+    prev = SimpleNamespace(tables={"suite03_runs": s3({"BroadPrior_Isotropic": 3, "AT2017gfo_FixedView": 3})})
+    _, errors, warnings = collect.validate_tables({"suite03_runs": s3({"AT2017gfo_FixedView": 3,
+                                                                         "BroadPopulation_Isotropic": 3})}, prev)
+    assert not [e for e in errors if "refusing" in e]
+    assert any("retired population BroadPrior_Isotropic" in w for w in warnings)
+    _, errors, _ = collect.validate_tables({"suite03_runs": s3({"AT2017gfo_FixedView": 2})}, prev)
+    assert any("AT2017gfo_FixedView has 2 runs" in e for e in errors)

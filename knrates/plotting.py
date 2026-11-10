@@ -22,16 +22,58 @@ OKABE_ITO = {
     "grey": "#7F7F7F",
 }
 
-# Display labels, colours and markers per simulated model
+# Display labels, colours and markers per simulated model. ``label`` carries no suite attribution; the suffix
+# returned by ``tag()`` depends on the label mode (see ``set_label_mode``).
 MODEL_STYLE = {
-    "Bu2026Fixed": dict(label=r"Bu2026, $\iota=26^\circ$ (S01)", color=OKABE_ITO["blue"], marker="o"),
-    "Bu2026Vary": dict(label=r"Bu2026, isotropic $\iota$ (S01)", color=OKABE_ITO["vermillion"], marker="s"),
-    "Metzger": dict(label=r"Metzger, $\kappa=398$ (S01)", color=OKABE_ITO["green"], marker="^"),
-    "GW170817_Bu2026_FixedView": dict(label=r"Bu2026 GW170817, $\iota=26^\circ$ (S07)", color=OKABE_ITO["skyblue"], marker="o"),
-    "GW170817_Bu2026_Isotropic": dict(label=r"Bu2026 GW170817, isotropic (S07)", color=OKABE_ITO["orange"], marker="s"),
-    "GW170817_Metzger_Blue": dict(label=r"Metzger blue, $\kappa=0.5$ (S07)", color=OKABE_ITO["purple"], marker="D"),
-    "GW170817_Metzger_Mean": dict(label=r"Metzger mean, $\kappa=1$ (S07)", color="#8C6D00", marker="v"),
+    "Bu2026Fixed": dict(label=r"Bu2026, $\iota=26^\circ$", color=OKABE_ITO["blue"], marker="o"),
+    "Bu2026Vary": dict(label=r"Bu2026, isotropic $\iota$", color=OKABE_ITO["vermillion"], marker="s"),
+    "Metzger": dict(label=r"Metzger, $\kappa=398$", color=OKABE_ITO["green"], marker="^"),
+    "GW170817_Bu2026_FixedView": dict(label=r"Bu2026, $\iota=26^\circ$", color=OKABE_ITO["skyblue"], marker="o"),
+    "GW170817_Bu2026_Isotropic": dict(label=r"Bu2026, isotropic $\iota$", color=OKABE_ITO["orange"], marker="s"),
+    "GW170817_Metzger_Blue": dict(label=r"Metzger blue, $\kappa=0.5$", color=OKABE_ITO["purple"], marker="D"),
+    "GW170817_Metzger_Mean": dict(label=r"Metzger mean, $\kappa=1$", color="#8C6D00", marker="v"),
 }
+
+# Which analysis suite produced each model (shown only in "working" label mode)
+SUITE_OF = {
+    "Bu2026Fixed": "S01", "Bu2026Vary": "S01", "Metzger": "S01",
+    "GW170817_Bu2026_FixedView": "S07", "GW170817_Bu2026_Isotropic": "S07",
+    "GW170817_Metzger_Blue": "S07", "GW170817_Metzger_Mean": "S07",
+}
+# Physical distinction used in "paper" label mode where two models would otherwise share a label
+# (the S01 and S07 Bu2026 models differ only in dynamical ejecta mass: log10 M_dyn = -1.7 vs -1.8).
+PAPER_TAG = {
+    "Bu2026Fixed": r"$M_{\rm dyn}=0.020\,M_\odot$", "Bu2026Vary": r"$M_{\rm dyn}=0.020\,M_\odot$",
+    "GW170817_Bu2026_FixedView": r"$M_{\rm dyn}=0.016\,M_\odot$",
+    "GW170817_Bu2026_Isotropic": r"$M_{\rm dyn}=0.016\,M_\odot$",
+}
+SUITE_NAME = {
+    "working": {"S01": "Suite 01", "S02": "Suite 02", "S03": "Suite 03", "S07": "Suite 07"},
+    "paper": {"S01": "Baseline parameters", "S02": "", "S03": "", "S07": "GW170817 literature parameters"},
+}
+
+LABEL_MODE = "paper"
+
+
+def set_label_mode(mode: str) -> None:
+    """``"paper"``: labels describe the physics only. ``"working"``: append the analysis suite (S01, S07, ...)."""
+    global LABEL_MODE
+    if mode not in ("paper", "working"):
+        raise ValueError(f"label mode must be 'paper' or 'working', not {mode!r}")
+    LABEL_MODE = mode
+
+
+def tag(model: str, sep: str = " ") -> str:
+    """Suffix that disambiguates ``model`` from same-named models of other suites (empty if none is needed)."""
+    if LABEL_MODE == "working":
+        return f"{sep}({SUITE_OF[model]})" if model in SUITE_OF else ""
+    return f"{sep}({PAPER_TAG[model]})" if model in PAPER_TAG else ""
+
+
+def suite_name(key: str) -> str:
+    """Name of a group of runs, e.g. ``suite_name("S07")`` -> "Suite 07" (working) or a physical description (paper)."""
+    return SUITE_NAME[LABEL_MODE].get(key, key)
+
 
 SHORT_LABEL = {
     "Bu2026Fixed": r"Bu2026 $\iota=26^\circ$",
@@ -61,7 +103,9 @@ VT_LABEL = r"$\langle VT\rangle_{\rm eff}$ [Gpc$^{3}$ yr]"
 
 
 def style(model: str) -> dict:
-    return MODEL_STYLE.get(model, dict(label=model, color=OKABE_ITO["grey"], marker="o"))
+    st = dict(MODEL_STYLE.get(model, dict(label=model, color=OKABE_ITO["grey"], marker="o")))
+    st["label"] = st["label"] + tag(model)
+    return st
 
 
 def use_style(context: str = "paper") -> None:
