@@ -30,7 +30,7 @@ Both manuscripts were re-drafted as **preliminary** versions (`paper/ms.tex`, `p
 ### 1.2 Proposed structure
 1. Introduction: kilonovae, previous untargeted limits, GW BNS rate, goal.
 2. ZTF data and selection criteria (compared with A20 and ZTFReST).
-3. Simulation and statistics: injections, VT (Eq. 1), pooling, Poisson/FC; models (POSSIS fixed and isotropic, AT2017gfo-posterior, population; one-zone only if re-tuned).
+3. Simulation and statistics: injections, VT (Eq. 1), pooling, Poisson/FC; models (POSSIS fixed and isotropic, AT2017gfo-posterior, population). One-zone Metzger models: **likely dropped** (see the note below the placeholder table).
 4. Results: Table 1, Fig. 3 (limits vs literature/GW), Fig. 1 (sensitivity vs time; 23-month comparison), Fig. 4 (distance reach).
 5. Viewing-angle dependence: Fig. 2.
 6. Monte Carlo convergence: Fig. 5 (short; could move to an appendix).
@@ -45,10 +45,22 @@ Both manuscripts were re-drafted as **preliminary** versions (`paper/ms.tex`, `p
 | Archival search result, N_obs, vetting efficiency (§7, abstract, conclusions) | Real ZTF alert + forced-photometry search with the simulated criteria; inject light curves through the vetting chain |
 | Population-averaged limit (§3 item 3, abstract, §8) | **Suite 03 re-run** with `BroadPopulation_Isotropic` (per-transient draws); justify the prior (Radice+2018-like ejecta masses) |
 | AT2017gfo posterior-marginalised limit (§3 item 1) | New run family drawing parameters per transient from a published AT2017gfo posterior (e.g. Anand+2023 / fiesta fit) |
-| One-zone models re-tuned or dropped (§3 item 2) | Engine-side fixes to the Metzger model or removal from the paper |
+| One-zone models: keep the AT2017gfo template or drop (§3 item 2, §8 "Model choice") | Light-curve check of the κ = 398 template against AT2017gfo photometry (local, no cluster time); drop all Metzger models if it does not match |
 | Criteria systematics band, A20 offset explanation (§4.1, §8) | **Suite 02 ensemble re-run** with the corrected filter and candidate envelope |
 | Extinction, fiesta time axis (§8) | Engine fixes, then re-run Suites 01/07 (same seeds) and rebuild the snapshot |
 | Companion citation, co-authors, acknowledgments, software DOI | Authors |
+
+**One-zone (Metzger) models — likely removal (Nov 2026).** Of the three implementations, the Suite 07 "blue" and
+"mean" presets put literature values into a code whose parameters mean something else ("blue" is ~1.6 mag brighter
+than AT2017gfo), so they are dropped. The Suite 01 κ = 398 template is kept only if it reproduces AT2017gfo: its
+recovered sources have median M ≈ −15.6 (AT2017gfo peak M_r ≈ −16.0) and ⟨VT⟩ is 4× lower than the POSSIS ι = 26°
+model, so it currently looks fainter than the event. If dropped:
+- §3 lists only the POSSIS models; remove the one-zone item and its extinction sentence in §8.
+- §8 "Model choice" no longer quotes the one-zone spread; model systematics are covered by viewing angle, the
+  AT2017gfo posterior and the population run.
+- Fig. 1 shows the two POSSIS curves only; Fig. 3 and Table 1 lose the Metzger rows.
+- Companion paper: run the Suite 02 ensemble for the two POSSIS models only (saves a third of the array).
+All notebooks have `INCLUDE_METZGER` in their settings cell to preview the figures without these models.
 
 Figures are written by `notebooks/paper_figures_and_analysis.ipynb`. If that notebook changes, check the captions in `ms.tex` against it.
 

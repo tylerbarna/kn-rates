@@ -51,6 +51,19 @@ class Snapshot:
     def get(self, name: str, default=None):
         return self.tables.get(name, default)
 
+    def exclude_models(self, models) -> "Snapshot":
+        """Copy without the rows of the given models in every table that has a ``model`` column.
+
+        ``models`` is a collection of model names or a predicate, e.g. ``lambda m: "Metzger" in m``.
+        """
+        pred = models if callable(models) else (lambda m, _s=frozenset(models): m in _s)
+        tables = {}
+        for name, df in self.tables.items():
+            if "model" in df.columns:
+                df = df[~df["model"].astype(str).map(pred).astype(bool)].reset_index(drop=True)
+            tables[name] = df
+        return Snapshot(tables, self.manifest, self.path)
+
     @property
     def label(self) -> str:
         src = self.path.name if self.path else "live build"

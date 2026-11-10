@@ -55,6 +55,29 @@ SUITE_NAME = {
 LABEL_MODE = "paper"
 
 
+_LIT_LS = ["--", "-.", ":", (0, (1, 3)), (0, (5, 2, 1, 2)), (0, (3, 1, 1, 1, 1, 1)), (0, (8, 3)), (0, (1, 1))]
+
+
+def lit_line_styles():
+    """Endless sequence of distinct line styles for literature reference lines: dict(ls=..., color=...)."""
+    import itertools
+    combos = [dict(ls=ls, color=c) for c in ("k", "0.5") for ls in _LIT_LS]
+    return itertools.cycle(combos)
+
+
+def lit_markers():
+    """Endless sequence of marker symbols for literature values placed as points."""
+    import itertools
+    return itertools.cycle(["*", "P", "X", "D", "v", "^", "s", "h"])
+
+
+def lit_bands():
+    """Endless sequence of shading styles for literature ranges (e.g. GW rates, viewing angles)."""
+    import itertools
+    return itertools.cycle([dict(color=OKABE_ITO["skyblue"], alpha=0.18), dict(color="0.80", alpha=0.5),
+                            dict(color=OKABE_ITO["yellow"], alpha=0.2)])
+
+
 def set_label_mode(mode: str) -> None:
     """``"paper"``: labels describe the physics only. ``"working"``: append the analysis suite (S01, S07, ...)."""
     global LABEL_MODE
