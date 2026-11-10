@@ -241,6 +241,35 @@ def build_population_instance(
     return pop, model, params
 
 
+
+def _norm(x):
+    """JSON round trip, so tuples/ints/floats compare the way they are stored in metadata files."""
+    return json.loads(json.dumps(x))
+
+
+def cache_mismatch(meta_file: Path, params: Dict[str, Any], n_transients: int, seed: int,
+                   randomize_params: bool) -> Optional[str]:
+    """Why an existing candidate file cannot be reused (None if it can).
+
+    A file is reused only if its metadata records exactly the current loose envelope, model parameters
+    (including z_max), number of injections, seed and randomisation flag. Files made with an older envelope
+    (e.g. loose |b| = 0, or Metzger at z_max = 0.3) are regenerated instead of silently reused.
+    """
+    try:
+        meta = json.loads(Path(meta_file).read_text())
+    except Exception:
+        return "no readable metadata"
+    if _norm(meta.get("loose_criteria")) != _norm(LOOSE_BOUNDING_CRITERIA):
+        return (f"loose envelope differs (stored |b|>={(meta.get('loose_criteria') or {}).get('min_galactic_lat')}, "
+                f"current |b|>={LOOSE_BOUNDING_CRITERIA['min_galactic_lat']})")
+    if _norm(meta.get("params")) != _norm(params):
+        return "model parameters differ (e.g. z_max)"
+    if meta.get("n_transients") != n_transients or meta.get("seed") != seed:
+        return "number of injections or seed differs"
+    if bool(meta.get("randomize_params")) != bool(randomize_params):
+        return "randomize_params differs"
+    return None
+
 def run_candidate_simulation(
     survey: Any,
     model_name: str,
@@ -255,20 +284,6 @@ def run_candidate_simulation(
     output_file.parent.mkdir(parents=True, exist_ok=True)
     meta_file = Path(f"{output_file}.metadata.json")
 
-    if not force_rerun and output_file.exists():
-        print(f"  [CACHE HIT] Candidate file already exists: {output_file}")
-        try:
-            data = json.loads(output_file.read_text())
-            return {
-                "file": str(output_file),
-                "model": model_name,
-                "n_simulated": data.get("n_simulated", n_transients),
-                "n_candidates": len(data.get("detected_sources", [])),
-                "cached": True,
-            }
-        except Exception:
-            pass  # Fall through to re-simulate if corrupted
-
     if not HAS_SURVEY_SIM:
         raise RuntimeError("survey_sim is not installed in the current environment.")
 
@@ -278,6 +293,24 @@ def run_candidate_simulation(
         randomize_params=randomize_params,
         rng=rng,
     )
+
+    if not force_rerun and output_file.exists():
+        reason = cache_mismatch(meta_file, params, n_transients, seed, randomize_params)
+        if reason is None:
+            print(f"  [CACHE HIT] Candidate file already exists with the current envelope: {output_file}")
+            try:
+                data = json.loads(output_file.read_text())
+                return {
+                    "file": str(output_file),
+                    "model": model_name,
+                    "n_simulated": data.get("n_simulated", n_transients),
+                    "n_candidates": len(data.get("detected_sources", [])),
+                    "cached": True,
+                }
+            except Exception:
+                print("  [CACHE] existing file unreadable -> re-simulating")
+        else:
+            print(f"  [CACHE STALE] {output_file.name}: {reason} -> re-simulating")
 
     det = DetectionCriteria(
         snr_threshold=float(LOOSE_BOUNDING_CRITERIA["snr_threshold"]),
