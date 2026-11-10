@@ -86,6 +86,7 @@ SNAPSHOT = "latest"   # or "20261109T184311Z" / a unique prefix like "20261109" 
 | `06_bu2026_inclination_discrepancy_investigation` | VT and limit vs. viewing angle from the isotropic ensembles |
 | `07_gw170817_fixed_parameter_analysis` | Suite 07 limits, parameter/luminosity checks vs. AT2017gfo, comparison with Suite 01 |
 | (model light curves) | `python scripts/make_model_lightcurves.py` (survey_sim env) tabulates the fiesta light curves used in notebook 06 and paper Fig. 2 |
+| (Metzger check) | `python scripts/make_metzger_check.py` (needs cargo) tabulates survey_sim's Metzger light curves and AT2017gfo photometry for notebook 07 §4b |
 | `paper_figures_and_analysis` | Publication figures (`paper/figures/`) and Table 1 (`paper/table1_master_rate_limits.{csv,tex}`) |
 | `job_resource_usage_analysis` | Slurm telemetry; `ANALYSIS_SCOPE = "numbered" \| "preliminary" \| "all"`, FairShare billing |
 

@@ -52,9 +52,13 @@ Both manuscripts were re-drafted as **preliminary** versions (`paper/ms.tex`, `p
 
 **One-zone (Metzger) models — likely removal (Nov 2026).** Of the three implementations, the Suite 07 "blue" and
 "mean" presets put literature values into a code whose parameters mean something else ("blue" is ~1.6 mag brighter
-than AT2017gfo), so they are dropped. The Suite 01 κ = 398 template is kept only if it reproduces AT2017gfo: its
-recovered sources have median M ≈ −15.6 (AT2017gfo peak M_r ≈ −16.0) and ⟨VT⟩ is 4× lower than the POSSIS ι = 26°
-model, so it currently looks fainter than the event. If dropped:
+than AT2017gfo), so they are dropped. The Suite 01 κ = 398 template was checked against AT2017gfo photometry
+(`scripts/make_metzger_check.py`, notebook 07 §4b): in the first two days it matches r and i to ≲0.15 mag but is
+~0.7 mag too faint in g, and after ~2 days it fades far too fast (0.5–2 mag too faint at 2–4 d, several mag by day 5).
+It therefore fails a 0.3-mag template criterion, and its 4× lower ⟨VT⟩ than the POSSIS model is not a clean measure of
+model dependence. **Recommendation: drop all three.** The same check shows the POSSIS ι = 25.8° model is ~0.5 mag
+brighter than AT2017gfo in r and i in the first two days (and fades faster in g after day 2), so its "AT2017gfo-like"
+limit is optimistic; state this in §8 and prioritise the AT2017gfo-posterior run. If dropped:
 - §3 lists only the POSSIS models; remove the one-zone item and its extinction sentence in §8.
 - §8 "Model choice" no longer quotes the one-zone spread; model systematics are covered by viewing angle, the
   AT2017gfo posterior and the population run.
