@@ -1,0 +1,7 @@
+[package]
+name = "metzger_lc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lightcurve-fitting = { git = "https://github.com/boom-astro/lightcurve-fitting", rev = "8c395c99b46b6d323cb63b9135d8d70a017bd49f" }
