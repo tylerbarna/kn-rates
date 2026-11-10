@@ -64,7 +64,8 @@ limit is optimistic; state this in §8 and prioritise the AT2017gfo-posterior ru
   AT2017gfo posterior and the population run.
 - Fig. 1 shows the two POSSIS curves only; Fig. 3 and Table 1 lose the Metzger rows.
 - Companion paper: run the Suite 02 ensemble for the two POSSIS models only (saves a third of the array).
-All notebooks have `INCLUDE_METZGER` in their settings cell to preview the figures without these models.
+All notebooks have `INCLUDE_METZGER` in their settings cell; it defaults to `False`, so the paper figures and Table 1
+already exclude these models (the light-curve check in notebook 07 §4b always shows them).
 
 Figures are written by `notebooks/paper_figures_and_analysis.ipynb`. If that notebook changes, check the captions in `ms.tex` against it.
 
