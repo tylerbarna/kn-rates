@@ -416,3 +416,14 @@ Bu2025_raw_data.h5
 .ipynb_checkpoints/
 snapshots/.collect.lock
 snapshots/.tmp_snapshot_*
+
+# LaTeX build products
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
+
+# Rust helper build output
+scripts/metzger_lightcurves/target/
