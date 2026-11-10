@@ -1,11 +1,11 @@
 %% ==============================================================================
-%% AASTeX v6.3.1 Manuscript Template for Companion Survey Methodology Paper
+%% AASTeX v6.3.1 companion manuscript -- PRELIMINARY REDRAFT (2026-11)
 %% ==============================================================================
-%% Primary Target Journal:
-%%   Publications of the Astronomical Society of the Pacific (PASP)
-%%   - Direct sequel and companion to Barna et al. (2025, PASP / arXiv:2506.15900)
-%%   - UMN / BTAA Open Access Agreement with IOP Publishing (100% APC waiver).
-%% Alternative: Astronomical Journal (AJ) or Astronomy and Computing
+%% Scope reduced to what the simulations in this repository deliver: the response of
+%% the kilonova recovery efficiency to the selection criteria (Suite 02). All Suite 02
+%% numbers are placeholders (\tbd{}) pending the ensemble re-run with the corrected
+%% filter and candidate envelope. Imposter contamination is presented as planned work.
+%% See docs/paper_revision_plan.md.
 %% ==============================================================================
 
 \documentclass[twocolumn]{aastex631}
@@ -14,191 +14,94 @@
 \usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{hyperref}
+\usepackage{xcolor}
 
-\newcommand{\msun}{M_\odot}
-\newcommand{\ztf}{\textit{ZTF}}
-\newcommand{\rubin}{\textit{Rubin}}
-\newcommand{\lsst}{\textit{LSST}}
+\newcommand{\tbd}[1]{\textcolor{red}{[TBD: #1]}}
+\newcommand{\vteff}{\langle VT\rangle}
+\newcommand{\gpcyr}{\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}}
 
-\shorttitle{Optimizing Fast Transient Selection in Optical Surveys}
+\shorttitle{Selection Criteria for Kilonova Searches}
 \shortauthors{Barna et al.}
 
 \begin{document}
 
-\title{Optimizing Fast Optical Transient Selection: A 10-Dimensional Criteria Sweep, Imposter Decontamination, and Follow-Up Allocation for ZTF and Rubin LSST}
+\title{How Selection Criteria Shape the Kilonova Sensitivity of Wide-Field Optical Surveys: A Systematic Study with Eight Years of ZTF}
 
 \author[0000-0002-0000-0000]{Tyler Barna}
 \affiliation{Minnesota Institute for Astrophysics, School of Physics and Astronomy, University of Minnesota, 116 Church Street SE, Minneapolis, MN 55455, USA}
-\affiliation{Minnesota Supercomputing Institute, University of Minnesota, 599 Walter Library, 117 Pleasant Street SE, Minneapolis, MN 55455, USA}
-\email{barna314@umn.edu; tylerpbarna@gmail.com}
+\email{barna314@umn.edu}
 
-\author{Co-Authors / Collaborators}
-\affiliation{Minnesota Institute for Astrophysics, School of Physics and Astronomy, University of Minnesota, 116 Church Street SE, Minneapolis, MN 55455, USA}
+\author{\tbd{co-authors}}
 
 \begin{abstract}
-Next-generation wide-field time-domain surveys face an acute tension between maximizing discovery efficiency for rare, rapidly evolving kilonovae and minimizing contamination from astrophysical imposters. In this paper, we conduct an exhaustive 10-dimensional parameter sweep across 2.14 million observational criteria configurations using the decoupled ``Simulate-Once, Filter-Many'' engine within the Rust-accelerated \texttt{survey-sim} framework. Evaluating the full 8-year dataset of the Zwicky Transient Facility (ZTF), we rank candidate selection cuts by their marginal elasticity, identifying minimum qualifying detections ($N_{\rm min}$), secondary signal-to-noise ratio ($\mathrm{SNR}_{\rm sec}$), and intra-night time separation ($\Delta t_{\rm min}$) as the primary bottlenecks governing survey completeness. We map the multi-objective Pareto frontier trading off candidate yield against alert purity. To mitigate contamination from rapid imposters---including Type~IIb supernova shock cooling, Fast Blue Optical Transients (FBOTs), and orphan gamma-ray burst afterglows---we introduce a dynamic color-slope discriminator ($\mathrm{d}(g-r)/\mathrm{d}t \ge 0.4\,\mathrm{mag\,day}^{-1}$) that separates rapidly reddening lanthanide-rich kilonovae from cooling blue imposters within $\le 48\,\mathrm{hours}$ of breakout. Projecting our framework to the 10-year Vera C. Rubin Observatory Legacy Survey of Space and Time (LSST), we demonstrate that un-optimized alert criteria produce a severe ``Purity Crisis'' ($\mathcal{P} < 10\%$) that overwhelms available 4m--10m spectroscopic resources. Finally, we formulate an optimal telescope follow-up budget allocator that maximizes confirmed kilonova yields under realistic spectroscopic scheduling constraints.
+Untargeted kilonova searches select fast transients with cuts on detection significance, the number and spacing of detections, duration, fade and rise rates, and Galactic latitude. We quantify how each cut changes the recovery efficiency, and hence the effective volume--time $\vteff$ and rate limit, of eight years of the Zwicky Transient Facility. Light curves recovered under a loose criteria envelope in $10^8$ injections per model are re-filtered on a grid of 427\,692 criteria combinations. The filter reproduces the selection of the full simulation \tbd{to X\% at the fiducial point after the re-run}. \tbd{Ranking of criteria by their effect on $\vteff$; one-at-a-time ranges; strongest pairwise interactions; recommendations.} Imposter contamination, which sets the other side of the trade-off, is outlined as the next step.
 \end{abstract}
 
-\keywords{methods: data analysis --- surveys: ZTF, LSST --- stars: neutron --- supernovae: individual (SN IIb)}
+\keywords{Neutron stars (1108) --- Transient sources (1851) --- Sky surveys (1464) --- Astronomy data analysis (1858)}
 
-%% ==============================================================================
-%% SECTION 1: INTRODUCTION
 %% ==============================================================================
 \section{Introduction}
 \label{sec:intro}
 
-The search for serendipitous optical kilonovae (KNe) in wide-field time-domain surveys represents one of the most demanding operational challenges in contemporary observational astronomy \citep{Andreoni2020, SaguesCarracedo2021}. Because kilonovae fade on timescales of days, discovery pipelines must trigger rapid spectroscopic follow-up before the transient drops below limiting magnitude. However, serendipitous candidate streams are heavily dominated by non-kilonova astrophysical transients with fast initial evolution \citep{Doctor2017, Andreoni2021_ZTFReST}.
+Searches for kilonovae in wide-field survey data must reject a large number of unrelated transients and artefacts \citep{Doctor2017, Andreoni2020, Andreoni2021}. The cuts used to do so also remove genuine kilonovae, so the choice of criteria sets the sensitivity of the search and the resulting rate limit. In ZTF \citep{Bellm2019, Graham2019}, the first 23 months were searched with band-dependent fade-rate cuts and without a Galactic-latitude cut \citep{Andreoni2020}. The real-time ZTFReST pipeline uses a single 0.3\,mag\,d$^{-1}$ fade threshold and $|b| > 10^\circ$ \citep{Andreoni2021}. Fast optical transients that mimic kilonovae at early times include stripped-envelope supernovae with shock-cooling peaks, which dominate a recent catalogue of ZTF kilonova imposters \citep{Barna2025}, and fast blue optical transients \citep{Ho2023}.
 
-As demonstrated in \citet{Barna2025}, early circumstellar shock cooling in stripped-envelope core-collapse supernovae (particularly Type~IIb SNe) produces prominent optical peaks with fast fading ($|\mathrm{d}m/\mathrm{d}t| \approx 0.3$--$0.7\,\mathrm{mag\,day}^{-1}$) that closely mimic kilonova lightcurves during the first 1--3 days post-breakout. Additional contamination arises from Fast Blue Optical Transients (FBOTs; \citealt{Ho2021, Perley2019}), relativistic orphan gamma-ray burst (GRB) afterglows \citep{Andreoni2021_ZTFReST}, and intra-night solar system asteroids.
-
-Historically, evaluating candidate selection criteria required re-running computationally intensive Monte Carlo lightcurve simulations for each parameter combination. In this paper, we employ a decoupled ``Simulate-Once, Filter-Many'' vectorized architecture within the Rust-based \texttt{survey-sim} framework to evaluate 2.14 million criteria configurations across the 8-year ZTF archive in minutes. We derive the empirical Pareto frontier between kilonova completeness and imposter rejection, develop a color-slope filter for candidate decontamination, and model spectroscopic follow-up optimization for the upcoming Vera C. Rubin Observatory Legacy Survey of Space and Time (LSST; \citealt{Ivezic2019}).
+This paper accompanies our eight-year ZTF rate analysis \tbd{citation} and asks how strongly the recovery efficiency depends on each criterion. Section~\ref{sec:method} describes the simulate-once/filter-many method and its validation, Section~\ref{sec:results} the response of $\vteff$ to the criteria, and Section~\ref{sec:imposters} the planned contamination study.
 
 %% ==============================================================================
-%% SECTION 2: 10-D SELECTION CRITERIA PARAMETER SPACE
-%% ==============================================================================
-\section{The 10-Dimensional Selection Criteria Parameter Space}
-\label{sec:criteria_space}
+\section{Method}
+\label{sec:method}
 
-We systematically evaluate the ten-dimensional criteria space:
-\begin{enumerate}
-    \item Primary Signal-to-Noise Ratio ($\mathrm{SNR}_{\rm prim} \in [3.5, 6.0]$): Photometric significance required for primary detections.
-    \item Secondary Signal-to-Noise Ratio ($\mathrm{SNR}_{\rm sec} \in [2.0, 4.0]$): Threshold for secondary confirmation epochs.
-    \item Minimum Detections ($N_{\rm min} \in [1, 5]$): Total count of qualifying detections required.
-    \item Minimum Primary Detections ($N_{\rm prim} \in [1, 3]$): Detections satisfying $\mathrm{SNR}_{\rm prim}$.
-    \item Qualifying Timespan ($\Delta t_{\rm max} \in [1, 28]\,\mathrm{days}$): Maximum allowed duration of the transient event.
-    \item Minimum Separation ($\Delta t_{\rm min} \in [0.5, 24.0]\,\mathrm{hours}$): Minimum baseline between first and last detections to reject asteroids.
-    \item Pre-Peak Rise Rate ($|\mathrm{d}m/\mathrm{d}t|_{\rm rise} \in [0.0, 1.0]\,\mathrm{mag\,day}^{-1}$): Minimum pre-peak brightening speed.
-    \item Post-Peak Fade Rate ($|\mathrm{d}m/\mathrm{d}t|_{\rm fade} \in [0.0, 1.0]\,\mathrm{mag\,day}^{-1}$): Minimum post-peak decline speed.
-    \item Galactic Latitude Exclusion ($|b|_{\rm min} \in [0^\circ, 20^\circ]$): Galactic plane veto.
-    \item Fast-Transient Cut ($\texttt{True} / \texttt{False}$): Enforcement of zero detections outside the active window.
-\end{enumerate}
+\subsection{Candidate generation}
+For each model (POSSIS two-component kilonovae evaluated with the \texttt{fiesta} surrogate, \citealt{Bulla2019, Bulla2023, Koehn2025}, at fixed $\iota = 25.8^\circ$ and with isotropic viewing angles; and a one-zone template), we inject $10^6$ kilonovae per realisation into the ZTF exposure history (2018--2026) with the same injection scheme as the rate paper. All recovered light curves that pass a loose envelope are stored: $\ge 1$ detection at $S/N \ge 3$, duration $\le 35$\,d, no separation or rate requirement, $|b| \ge 15^\circ$, and $z_{\max} = 0.15$. The Galactic-latitude cut is applied during simulation because positions are not stored, so the grid keeps $|b| \ge 15^\circ$ fixed. \tbd{Number of realisations per model in the ensemble re-run (target 100).}
 
-By storing simulated photometric epochs as packed columnar arrays, candidate selection cuts reduce to bitmask filtering operations, enabling a 2.14-million-point grid sweep in under two minutes on standard HPC hardware.
+\subsection{Criteria grid and filter}
+The filter re-applies, to every stored light curve, the primary and secondary $S/N$ thresholds ($3.5$--$6.0$ and $2.0$--$4.0$), the minimum number of detections (1--5) and of primary detections (1--3), the maximum duration (2, 7, 14, 28\,d), the minimum first-to-last separation (0.5--6\,h), minimum rise and fade rates (0--1\,mag\,d$^{-1}$), and whether the rate test is required. After removing logically inconsistent combinations, 427\,692 grid points remain. Rise and fade rates are measured as in the full simulation: weighted least-squares slopes before and after the brightest point in each band, with same-band points within 2\,h averaged; a source passes if it fades or rises fast enough. $\vteff$ at each grid point is the stored efficiency times the volume--time per unit efficiency of the loose run.
+
+\subsection{Validation}
+For one realisation at the fiducial criteria ($|b| \ge 0^\circ$, rise test disabled), the full simulation recovers 2315 kilonovae and the filter 2086. With the fade requirement removed the counts agree to $\approx 2\%$. The residual difference arises because the filter measures slopes from the stored, noise-added photometry, whereas the simulation uses noiseless model magnitudes. \tbd{Validate at $\ge 5$ grid points after the re-run, and report the residual as a systematic or remove it by storing model magnitudes.}
 
 %% ==============================================================================
-%% SECTION 3: SENSITIVITY ELASTICITY AND CRITERIA HIERARCHY
-%% ==============================================================================
-\section{Sensitivity Elasticity and Criteria Hierarchy}
-\label{sec:elasticity}
+\section{Response of the sensitivity to the criteria}
+\label{sec:results}
 
-To quantify the sensitivity of survey completeness $\epsilon$ to small variations in each selection threshold $x_i$, we define the dimensionless marginal elasticity:
-\begin{equation}
-\label{eq:elasticity}
-E_{x_i} = \frac{\partial \ln \epsilon}{\partial \ln x_i} \approx \frac{\Delta \epsilon / \epsilon_0}{\Delta x_i / x_{i,0}}.
-\end{equation}
+\tbd{One-at-a-time response of $\vteff/\vteff^{\rm fid}$ for each criterion and model (Figure~\ref{fig:oat}); total range and local logarithmic elasticity $e = \Delta\ln\vteff/\Delta\ln x$ at the fiducial point; pairwise maps for the strongest interactions; comparison of the fiducial point with the Andreoni et al.\ (2020) and ZTFReST criteria; consequences for the rate limit.}
 
-Our sweep reveals a strict three-tier hierarchy of criteria impact:
-\begin{itemize}
-    \item \textbf{Tier 1 (Catastrophic Drivers, $|E| > 1.5$)}: The minimum detection count $N_{\rm min}$ is the dominant bottleneck; increasing $N_{\rm min}$ from 2 to 3 causes a catastrophic $63\%$ collapse in kilonova discovery efficiency under ZTF's 2- to 3-night cadence. Similarly, relaxing $\mathrm{SNR}_{\rm sec}$ from $5.0$ to $3.0$ doubles the effective search volume.
-    \item \textbf{Tier 2 (Moderate Regulators, $0.3 < |E| \le 1.5$)}: Post-peak fade rate $|\mathrm{d}m/\mathrm{d}t|_{\rm fade} \ge 0.3\,\mathrm{mag\,day}^{-1}$ and primary SNR filter slow supernovae while preserving $>80\%$ of fast-cooling kilonovae.
-    \item \textbf{Tier 3 (Inelastic Constraints, $|E| \le 0.3$)}: Qualifying timespan $\Delta t_{\rm max} \ge 14\,\mathrm{days}$ and Galactic latitude $|b| \ge 15^\circ$ impose minimal efficiency penalties ($<3\%$) while effectively rejecting stellar variability.
-\end{itemize}
-
-%% ==============================================================================
-%% SECTION 4: PARETO OPTIMIZATION
-%% ==============================================================================
-\section{Pareto Optimization: Completeness vs. Rejection Strictness}
-\label{sec:pareto}
-
-Candidate selection inherently balances two competing objectives: maximizing kilonova completeness $\epsilon_{\rm KN}$ and minimizing false-positive alert volume $N_{\rm false}$. Across the 2.14-million grid evaluations, we construct the empirical Pareto frontier representing the non-dominated set of criteria configurations where no single objective can be improved without degrading the other.
-
-\begin{figure}[t]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\columnwidth]{figures/fig6_criteria_elasticity_pareto.pdf}
-\caption{Parameter sensitivity and Pareto optimization. \textit{Top}: Dimensionless marginal elasticity $|E_x|$ across the 10 selection criteria, establishing $N_{\rm min}$, $\mathrm{SNR}_{\rm sec}$, and $\Delta t_{\rm min}$ as primary survey bottlenecks. \textit{Bottom}: Empirical Pareto frontier trading off kilonova completeness against imposter rejection across 2.14 million criteria configurations, highlighting the Balanced ZTFReST operating point.}
-\label{fig:pareto}
-\end{figure}
-
-As shown in Figure~\ref{fig:pareto}, the fiducial ZTFReST profile ($N_{\rm min}=2$, $\mathrm{SNR}_{\rm prim}=5$, $\mathrm{SNR}_{\rm sec}=3$, $\Delta t_{\rm min}=3\,\mathrm{hr}$, $|\mathrm{d}m/\mathrm{d}t|_{\rm fade} \ge 0.3\,\mathrm{mag\,d}^{-1}$) lies near the knee of the Pareto frontier, capturing $\approx 85\%$ of the maximum achievable kilonova volume while suppressing $99.8\%$ of common supernova false positives.
+\includegraphics[width=\textwidth]{figures/fig6_criteria_sensitivity_PRELIMINARY.pdf}
+\caption{\tbd{Regenerate after the re-run.} One-at-a-time response of $\vteff$, relative to the fiducial criteria (dotted lines), for each model.}
+\label{fig:oat}
+\end{figure*}
 
 %% ==============================================================================
-%% SECTION 5: ASTROPHYSICAL IMPOSTERS & COLOR DECONTAMINATION
-%% ==============================================================================
-\section{Astrophysical Imposters and Multi-Band Decontamination}
+\section{Toward contamination-aware criteria}
 \label{sec:imposters}
 
-Even after applying fiducial Pareto-optimal cuts, serendipitous searches are contaminated by fast astrophysical imposters. We model three major contaminant classes:
-\begin{enumerate}
-    \item \textbf{Type IIb Supernova Shock Cooling}: Following the volumetric rates and shock breakout models of \citet{Barna2025}, shock cooling peaks at $M_g \sim -17.5$ and declines at $\approx 0.4\,\mathrm{mag\,day}^{-1}$ for the first 48 hours.
-    \item \textbf{Fast Blue Optical Transients (FBOTs)}: Characterized by luminous optical peaks ($M_g \le -19$) and expansion velocities $v \sim 0.1c$ \citep{Perley2019, Ho2021}.
-    \item \textbf{Relativistic Afterglows}: Off-axis GRB afterglows exhibiting synchrotron power-law decays \citep{Andreoni2021_ZTFReST}.
-\end{enumerate}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\columnwidth]{figures/fig7_color_slope_decontamination.pdf}
-\caption{Astrophysical imposter decontamination via multi-band color evolution. \textit{Top}: Early $g-r$ color evolution of kilonovae (reddening at $\mathrm{d}(g-r)/\mathrm{d}t \ge 0.4\,\mathrm{mag\,day}^{-1}$ due to lanthanide line-blanketing) compared against SN IIb shock cooling and FBOTs ($g-r \le 0.0\,\mathrm{mag}$). \textit{Bottom}: Sample purity recovery as a function of post-breakout baseline, demonstrating purity increasing from $\approx 17\%$ to $>80\%$ within 48 hours.}
-\label{fig:color_slope}
-\end{figure}
-
-Because of heavy element nucleosynthesis and intense lanthanide line-blanketing, kilonovae exhibit an extraordinarily rapid optical reddening:
-\begin{equation}
-\label{eq:color_slope}
-\frac{\mathrm{d}(g-r)}{\mathrm{d}t} = \frac{(g-r)_{t_2} - (g-r)_{t_1}}{t_2 - t_1} \ge 0.4\,\mathrm{mag\,day}^{-1}.
-\end{equation}
-In contrast, SN IIb shock cooling and FBOTs maintain high photospheric temperatures ($T \ge 20,000\,\mathrm{K}$) for several days, remaining persistently blue ($g-r \le 0.0\,\mathrm{mag}$). As illustrated in Figure~\ref{fig:color_slope}, enforcing Equation~\eqref{eq:color_slope} across two photometric bands separated by $\ge 12\,\mathrm{hours}$ boosts candidate sample purity:
-\begin{equation}
-\label{eq:purity}
-\mathcal{P} = \frac{N_{\rm KN}}{N_{\rm KN} + N_{\rm IIb} + N_{\rm FBOT} + N_{\rm afterglow}}
-\end{equation}
-from $\mathcal{P} \approx 17\%$ to $\mathcal{P} > 80\%$, filtering $>95\%$ of shock cooling imposters.
+Choosing criteria requires the recovery efficiency of contaminants as well as of kilonovae. \tbd{Planned: inject shock-cooling, CSM-interaction, orphan-afterglow and cocoon light-curve models available in \texttt{survey-sim} through the same exposure history and filter; adopt volumetric rates from the literature with uncertainties; calibrate against the ZTF imposter catalogue of \citet{Barna2025}; evaluate colour-evolution discriminants on the simulated multi-band photometry; then derive completeness--purity frontiers and Rubin projections \citep[cf.][]{Andreoni2022Rubin}.} No contamination or purity numbers are given until these simulations exist.
 
 %% ==============================================================================
-%% SECTION 6: RUBIN LSST SCALING & FOLLOW-UP BUDGET ALLOCATION
-%% ==============================================================================
-\section{Scaling to Rubin LSST: Purity Crisis and Follow-Up Budgets}
-\label{sec:lsst_scaling}
-
-The Vera C. Rubin Observatory Legacy Survey of Space and Time (LSST; \citealt{Ivezic2019}) will reach single-epoch limiting magnitudes of $r \approx 24.5\,\mathrm{mag}$, expanding the searchable comoving volume by over two orders of magnitude compared to ZTF. However, volumetric scaling without enhanced discrimination produces an acute ``Purity Crisis'': the absolute number of detected SN~IIb shock cooling events and FBOTs scales directly with volume, generating hundreds of alerts per year that will overwhelm global 8m--10m spectroscopic facilities \citep{Andreoni2022_LSST}.
-
-To address this challenge, we formalize the optimal follow-up allocation problem. Let $B_{\rm spec}$ be the total annual spectroscopic follow-up budget (typically 20--50 targets for high-priority fast transients). The objective is to maximize the expected yield of confirmed kilonovae $N_{\rm confirmed}$:
-\begin{equation}
-\label{eq:budget_optimization}
-\max_{\{c_i\}} N_{\rm confirmed} = \epsilon_{\rm KN}(\mathbf{c}) \cdot N_{\rm KN} \cdot P_{\rm spec}(\mathbf{c})
-\end{equation}
-\begin{equation*}
-\text{subject to} \quad N_{\rm alerts}(\mathbf{c}) \le B_{\rm spec},
-\end{equation*}
-where $\mathbf{c} = \{c_1, \dots, c_{10}\}$ represents the vector of selection criteria, and $P_{\rm spec} = \min(1, B_{\rm spec} / N_{\rm alerts})$ is the spectroscopic trigger probability. Our analysis indicates that incorporating the dynamic color-slope cut ($\mathrm{d}(g-r)/\mathrm{d}t \ge 0.4\,\mathrm{mag\,day}^{-1}$) into LSST alert brokers is strictly necessary to preserve $P_{\rm spec} \approx 1$ and ensure no genuine kilonova candidates are lost to budget exhaustion.
-
-%% ==============================================================================
-%% SECTION 7: SUMMARY
-%% ==============================================================================
-\section{Summary and Recommendations}
+\section{Summary}
 \label{sec:summary}
-
-In this paper, we have presented the first comprehensive 10-dimensional selection criteria sweep and imposter decontamination framework for serendipitous optical kilonova searches across the 8-year ZTF archive and Rubin LSST:
-\begin{enumerate}
-    \item Survey completeness is overwhelmingly governed by Tier-1 criteria: $N_{\rm min} \ge 2$, $\mathrm{SNR}_{\rm sec} \le 3.0$, and $\Delta t_{\rm min} \ge 3\,\mathrm{hr}$. Demanding $N_{\rm min} \ge 3$ reduces discovery efficiency by $63\%$.
-    \item The fiducial ZTFReST filter configuration achieves an optimal balance on the empirical Pareto frontier, capturing $85\%$ of kilonova volume while rejecting $99.8\%$ of false alarms.
-    \item Multi-band color slope evolution ($\mathrm{d}(g-r)/\mathrm{d}t \ge 0.4\,\mathrm{mag\,day}^{-1}$) cleanly decouples lanthanide-rich kilonovae from Type~IIb shock cooling and FBOTs within 48 hours post-breakout, boosting candidate purity from $17\%$ to $>80\%$.
-    \item For Rubin LSST, incorporating color-slope filters into alert brokers is mandatory to prevent spectroscopic resource exhaustion and optimize target selection under realistic telescope follow-up budgets.
-\end{enumerate}
+\tbd{Summary of the criteria ranking and recommendations after the re-run.}
 
 \begin{acknowledgments}
-T.B. acknowledges support from the Minnesota Supercomputing Institute (MSI) at the University of Minnesota. Based on observations obtained with the Samuel Oschin 48-inch Telescope at Palomar Observatory as part of the Zwicky Transient Facility project.
+Based on observations obtained with the Samuel Oschin 48-inch Telescope at Palomar Observatory as part of the Zwicky Transient Facility project. Computations were performed at the Minnesota Supercomputing Institute.
 \end{acknowledgments}
 
-\vspace{5mm}
-\facilities{PO:1.2m (ZTF), Rubin}
-\software{\texttt{survey-sim}, \texttt{fiesta}, \texttt{numpy}, \texttt{pandas}, \texttt{matplotlib}, \texttt{scipy}}
+\software{\texttt{survey-sim}, \texttt{fiesta} \citep{Koehn2025}, \texttt{numpy}, \texttt{pandas}, \texttt{matplotlib}}
 
-%% ==============================================================================
-%% REFERENCES
-%% ==============================================================================
 \begin{thebibliography}{}
-\bibitem[Andreoni et al.(2020)]{Andreoni2020} Andreoni, I., Goldstein, D.~A., Kasliwal, M.~M., et al.\ 2020, \apj, 904, 155
-\bibitem[Andreoni et al.(2021)]{Andreoni2021_ZTFReST} Andreoni, I., Coughlin, M.~W., Kool, E.~C., et al.\ 2021, \apj, 918, 63
-\bibitem[Andreoni et al.(2022)]{Andreoni2022_LSST} Andreoni, I., Margutti, R., Salafia, O.~S., et al.\ 2022, \apjs, 260, 18
-\bibitem[Barna et al.(2025)]{Barna2025} Barna, T., et al.\ 2025, \pasp, in press (arXiv:2506.15900)
-\bibitem[Bellm et al.(2019)]{Bellm2019} Bellm, E.~C., Kulkarni, S.~R., Graham, M.~J., et al.\ 2019, \pasp, 131, 018002
-\bibitem[Bulla(2019)]{Bulla2019} Bulla, M.\ 2019, \mnras, 489, 5037
-\bibitem[Doctor et al.(2017)]{Doctor2017} Doctor, Z., Kessler, R., Chen, H.-Y., et al.\ 2017, \apj, 837, 57
-\bibitem[Ho et al.(2021)]{Ho2021} Ho, A.~Y.~Q., Perley, D.~A., Gal-Yam, A., et al.\ 2021, \apj, 909, 209
-\bibitem[Ivezi{\'c} et al.(2019)]{Ivezic2019} Ivezi{\'c}, {\v{Z}}., Kahn, S.~M., Tyson, J.~A., et al.\ 2019, \apj, 873, 111
-\bibitem[Perley et al.(2019)]{Perley2019} Perley, D.~A., Mazzali, P.~A., Yan, L., et al.\ 2019, \mnras, 484, 1031
-\bibitem[Sagu{\'e}s Carracedo et al.(2021)]{SaguesCarracedo2021} Sagu{\'e}s Carracedo, A., Bulla, M., Feindt, U., et al.\ 2021, \mnras, 504, 1294
+\bibitem[Andreoni et al.(2020)]{Andreoni2020} Andreoni, I., Kool, E.~C., Sagu{\'e}s Carracedo, A., et al. 2020, ApJ, 904, 155
+\bibitem[Andreoni et al.(2021)]{Andreoni2021} Andreoni, I., Coughlin, M.~W., Kool, E.~C., et al. 2021, ApJ, 918, 63
+\bibitem[Andreoni et al.(2022)]{Andreoni2022Rubin} Andreoni, I., Coughlin, M.~W., Almualla, M., et al. 2022, ApJS, 258, 5
+\bibitem[Barna et al.(2025)]{Barna2025} Barna, T., Fremling, C., Ahumada, T., et al. 2025, PASP, 137, 084105
+\bibitem[Bellm et al.(2019)]{Bellm2019} Bellm, E.~C., Kulkarni, S.~R., Graham, M.~J., et al. 2019, PASP, 131, 018002
+\bibitem[Bulla(2019)]{Bulla2019} Bulla, M. 2019, MNRAS, 489, 5037
+\bibitem[Bulla(2023)]{Bulla2023} Bulla, M. 2023, MNRAS, 520, 2558
+\bibitem[Doctor et al.(2017)]{Doctor2017} Doctor, Z., Kessler, R., Chen, H.~Y., et al. 2017, ApJ, 837, 57
+\bibitem[Graham et al.(2019)]{Graham2019} Graham, M.~J., Kulkarni, S.~R., Bellm, E.~C., et al. 2019, PASP, 131, 078001
+\bibitem[Ho et al.(2023)]{Ho2023} Ho, A.~Y.~Q., Perley, D.~A., Gal-Yam, A., et al. 2023, ApJ, 949, 120
+\bibitem[Koehn et al.(2025)]{Koehn2025} Koehn, H., Wouters, T., Pang, P.~T.~H., et al. 2025, A\&A, 704, A55
 \end{thebibliography}
 
 \end{document}

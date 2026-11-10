@@ -6,8 +6,8 @@ Injection–recovery simulations of kilonovae (KNe) in the full Zwicky Transient
 
 > **Read first:** [`docs/review_2026-11.md`](docs/review_2026-11.md) — scientific and code review (Nov 2026)
 > listing which results are trustworthy, which suites must be re-run, and what the manuscript draft must change.
-> In short: the survey_sim engine over-matches pointings (VT ≈ 30 % too high) and must be fixed before Suites 01/07
-> are re-run; Suite 02 has bugs; Suite 03 "broad prior" is not a population;
+> In short: Suites 01 and 07 are valid fixed-parameter ensembles; Suite 02's filter has been fixed and its candidate ensemble
+> must be re-simulated (`--ensemble --samples 100`); Suite 03 now samples a real population and must be re-run;
 > the former Suites 04–06 did not run simulations and were retired; the limits assume (but the repository does not
 > perform) a real-data search with zero candidates.
 
@@ -85,6 +85,7 @@ SNAPSHOT = "latest"   # or "20261109T184311Z" / a unique prefix like "20261109" 
 | `05_sample_convergence_analysis` | MC convergence from hypergeometric sub-sampling of the real realisations |
 | `06_bu2026_inclination_discrepancy_investigation` | VT and limit vs. viewing angle from the isotropic ensembles |
 | `07_gw170817_fixed_parameter_analysis` | Suite 07 limits, parameter/luminosity checks vs. AT2017gfo, comparison with Suite 01 |
+| (model light curves) | `python scripts/make_model_lightcurves.py` (survey_sim env) tabulates the fiesta light curves used in notebook 06 and paper Fig. 2 |
 | `paper_figures_and_analysis` | Publication figures (`paper/figures/`) and Table 1 (`paper/table1_master_rate_limits.{csv,tex}`) |
 | `job_resource_usage_analysis` | Slurm telemetry; `ANALYSIS_SCOPE = "numbered" \| "preliminary" \| "all"`, FairShare billing |
 

@@ -364,6 +364,8 @@ class CandidatePool:
             print(f"  [warn] {filepath.name}: no loose-run VT; falling back to analytic normalisation", flush=True)
         loose = meta.get("loose_criteria", {})
         self.loose_min_galactic_lat = float(loose.get("min_galactic_lat", 0.0))
+        srcs = self.data.get("detected_sources") or []
+        self.has_positions = any(("galactic_lat" in x) or ("gal_lat" in x) for x in srcs[:50])
 
         # Parse source arrays into flat NumPy arrays for fast vectorized checks
         sources = self.data.get("detected_sources", [])
@@ -642,10 +644,10 @@ def evaluate_grid_chunk_counts(chunk_cfgs: List[Dict[str, Any]], pool: Candidate
     """Process a chunk of criteria points sequentially using precomputed candidate indices."""
     counts = np.zeros(len(chunk_cfgs), dtype=np.int32)
     for cfg in chunk_cfgs:
-        if cfg["min_galactic_lat"] < pool.loose_min_galactic_lat - 1e-6:
+        if not pool.has_positions and abs(cfg["min_galactic_lat"] - pool.loose_min_galactic_lat) > 1e-6:
             raise ValueError(
-                f"grid point |b|>={cfg['min_galactic_lat']} is looser than the candidates' simulated cut "
-                f"|b|>={pool.loose_min_galactic_lat}; positions are not stored, so it cannot be evaluated")
+                f"grid point |b|>={cfg['min_galactic_lat']} differs from the |b| cut applied when the candidates were "
+                f"simulated (|b|>={pool.loose_min_galactic_lat}); positions are not stored, so it cannot be evaluated")
     index = pool.index_by_sec_lat
     prim_map = PRIM_MAP
 
@@ -758,14 +760,21 @@ def build_model_metrics_df(
     counts_matrix: np.ndarray,
     pool: CandidatePool,
     cand_files: List[Path],
+    vt_per_eff: Optional[np.ndarray] = None,
 ) -> Any:
-    """Construct model metrics table from the aggregated counts matrix in a fast vectorized manner."""
+    """Construct model metrics table from the aggregated counts matrix in a fast vectorized manner.
+
+    ``vt_per_eff`` (one value per candidate set) converts each set's efficiency to VT with that set's own
+    survey_sim normalisation; if omitted, ``pool.vt_total`` is used for all sets.
+    """
     n_samples = len(cand_files)
     n_sim = float(pool.n_simulated)
-    vt_tot = float(pool.vt_total)
+    if vt_per_eff is None:
+        vt_per_eff = np.full(n_samples, float(pool.vt_total))
+    vt_per_eff = np.asarray(vt_per_eff, dtype=np.float64).reshape(-1, 1)
 
     eff_matrix = counts_matrix.astype(np.float64) / max(1.0, n_sim)
-    vt_matrix = eff_matrix * vt_tot
+    vt_matrix = eff_matrix * vt_per_eff
 
     mean_counts = np.mean(counts_matrix, axis=0)
     mean_eff = np.mean(eff_matrix, axis=0)
@@ -895,6 +904,56 @@ def compute_criteria_ranking(df: Any) -> Any:
     return make_df(ranking_data)
 
 
+FILTER_VERSION = "2026-11b"  # bump whenever the criteria logic changes (invalidates resume checkpoints)
+REQUIRED_LOOSE_GAL_LAT = 15.0  # candidates must have the |b| cut applied by survey_sim (positions are not stored)
+REQUIRED_Z_MAX = 0.15
+
+
+def _candidate_meta(f: Path) -> Dict[str, Any]:
+    mp = Path(f"{f}.metadata.json")
+    try:
+        return json.loads(mp.read_text())
+    except Exception:
+        return {}
+
+
+def filter_compatible_candidates(files: List[Path]) -> Tuple[List[Path], List[str]]:
+    """Keep candidate sets generated with the current loose envelope (|b| applied by the engine, z_max 0.15).
+
+    Legacy sets (loose |b| = 0 without stored positions, or Metzger at z_max 0.30) cannot be filtered correctly
+    and would bias the ensemble, so they are skipped with a message.
+    """
+    keep, skipped = [], []
+    for f in files:
+        m = _candidate_meta(f)
+        loose_b = float((m.get("loose_criteria") or {}).get("min_galactic_lat", -1))
+        zmax = float((m.get("params") or {}).get("z_max", -1))
+        if abs(loose_b - REQUIRED_LOOSE_GAL_LAT) > 1e-6 or abs(zmax - REQUIRED_Z_MAX) > 1e-6:
+            skipped.append(f"{f.name} (loose |b|>={loose_b:g}, z_max={zmax:g})")
+        else:
+            keep.append(f)
+    # the fiducial set and ensemble sample 0 share a seed (identical injections): keep only one of them
+    seen_seeds: Dict[Any, Path] = {}
+    dedup = []
+    for f in sorted(keep, key=lambda x: ("fiducial" in x.name, x.name)):
+        sd = _candidate_meta(f).get("seed")
+        if sd is not None and sd in seen_seeds:
+            skipped.append(f"{f.name} (duplicate seed {sd} of {seen_seeds[sd].name})")
+            continue
+        seen_seeds[sd] = f
+        dedup.append(f)
+    return dedup, skipped
+
+
+def vt_per_efficiency(f: Path) -> float:
+    """survey_sim VT per unit efficiency of a candidate set's loose run (from its metadata)."""
+    m = _candidate_meta(f)
+    eff, vt = float(m.get("overall_efficiency", 0) or 0), float(m.get("effective_vt_gpc3_yr", 0) or 0)
+    if eff > 0 and vt > 0:
+        return vt / eff
+    return float(CandidatePool(f, "unknown").vt_total)
+
+
 def find_candidate_files(cand_dir: Union[str, Path], model_name: str) -> List[Path]:
     """Discover candidate JSON files for a given model across multiple directory layouts.
 
@@ -989,6 +1048,14 @@ def main():
             print(f"\n[SKIP] No candidate files found for {model_name} in or under: {cand_dir}", flush=True)
             continue
 
+        cand_files, skipped = filter_compatible_candidates(cand_files)
+        if skipped:
+            print(f"  [skip] {len(skipped)} legacy candidate set(s) incompatible with the current envelope "
+                  f"(need loose |b|>={REQUIRED_LOOSE_GAL_LAT:g}, z_max={REQUIRED_Z_MAX:g}); e.g. {skipped[0]}", flush=True)
+        if not cand_files:
+            print(f"  [skip] no compatible candidate sets for {model_name}; re-run simulate_candidates", flush=True)
+            continue
+
         if args.max_samples is not None and args.max_samples > 0:
             cand_files = cand_files[:args.max_samples]
 
@@ -1007,12 +1074,15 @@ def main():
             print(f"  Loaded {pool.n_candidates:,} candidates ({pool.n_simulated:,} simulated transients, V_total={pool.vt_total:.2f} Gpc^3 yr)", flush=True)
             counts = run_filter_counts_for_pool(pool, grid, n_workers=args.n_workers)
             counts_matrix = counts.reshape(1, -1)
-            df_model = build_model_metrics_df(grid, counts_matrix, pool, [fiducial_file])
+            df_model = build_model_metrics_df(grid, counts_matrix, pool, [fiducial_file],
+                                              np.array([pool.vt_total]))
             elapsed = time.perf_counter() - t0
             print(f"  Evaluated {len(grid):,} points in {elapsed:.2f}s ({len(grid)/max(0.01, elapsed):.0f} points/sec)", flush=True)
         else:
             # Multi-sample ensemble run (vectorized aggregation across samples)
-            chk_file = out_dir / f".checkpoint_{model_name}_{len(cand_files)}samples.npy"
+            import hashlib
+            _key = hashlib.sha1(("|".join(f.name for f in cand_files) + FILTER_VERSION + str(len(grid))).encode()).hexdigest()[:12]
+            chk_file = out_dir / f".checkpoint_{model_name}_{len(cand_files)}samples_{_key}.npy"
             if chk_file.exists():
                 try:
                     counts_matrix = np.load(chk_file)
@@ -1047,7 +1117,8 @@ def main():
             if first_pool is None:
                 first_pool = CandidatePool(cand_files[0], model_name)
 
-            df_model = build_model_metrics_df(grid, counts_matrix, first_pool, cand_files)
+            df_model = build_model_metrics_df(grid, counts_matrix, first_pool, cand_files,
+                                              np.array([vt_per_efficiency(f) for f in cand_files]))
             if chk_file.exists():
                 try:
                     chk_file.unlink()

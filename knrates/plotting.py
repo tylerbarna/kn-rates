@@ -127,3 +127,24 @@ def fmt_sig(x: float, sig: int = 3) -> str:
     digits = sig - int(floor(log10(abs(x)))) - 1
     digits = max(digits, 0)
     return f"{round(x, digits):,.{digits}f}"
+
+
+
+def plain_log(ax, axis: str = "y", minor=(2, 3, 5)) -> None:
+    """Label a log axis with plain numbers (e.g. 200, 300, 500) instead of 2x10^2-style labels."""
+    import matplotlib.ticker as mt
+    import numpy as np
+
+    def fmt(v, _pos=None):
+        if v <= 0:
+            return ""
+        if 1e-3 <= v < 1e5:
+            return f"{v:g}"
+        lg = np.log10(v)
+        return f"$10^{{{int(round(lg))}}}$" if np.isclose(lg, round(lg)) else ""
+
+    axes = ([ax.xaxis] if axis in ("x", "both") else []) + ([ax.yaxis] if axis in ("y", "both") else [])
+    for a in axes:
+        a.set_major_formatter(mt.FuncFormatter(fmt))
+        a.set_minor_locator(mt.LogLocator(base=10, subs=minor))
+        a.set_minor_formatter(mt.FuncFormatter(fmt))
