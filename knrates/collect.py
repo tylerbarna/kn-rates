@@ -291,9 +291,19 @@ def collect_simulation_suite(ctx: Context, suite_id: str, subdir: str,
     return out
 
 
+# Populations that were intentionally retired; their disappearance is not a partial write.
+# Suite 03 "BroadPrior_*" drew ONE parameter set per realisation and were replaced by the per-transient
+# BroadPopulation_Isotropic (compare_priors_at2017gfo.py, Nov 2026).
+RETIRED_POPULATIONS = {"suite03_runs": {"BroadPrior_FixedView", "BroadPrior_Isotropic"}}
+
+# Bump a suite's version whenever its collector output changes, so cached tables are rebuilt.
+COLLECTOR_VERSIONS = {"suite01": 1, "suite07": 1, "suite03": 2, "suite02": 2, "models": 1}
+
+
 def _reuse_or_run(ctx: Context, name: str, patterns: Sequence[str],
                   build: Callable[[], Dict[str, pd.DataFrame]], table_prefix: str) -> Dict[str, pd.DataFrame]:
     fp = _fingerprint(ctx.results_dir, patterns)
+    fp["collector_version"] = COLLECTOR_VERSIONS.get(name, 1)
     ctx.fingerprints[name] = fp
     prev = ctx.previous
     if (not ctx.force and prev is not None and prev.manifest.get("fingerprints", {}).get(name) == fp
@@ -364,6 +374,20 @@ def collect_suite03(ctx: Context) -> Dict[str, pd.DataFrame]:
     return _reuse_or_run(ctx, "suite03", ["03_prior_vs_at2017gfo/*"], build, "suite03_")
 
 
+# Named criteria regimes evaluated from the full Suite 02 grid (|b| is fixed at the fiducial value in the grid).
+SUITE02_NAMED_CONFIGS = {
+    "Ultra-relaxed": dict(snr_threshold=4.0, snr_threshold_secondary=2.5, max_timespan_days=28.0, min_fade_rate=0.0),
+    "Relaxed (S03-like)": dict(snr_threshold=4.0, snr_threshold_secondary=2.5, max_timespan_days=28.0,
+                               min_time_separation_hours=1.0, min_fade_rate=0.1),
+    "Fiducial": dict(),
+    "N_min = 3": dict(min_detections=3),
+    "Strict (S03-like)": dict(snr_threshold=6.0, snr_threshold_secondary=4.0, min_detections=3,
+                              min_detections_primary=2, max_timespan_days=7.0, min_time_separation_hours=6.0,
+                              min_fade_rate=0.5),
+    "Ultra-strict": dict(snr_threshold=6.0, snr_threshold_secondary=4.0, min_detections=3, max_timespan_days=7.0,
+                         min_fade_rate=0.6),
+}
+
 _S02_USECOLS = CRITERIA_KEYS + ["model", "n_detected", "n_simulated", "overall_efficiency",
                                 "overall_efficiency_std", "effective_vt_gpc3_yr",
                                 "effective_vt_gpc3_yr_std", "rate_upper_95", "n_samples"]
@@ -401,7 +425,17 @@ def _suite02_tables(df: pd.DataFrame, model: str) -> Dict[str, pd.DataFrame]:
         g = g.rename(columns={k: "value"}).assign(model=model, criterion=k)
         g["value"] = g["value"].astype(float)
         marg.append(g)
+    named = []
+    for label, over in SUITE02_NAMED_CONFIGS.items():
+        cfg = dict(fid, **over)
+        m = np.ones(len(df), dtype=bool)
+        for k, v in cfg.items():
+            m &= (df[k] == v) if isinstance(v, bool) else np.isclose(df[k].astype(float), float(v))
+        row = df[m][keep]
+        if len(row) == 1:
+            named.append(row.assign(model=model, regime=label))
     return {
+        "named_configs": pd.concat(named, ignore_index=True) if named else pd.DataFrame(),
         "fiducial": fid_row,
         "slices_1d": pd.concat(slices1d, ignore_index=True),
         "slices_2d": pd.concat(pairs, ignore_index=True),
@@ -454,6 +488,23 @@ def collect_suite02(ctx: Context) -> Dict[str, pd.DataFrame]:
                          ["02_granular_criteria_sweep/granular_sweep_metrics_*.csv",
                           "02_granular_criteria_sweep/candidates/*/*.metadata.json"],
                          build, "suite02_")
+
+
+@register("model_lightcurves/*.csv")
+def collect_models(ctx: Context) -> Dict[str, pd.DataFrame]:
+    """Model light curves tabulated by scripts/make_model_lightcurves.py (absolute magnitudes vs. rest-frame time)."""
+
+    def build():
+        files = sorted((ctx.results_dir / "model_lightcurves").glob("*.csv"))
+        frames = []
+        for f in files:
+            try:
+                frames.append(pd.read_csv(f).assign(source_file=f.name))
+            except Exception as exc:
+                ctx.skipped_files.append(f"{_rel(f, ctx.results_dir)}: {exc}"[:300])
+        return {"lightcurves": pd.concat(frames, ignore_index=True)} if frames else {}
+
+    return _reuse_or_run(ctx, "models", ["model_lightcurves/*.csv"], build, "models_")
 
 
 # ---------------------------------------------------------------------------
@@ -546,6 +597,9 @@ def validate_tables(tables: Dict[str, pd.DataFrame], previous=None) -> Tuple[Dic
                 new = tables[name].groupby(key).size()
                 for m, n_old in old.items():
                     n_new = int(new.get(m, 0))
+                    if n_new == 0 and m in RETIRED_POPULATIONS.get(name, ()):
+                        warnings.append(f"{name}: retired population {m} dropped ({n_old} runs in previous snapshot)")
+                        continue
                     if n_new < n_old:
                         errors.append(f"{name}: {m} has {n_new} runs, previous snapshot had {n_old} "
                                       f"(refusing to replace good data with a partial set; use --allow-shrink)")
@@ -617,13 +671,23 @@ def write_snapshot(tables: Dict[str, pd.DataFrame], manifest: dict, dest: Path) 
 
 
 def build(results_dir: Path = DEFAULT_RESULTS, previous=None, force: bool = False,
-          max_source_runs: int = 10, allow_shrink: bool = False):
+          max_source_runs: int = 10, allow_shrink: bool = False, only: Optional[Sequence[str]] = None):
     """Run all collectors and validation. Returns (tables, manifest, errors)."""
     ctx = Context(results_dir=Path(results_dir), previous=previous, force=force,
                   max_source_runs=max_source_runs)
     tables: Dict[str, pd.DataFrame] = {}
     t0 = time.time()
     for col in REGISTRY:
+        if only and col.name not in only:
+            print(f"[collect] {col.name}: skipped (--suites); previous tables carried forward", flush=True)
+            if previous is not None:
+                for t, df in previous.tables.items():
+                    if t.startswith(f"{col.name}_"):
+                        tables[t] = df
+                if col.name in previous.manifest.get("fingerprints", {}):
+                    ctx.fingerprints[col.name] = previous.manifest["fingerprints"][col.name]
+                ctx.reused.append(col.name)
+            continue
         print(f"[collect] {col.name}", flush=True)
         try:
             out = col.func(ctx)
@@ -676,6 +740,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--force", action="store_true", help="re-read all suites (ignore cache)")
     ap.add_argument("--allow-shrink", action="store_true",
                     help="permit a suite to have fewer runs than the previous snapshot")
+    ap.add_argument("--suites", nargs="+", default=None,
+                    help="only (re)collect these suites (e.g. suite03 models); others are carried forward")
     ap.add_argument("--max-source-runs", type=int, default=10,
                     help="runs per model whose per-source rows are stored (inclination models: all runs)")
     args = ap.parse_args(argv)
@@ -700,7 +766,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"[collect] results directory {args.results_dir} not found; nothing to do")
         return 1
     tables, manifest, errors = build(Path(args.results_dir), previous, args.force,
-                                     args.max_source_runs, args.allow_shrink)
+                                     args.max_source_runs, args.allow_shrink, args.suites)
     print(f"[collect] {len(tables)} tables, {len(manifest['warnings'])} warnings, {len(errors)} errors, "
           f"{len(manifest['skipped_files'])} skipped files")
     for w in manifest["warnings"]:

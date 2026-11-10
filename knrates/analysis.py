@@ -157,8 +157,13 @@ def subsampling_convergence(runs: pd.DataFrame, model: str, sizes: Iterable[int]
     return pd.DataFrame(rows)
 
 
-def comoving_distance_mpc(z, h0: float = 67.66, om: float = 0.30966) -> np.ndarray:
-    """Flat LCDM comoving distance (default Planck18 parameters), numerical integration."""
+# Cosmology used by survey_sim (flat LCDM, h = 0.674, Omega_m = 0.315; survey-sim src/types.rs)
+H0_SURVEY_SIM = 67.4
+OM_SURVEY_SIM = 0.315
+
+
+def comoving_distance_mpc(z, h0: float = H0_SURVEY_SIM, om: float = OM_SURVEY_SIM) -> np.ndarray:
+    """Flat LCDM comoving distance (default: survey_sim's cosmology), numerical integration."""
     z = np.atleast_1d(np.asarray(z, dtype=float))
     out = np.empty_like(z)
     for i, zi in enumerate(z):
@@ -171,3 +176,40 @@ def comoving_distance_mpc(z, h0: float = 67.66, om: float = 0.30966) -> np.ndarr
 def luminosity_distance_mpc(z, **kw) -> np.ndarray:
     z = np.atleast_1d(np.asarray(z, dtype=float))
     return (1 + z) * comoving_distance_mpc(z, **kw)
+
+
+def comoving_volume_gpc3(z, **kw) -> np.ndarray:
+    """Full-sky comoving volume [Gpc^3] inside redshift z."""
+    return 4.0 / 3.0 * np.pi * (comoving_distance_mpc(z, **kw) / 1e3) ** 3
+
+
+def efficiency_vs_redshift(z_hist: pd.DataFrame, runs: pd.DataFrame, model: str) -> pd.DataFrame:
+    """Recovery efficiency per redshift bin.
+
+    survey_sim injects redshifts with probability proportional to dV_c/dz up to z_max (full sky), so the expected
+    number of injections in a bin is N_inj * [V(z_hi) - V(z_lo)] / V(z_max).
+    """
+    h = z_hist[z_hist["model"] == model].groupby(["z_lo", "z_hi"], as_index=False)["n_detected"].sum()
+    r = runs[runs["model"] == model]
+    zmax = float(r["z_max"].iloc[0])
+    n_inj = float(r["n_simulated"].sum())
+    h = h[h["z_hi"] <= zmax + 1e-9].copy()
+    v_lo = comoving_volume_gpc3(h["z_lo"].to_numpy())
+    v_hi = comoving_volume_gpc3(h["z_hi"].to_numpy())
+    vmax = float(comoving_volume_gpc3(zmax)[0])
+    h["n_injected"] = n_inj * (v_hi - v_lo) / vmax
+    h["efficiency"] = h["n_detected"] / h["n_injected"]
+    h["eff_err"] = np.sqrt(h["n_detected"]) / h["n_injected"]
+    h["z_center"] = 0.5 * (h["z_lo"] + h["z_hi"])
+    h["model"] = model
+    return h
+
+
+def cumulative_vt_vs_redshift(z_hist: pd.DataFrame, runs: pd.DataFrame, model: str) -> pd.DataFrame:
+    """Fraction of <VT> contributed by recoveries below each redshift (weights 1/(1+z), as in survey_sim)."""
+    h = z_hist[z_hist["model"] == model].groupby(["z_lo", "z_hi"], as_index=False)["n_detected"].sum()
+    zc = 0.5 * (h["z_lo"] + h["z_hi"])
+    w = h["n_detected"] / (1 + zc)
+    h["vt_fraction_below"] = np.cumsum(w) / w.sum()
+    h["model"] = model
+    return h
