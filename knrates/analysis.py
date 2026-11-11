@@ -169,7 +169,7 @@ def comoving_distance_mpc(z, h0: float = H0_SURVEY_SIM, om: float = OM_SURVEY_SI
     for i, zi in enumerate(z):
         zz = np.linspace(0.0, zi, 513)
         e = np.sqrt(om * (1 + zz) ** 3 + (1 - om))
-        out[i] = 299792.458 / h0 * np.trapz(1.0 / e, zz)
+        out[i] = 299792.458 / h0 * np.trapezoid(1.0 / e, zz)
     return out
 
 
