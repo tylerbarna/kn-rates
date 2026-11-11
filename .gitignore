@@ -427,3 +427,6 @@ paper/*.synctex.gz
 
 # Rust helper build output
 scripts/metzger_lightcurves/target/
+
+# Separate project material; not part of this repository
+docs/real_ztf_search/

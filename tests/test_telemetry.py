@@ -290,7 +290,7 @@ class TestTelemetryUnit(unittest.TestCase):
     def test_notebook_cell_ids_validity(self):
         """Verify that all notebook cells contain valid string IDs to prevent PR diff errors."""
         import json
-        nb_path = Path(__file__).resolve().parent.parent / "notebooks" / "job_resource_usage_analysis.ipynb"
+        nb_path = Path(__file__).resolve().parent.parent / "notebooks" / "telemetry_job_resources.ipynb"
         self.assertTrue(nb_path.exists())
         with open(nb_path, "r", encoding="utf-8") as f:
             nb = json.load(f)
@@ -705,7 +705,7 @@ class TestRegistryFrameAndAccounting(unittest.TestCase):
 
 
 class TestNotebookContract(unittest.TestCase):
-    NB = Path(__file__).resolve().parent.parent / "notebooks" / "job_resource_usage_analysis.ipynb"
+    NB = Path(__file__).resolve().parent.parent / "notebooks" / "telemetry_job_resources.ipynb"
 
     def setUp(self):
         import json

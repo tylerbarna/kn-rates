@@ -81,13 +81,13 @@ echo "[3/3] Re-executing Notebook 01 to generate populated distribution plots...
 python -c "
 from pathlib import Path
 import execute_notebooks
-execute_notebooks.execute_notebook(Path('notebooks/01_large_scale_rate_limits_analysis.ipynb'))
+execute_notebooks.execute_notebook(Path('notebooks/01_limits.ipynb'))
 "
 
 echo "=============================================================================="
 echo "SUITE 01 AGGREGATION & DISTRIBUTION RE-EXECUTION COMPLETE"
 echo "Results available at: ${OUTPUT_CSV}"
 echo "Benchmark synced at:  results/rate_limit_benchmark.csv"
-echo "Notebook updated at:  notebooks/01_large_scale_rate_limits_analysis.ipynb"
+echo "Notebook updated at:  notebooks/01_limits.ipynb"
 echo "Finished at:          $(date)"
 echo "=============================================================================="

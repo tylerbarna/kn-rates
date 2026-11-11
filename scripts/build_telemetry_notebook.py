@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DEPRECATED generator -- ``notebooks/job_resource_usage_analysis.ipynb`` is now the source of truth.
+"""DEPRECATED generator -- ``notebooks/telemetry_job_resources.ipynb`` is now the source of truth.
 
 The telemetry notebook used to be generated from code in this file, which made the two drift
 apart (hard-coded numbers in markdown, plots that no longer matched the data).  Edit the
@@ -30,7 +30,7 @@ import sys
 import tempfile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-NOTEBOOK = REPO_ROOT / "notebooks" / "job_resource_usage_analysis.ipynb"
+NOTEBOOK = REPO_ROOT / "notebooks" / "telemetry_job_resources.ipynb"
 SCOPES = ("numbered", "preliminary", "all")
 
 
