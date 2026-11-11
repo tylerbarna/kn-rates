@@ -4,7 +4,10 @@ Injection–recovery simulations of kilonovae (KNe) in the full Zwicky Transient
 (March 2018 – March 2026) to derive volumetric rate upper limits, using the
 [`survey_sim`](../survey-sim) engine (fiesta POSSIS surrogate — labelled `Bu2026` here — and a one-zone Metzger model).
 
-> **Read first:** [`docs/review_2026-11.md`](docs/review_2026-11.md) — scientific and code review (Nov 2026)
+> **Catching up?** Open `notebooks/00_overview.ipynb` (every headline number, where it comes from, and every open
+> item) and [`docs/decisions.md`](docs/decisions.md) (what was decided and why).
+>
+> **Background:** [`docs/review_2026-11.md`](docs/review_2026-11.md) — scientific and code review (Nov 2026)
 > listing which results are trustworthy, which suites must be re-run, and what the manuscript draft must change.
 > In short: Suites 01 and 07 are valid fixed-parameter ensembles; Suite 02's filter has been fixed and its candidate ensemble
 > was re-simulated (100 compatible sets per model, Nov 2026); Suite 03 now samples a real population and must be re-run;
@@ -26,14 +29,16 @@ kn-rates/
 │   ├── stats.py                  #   Poisson limits, pooled MC estimators, hypergeometric sub-sampling
 │   ├── analysis.py               #   pooled limits, VT vs. epoch, VT vs. inclination, convergence
 │   ├── literature.py             #   published limits/parameters with arXiv sources (verified)
-│   └── plotting.py               #   AAS-sized publication style, fixed colours per model
+│   ├── plotting.py               #   AAS-sized publication style, fixed colours per model
+│   ├── figures.py                #   every figure, one function each (used by notebooks and the paper)
+│   └── notebook.py               #   one-call notebook setup (snapshot + model selection + style)
 ├── snapshots/                    # VERSION-CONTROLLED compiled results (single ZIP per snapshot)
 ├── analysis_suites/
 │   ├── 01_large_scale_rate_limits/   # 100 x 1e6 injections per fiducial model
 │   ├── 02_granular_criteria_sweep/   # simulate-once, filter-many criteria sweep (see review: needs fixes)
 │   ├── 03_prior_vs_at2017gfo/        # criteria regimes x populations (BroadPrior needs redesign)
 │   └── 07_gw170817_rate_limits/      # 100 x 1e6 injections per GW170817-informed model
-├── notebooks/                    # data-driven analysis notebooks (source of truth; no generators)
+├── notebooks/                    # analysis notebooks, ordered by the paper's argument (start at 00_overview)
 ├── scripts/                      # Slurm submission / aggregation scripts (MSI)
 ├── telemetry/                    # Slurm job telemetry, classification, FairShare accounting
 ├── paper/                        # manuscript drafts, figures (written by the paper notebook)
@@ -76,19 +81,29 @@ SNAPSHOT = "latest"   # or "20261109T184311Z" / a unique prefix like "20261109" 
 
 ## 3. Notebooks
 
-| Notebook | Content |
-|---|---|
-| `01_large_scale_rate_limits_analysis` | Suite 01 pooled limits, MC scatter, redshift reach, sensitivity vs. survey time |
-| `02_granular_criteria_sweep_analysis` | Suite 02 cross-check vs. Suite 01, one-at-a-time and pairwise criteria response (**preliminary**) |
-| `03_prior_vs_at2017gfo_analysis` | Suite 03 regimes; BroadPrior single-draw diagnostics |
-| `04_historical_andreoni_comparison_analysis` | Like-for-like comparison with Andreoni+2020/2021 using the first-23-month VT |
-| `05_sample_convergence_analysis` | MC convergence from hypergeometric sub-sampling of the real realisations |
-| `06_bu2026_inclination_discrepancy_investigation` | VT and limit vs. viewing angle from the isotropic ensembles |
-| `07_gw170817_fixed_parameter_analysis` | Suite 07 limits, parameter/luminosity checks vs. AT2017gfo, comparison with Suite 01 |
-| (model light curves) | `python scripts/make_model_lightcurves.py` (survey_sim env) tabulates the fiesta light curves used in notebook 06 and paper Fig. 2 |
-| (Metzger check) | `python scripts/make_metzger_check.py` (needs cargo) tabulates survey_sim's Metzger light curves and AT2017gfo photometry for notebook 07 §4b |
-| `paper_figures_and_analysis` | Publication figures (`paper/figures/`) and Table 1 (`paper/table1_master_rate_limits.{csv,tex}`) |
-| `job_resource_usage_analysis` | Slurm telemetry; `ANALYSIS_SCOPE = "numbered" \| "preliminary" \| "all"`, FairShare billing |
+**Start with `notebooks/00_overview.ipynb`.** It lists what the snapshot contains, every headline number with the
+notebook and paper section it comes from, and every open `\tbd{}` in the manuscripts. Decisions and their
+reasons are in [`docs/decisions.md`](docs/decisions.md).
+
+| Notebook | Question | Paper |
+|---|---|---|
+| `00_overview` | What is in the snapshot, what the results say, and what is still open | — |
+| `01_limits` | ⟨VT⟩ and rate limits; distance reach | §4, Figs. 3–4, Table 1 |
+| `02_survey_time_and_previous_searches` | Sensitivity over the survey; comparison with Andreoni+2020/2021 | §4.1, Fig. 1 |
+| `03_viewing_angle` | How much the orientation matters | §5, Fig. 2 |
+| `04_systematics` | MC noise, z_max, parameter set (Suite 07), light curves vs. AT2017gfo, criteria, population (Suite 03) | §6, §8, Fig. 5 |
+| `05_criteria_companion` | Response of ⟨VT⟩ to each selection criterion (Suite 02) | companion paper, Fig. 6 |
+| `paper_figures` | Writes `paper/figures/` and Table 1 (`paper/table1_master_rate_limits.{csv,tex}`) | all figures |
+| `telemetry_job_resources` | Slurm telemetry; `ANALYSIS_SCOPE = "numbered" \| "preliminary" \| "all"`, FairShare billing | — |
+
+Each figure is drawn by one function in `knrates/figures.py`; `knrates.notebook.setup()` loads the snapshot and
+keeps only the Suite 01 POSSIS models unless `include_metzger` / `include_suite07` are set. Each notebook gives a
+one-line computed **Result** under each figure; the longer per-figure explanations are in the archived per-suite
+notebooks, `defunct/notebooks_by_suite/`, which still run.
+
+Light-curve tables used by notebooks 03–04: `python scripts/make_model_lightcurves.py` (survey_sim env) and
+`python scripts/make_metzger_check.py` (needs cargo; also adds the AT2017gfo photometry), then
+`python -m knrates.collect --suites models`.
 
 Run all notebooks: `python execute_notebooks.py` (or a subset by path). Executing notebooks needs a local kernel
 port; inside the Claude Code sandbox enable `sandbox.network.allowLocalBinding`.
@@ -111,7 +126,7 @@ Local smoke test: `python analysis_suites/01_large_scale_rate_limits/run_large_s
 - Harvest (on MSI): `python -m telemetry update` — merges sacct/reportseff/logs into
   `telemetry/job_resource_registry.csv` and, if `sshare` is available, appends a FairShare snapshot to
   `telemetry/fairshare_snapshots.csv` (`python -m telemetry fairshare` for a snapshot only).
-- Analyse (anywhere, CSV only): `notebooks/job_resource_usage_analysis.ipynb`; set `ANALYSIS_SCOPE`
+- Analyse (anywhere, CSV only): `notebooks/telemetry_job_resources.ipynb`; set `ANALYSIS_SCOPE`
   (`"numbered"` production suites 01–07, `"preliminary"` older exploratory runs, `"all"`), `INCLUDE_OTHER`,
   `DATE_RANGE`, `MEM_PER_CORE_GB` in the first cell. Covers job outcomes, queue waits, efficiency, billed usage
   (max of cores and memory/3.9 GB — an assumption to confirm per partition), wasted and failed allocation,
