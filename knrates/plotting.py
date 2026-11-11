@@ -86,8 +86,15 @@ def set_label_mode(mode: str) -> None:
     LABEL_MODE = mode
 
 
+#: Whether labels need the suite/parameter-set tag. ``knrates.notebook.setup`` turns it off when only one
+#: parameter set (Suite 01) is loaded, so that labels name the physics alone.
+DISAMBIGUATE = True
+
+
 def tag(model: str, sep: str = " ") -> str:
     """Suffix that disambiguates ``model`` from same-named models of other suites (empty if none is needed)."""
+    if not DISAMBIGUATE:
+        return ""
     if LABEL_MODE == "working":
         return f"{sep}({SUITE_OF[model]})" if model in SUITE_OF else ""
     return f"{sep}({PAPER_TAG[model]})" if model in PAPER_TAG else ""

@@ -213,3 +213,90 @@ def cumulative_vt_vs_redshift(z_hist: pd.DataFrame, runs: pd.DataFrame, model: s
     h["vt_fraction_below"] = np.cumsum(w) / w.sum()
     h["model"] = model
     return h
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# Quantities shared by the streamlined notebooks (notebooks/0N_*) and the paper notebook.
+
+#: Detection criteria of the Suite 01/07 runs (the Suite 02 fiducial point).
+FIDUCIAL_CRITERIA = dict(snr_threshold=5.0, snr_threshold_secondary=3.0, min_detections=2, min_detections_primary=1,
+                         max_timespan_days=14.0, min_time_separation_hours=3.0, min_rise_rate=0.0,
+                         min_fade_rate=0.3, min_galactic_lat=15.0)
+
+#: Andreoni et al. (2020) used "the first 23 months" of ZTF without exact dates; we adopt these calendar months.
+ANDREONI_WINDOW = ("2018-03", "2020-01")
+
+#: Published limit each of our models is compared with (literature keys, see knrates.literature).
+ANDREONI_COUNTERPART = {"Bu2026Fixed": "andreoni2020_gw170817", "Bu2026Vary": "andreoni2020_possis_isotropic",
+                        "GW170817_Bu2026_FixedView": "andreoni2020_gw170817",
+                        "GW170817_Bu2026_Isotropic": "andreoni2020_possis_isotropic"}
+
+
+def andreoni_comparison(tm: pd.DataFrame, runs: pd.DataFrame, models: Sequence[str],
+                        window: Sequence[str] = ANDREONI_WINDOW) -> pd.DataFrame:
+    """Our limit in the Andreoni et al. (2020) window and over the full survey, next to the published limit.
+
+    ``published_projected_full`` carries the published limit to the full survey with the <VT> growth we measure
+    (assumes the ratio of the published efficiency to ours is the same in every epoch);
+    ``published_duration_scaled`` scales it with survey duration only, for contrast.
+    """
+    from . import literature as L
+    n_months = (pd.Period(window[1], "M") - pd.Period(window[0], "M")).n + 1
+    dur = float(runs["survey_duration_years"].iloc[0])
+    rows = []
+    for m in models:
+        if m not in ANDREONI_COUNTERPART:
+            continue
+        full = headline_limits(runs, [m]).iloc[0]
+        win = vt_in_window(tm, runs, m, *window)
+        ref = L.lookup(ANDREONI_COUNTERPART[m])
+        gain = full.vt_gpc3_yr / win["vt"]
+        rows.append(dict(model=m, published_key=ref["key"], published=ref["limit"], published_model=ref["model"],
+                         vt_window=win["vt"], r95_window=win["r95"], vt_full=full.vt_gpc3_yr, r95_full=full.r95,
+                         vt_gain_full_over_window=gain, duration_gain=dur / (n_months / 12),
+                         window_change_vs_published=win["r95"] / ref["limit"] - 1,
+                         published_projected_full=ref["limit"] / gain,
+                         published_duration_scaled=ref["limit"] * (n_months / 12) / dur))
+    return pd.DataFrame(rows)
+
+
+def criteria_response(s1: pd.DataFrame, fid: pd.DataFrame, fiducial: dict = FIDUCIAL_CRITERIA) -> pd.DataFrame:
+    """Per model and criterion: <VT> range over the one-at-a-time slice and the log-elasticity at the fiducial point.
+
+    ``elasticity`` is d ln<VT> / d ln(criterion) from the neighbouring grid values (NaN where the fiducial value is
+    0 or at the edge of the grid).
+    """
+    rows = []
+    fid = fid if "model" not in fid.columns else fid.set_index("model")
+    for m in fid.index:
+        for c, x0 in fiducial.items():
+            d = s1[(s1.varied == c) & (s1.model == m)].sort_values(c)
+            if c not in d or d[c].nunique() < 2:
+                continue
+            v = d.effective_vt_gpc3_yr.to_numpy(); xv = d[c].to_numpy(float)
+            i0 = int(np.argmin(np.abs(xv - x0)))
+            e = np.nan
+            if x0 > 0 and 0 < i0 < len(xv) - 1 and xv[i0 - 1] > 0:
+                e = (np.log(v[i0 + 1]) - np.log(v[i0 - 1])) / (np.log(xv[i0 + 1]) - np.log(xv[i0 - 1]))
+            rows.append(dict(model=m, criterion=c, vt_max_over_min=v.max() / v.min(),
+                             vt_rel_min=v.min() / fid.loc[m, "effective_vt_gpc3_yr"],
+                             vt_rel_max=v.max() / fid.loc[m, "effective_vt_gpc3_yr"], elasticity=e))
+    return pd.DataFrame(rows)
+
+
+def inclination_crosscheck(inc: pd.DataFrame, lim: pd.DataFrame, iso_model: str, fixed_model: str,
+                           iota_rad: float = 0.45) -> dict:
+    """Isotropic <VT>(iota) interpolated to the fixed-angle model's iota, compared with that model's own <VT>."""
+    tt = inc.sort_values("center")
+    v_interp = float(np.interp(np.cos(iota_rad), tt.center, tt.vt))
+    v_fixed = float(lim.loc[fixed_model, "vt_gpc3_yr"])
+    v_avg = float(np.sum(inc.vt * (inc.hi_edge - inc.lo_edge)))
+    return dict(vt_interp=v_interp, vt_fixed=v_fixed, rel_diff=v_fixed / v_interp - 1,
+                vt_iso_from_bins=v_avg, vt_iso_pooled=float(lim.loc[iso_model, "vt_gpc3_yr"]))
+
+
+def distance_quantiles(zh: pd.DataFrame, model: str, q=(0.5, 0.9, 0.99)) -> dict:
+    """Luminosity distance [Mpc] below which a fraction ``q`` of the recovered injections lie."""
+    h = zh[zh.model == model].groupby(["z_lo", "z_hi"], as_index=False)["n_detected"].sum().sort_values("z_lo")
+    c = np.cumsum(h.n_detected) / h.n_detected.sum()
+    return {f"dL{int(round(p * 100))}": float(luminosity_distance_mpc(float(np.interp(p, c, h.z_hi)))[0]) for p in q}

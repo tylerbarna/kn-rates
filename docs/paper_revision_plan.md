@@ -67,7 +67,7 @@ limit is optimistic; state this in §8 and prioritise the AT2017gfo-posterior ru
 All notebooks have `INCLUDE_METZGER` in their settings cell; it defaults to `False`, so the paper figures and Table 1
 already exclude these models (the light-curve check in notebook 07 §4b always shows them).
 
-Figures are written by `notebooks/paper_figures_and_analysis.ipynb`. If that notebook changes, check the captions in `ms.tex` against it.
+Figures are written by `notebooks/paper_figures.ipynb`. If that notebook changes, check the captions in `ms.tex` against it.
 
 ---
 
