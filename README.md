@@ -7,7 +7,7 @@ Injection–recovery simulations of kilonovae (KNe) in the full Zwicky Transient
 > **Read first:** [`docs/review_2026-11.md`](docs/review_2026-11.md) — scientific and code review (Nov 2026)
 > listing which results are trustworthy, which suites must be re-run, and what the manuscript draft must change.
 > In short: Suites 01 and 07 are valid fixed-parameter ensembles; Suite 02's filter has been fixed and its candidate ensemble
-> must be re-simulated (`--ensemble --samples 100`); Suite 03 now samples a real population and must be re-run;
+> was re-simulated (100 compatible sets per model, Nov 2026); Suite 03 now samples a real population and must be re-run;
 > the former Suites 04–06 did not run simulations and were retired; the limits assume (but the repository does not
 > perform) a real-data search with zero candidates.
 
