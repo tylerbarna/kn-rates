@@ -1,6 +1,6 @@
 {
   "last_updated": "",
-  "total_tracked_jobs": 40575,
+  "total_tracked_jobs": 40686,
   "scaling_models": {
     "Metzger": {
       "ram_gb_per_million": 25.556,
@@ -33,9 +33,9 @@
   "queue_characteristics": {
     "by_memory_tier": {
       "Standard (<= 32 GB)": {
-        "count": 8766,
-        "mean_min": 65.58,
-        "median_min": 61.0,
+        "count": 8825,
+        "mean_min": 65.38,
+        "median_min": 59.58,
         "max_min": 1115.25
       },
       "Medium (33 - 128 GB)": {
@@ -89,10 +89,10 @@
         "max_min": 3.0
       },
       "12": {
-        "count": 3,
-        "mean_min": 4.8,
-        "median_min": 1.3,
-        "max_min": 12.0
+        "count": 47,
+        "mean_min": 38.66,
+        "median_min": 39.88,
+        "max_min": 89.22
       },
       "13": {
         "count": 17,
@@ -101,8 +101,8 @@
         "max_min": 2744.95
       },
       "14": {
-        "count": 6263,
-        "mean_min": 319.28,
+        "count": 6278,
+        "mean_min": 318.57,
         "median_min": 76.95,
         "max_min": 1140.23
       },
@@ -175,9 +175,9 @@
         "max_min": 2334.18
       },
       "Wed": {
-        "count": 6205,
-        "mean_min": 110.07,
-        "median_min": 79.18,
+        "count": 6264,
+        "mean_min": 109.37,
+        "median_min": 79.17,
         "max_min": 2744.95
       },
       "Fri": {
@@ -195,9 +195,9 @@
     },
     "by_batch_size": {
       "Single Task (1)": {
-        "count": 23981,
-        "mean_min": 425.4,
-        "median_min": 79.98,
+        "count": 24040,
+        "mean_min": 424.44,
+        "median_min": 79.97,
         "max_min": 3896.28
       },
       "Small Array (2 - 50)": {
@@ -216,31 +216,31 @@
   },
   "efficiency_profile": {
     "time_efficiency": {
-      "count": 23881,
-      "mean": 5.58,
+      "count": 23940,
+      "mean": 5.59,
       "median": 1.49,
       "min": 0.01,
       "max": 123.3,
-      "p25": 0.37,
-      "p75": 4.36
+      "p25": 0.38,
+      "p75": 4.41
     },
     "cpu_efficiency": {
-      "count": 38097,
-      "mean": 72.16,
-      "median": 85.15,
+      "count": 38208,
+      "mean": 72.13,
+      "median": 85.0,
       "min": 0.04,
       "max": 100.0,
-      "p25": 54.13,
-      "p75": 95.21
+      "p25": 54.1,
+      "p75": 95.2
     },
     "memory_efficiency": {
-      "count": 23873,
-      "mean": 38.26,
+      "count": 23932,
+      "mean": 38.24,
       "median": 25.48,
       "min": 0.01,
       "max": 100.0,
       "p25": 9.87,
-      "p75": 55.3
+      "p75": 55.26
     },
     "by_state": {
       "FAILED": {
@@ -332,71 +332,71 @@
       },
       "COMPLETED": {
         "time_eff": {
-          "count": 16956,
-          "mean": 6.5,
-          "median": 2.29,
+          "count": 17014,
+          "mean": 6.52,
+          "median": 2.31,
           "min": 0.01,
           "max": 99.86,
           "p25": 0.3,
-          "p75": 6.87
+          "p75": 6.88
         },
         "cpu_eff": {
-          "count": 16933,
-          "mean": 72.13,
-          "median": 81.1,
+          "count": 16991,
+          "mean": 72.09,
+          "median": 80.98,
           "min": 0.21,
           "max": 100.0,
-          "p25": 43.16,
+          "p25": 43.0,
           "p75": 100.0
         },
         "mem_eff": {
-          "count": 16953,
-          "mean": 19.17,
-          "median": 16.25,
+          "count": 17011,
+          "mean": 19.2,
+          "median": 16.26,
           "min": 0.01,
-          "max": 87.9,
+          "max": 99.92,
           "p25": 8.24,
           "p75": 25.6
         }
       },
       "TIMEOUT": {
         "time_eff": {
-          "count": 22,
-          "mean": 101.51,
-          "median": 100.09,
+          "count": 23,
+          "mean": 101.48,
+          "median": 100.1,
           "min": 100.01,
           "max": 123.3,
           "p25": 100.04,
-          "p75": 100.63
+          "p75": 100.72
         },
         "cpu_eff": {
-          "count": 21,
-          "mean": 83.86,
+          "count": 22,
+          "mean": 83.19,
           "median": 100.0,
           "min": 2.7,
           "max": 100.0,
-          "p25": 71.98,
+          "p25": 70.87,
           "p75": 100.0
         },
         "mem_eff": {
-          "count": 21,
-          "mean": 52.55,
-          "median": 54.47,
+          "count": 22,
+          "mean": 51.3,
+          "median": 54.46,
           "min": 0.11,
           "max": 100.0,
-          "p25": 26.36,
+          "p25": 25.1,
           "p75": 99.99
         }
       },
       "RUNNING": {
         "time_eff": {
           "count": 1,
-          "mean": 55.0,
-          "median": 55.0,
-          "min": 55.0,
-          "max": 55.0,
-          "p25": 55.0,
-          "p75": 55.0
+          "mean": 91.7,
+          "median": 91.7,
+          "min": 91.7,
+          "max": 91.7,
+          "p25": 91.7,
+          "p75": 91.7
         },
         "cpu_eff": {
           "count": 0,
@@ -418,7 +418,7 @@
         }
       }
     },
-    "total_wasted_core_hours": 25474.11,
-    "total_wasted_mem_gb_hours": 2019178.29
+    "total_wasted_core_hours": 25476.09,
+    "total_wasted_mem_gb_hours": 2019190.56
   }
 }
