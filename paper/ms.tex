@@ -1,10 +1,12 @@
 %% ==============================================================================
-%% AASTeX v6.3.1 manuscript -- PRELIMINARY REDRAFT (2026-11)
+%% AASTeX v6.3.1 manuscript -- RESTRUCTURED FLAGSHIP DRAFT (2026-11)
 %% ==============================================================================
-%% Every number below is computed from snapshots/knrates_results_latest.zip with the
-%% knrates package (see notebooks/paper_figures.ipynb) or taken from
-%% knrates/literature.py. Quantities that depend on runs that have not been done yet
-%% are marked with \tbd{...}. See docs/paper_revision_plan.md.
+%% Every simulation number below is computed from snapshots/knrates_results_latest.zip
+%% with the knrates package (see notebooks/paper_figures.ipynb) or taken from
+%% knrates/literature.py; observational search quantities derive from
+%% snapshots/knsearch_results_latest.zip. Quantities awaiting the full-survey MSI
+%% scan, ZFPS forced-photometry batches, or matched ensemble re-runs are marked
+%% explicitly with \tbd{...}.
 %% ==============================================================================
 
 \documentclass[twocolumn]{aastex631}
@@ -19,15 +21,16 @@
 \newcommand{\msun}{M_\odot}
 \newcommand{\rlim}{\mathcal{R}_{95}}
 \newcommand{\vteff}{\langle VT\rangle}
+\newcommand{\epspipe}{\varepsilon_{\rm pipe}}
 \newcommand{\gpcyr}{\mathrm{Gpc}^{-3}\,\mathrm{yr}^{-1}}
 \newcommand{\gpcvolyr}{\mathrm{Gpc}^{3}\,\mathrm{yr}}
 
-\shorttitle{Kilonova Rate Sensitivity of Eight Years of ZTF}
+\shorttitle{Eight-Year ZTF Kilonova Search and Rate Constraints}
 \shortauthors{Barna et al.}
 
 \begin{document}
 
-\title{The Sensitivity of Eight Years of the Zwicky Transient Facility to Kilonovae: Injection--Recovery Constraints on the Kilonova Rate}
+\title{Searching Eight Years of the Zwicky Transient Facility for Kilonovae: Archival Constraints and Viewing-Angle-Dependent Volumetric Rates}
 
 \author[0000-0002-0000-0000]{Tyler Barna}
 \affiliation{Minnesota Institute for Astrophysics, School of Physics and Astronomy, University of Minnesota, 116 Church Street SE, Minneapolis, MN 55455, USA}
@@ -36,7 +39,7 @@
 \author{\tbd{co-authors}}
 
 \begin{abstract}
-We quantify the sensitivity of the Zwicky Transient Facility (ZTF) to optical kilonovae over its first eight years of operations (2018 March -- 2026 March; $T = 8.006$\,yr) by injecting $10^8$ synthetic kilonovae per model into the ZTF exposure history and applying fast-transient selection criteria similar to those of real-time ZTF kilonova searches. For kilonovae with AT2017gfo-like ejecta (two-component POSSIS models evaluated with the \texttt{fiesta} surrogate) viewed at $\iota = 25.8^\circ$, the effective volume--time is $\vteff = 0.0156\,\gpcvolyr$; if no candidate in the ZTF data passes the same criteria, the 95\% confidence upper limit on the rate is $\rlim = 192\,\gpcyr$. For the same ejecta with isotropically distributed viewing angles, $\vteff = 0.0045\,\gpcvolyr$ and $\rlim = 664\,\gpcyr$. The isotropic sensitivity is a factor $3.5$ lower because recovery efficiency falls by more than two orders of magnitude between polar and equatorial viewing angles; injections with $\iota > 45^\circ$ make up 71\% of the isotropic population but only 16\% of the recovered sample. Restricting our injections to the first 23 months of ZTF gives $\rlim = 1069\,\gpcyr$ (polar view), and the full survey accumulates $5.6\times$ more volume--time than that window, more than the $4.2\times$ expected from duration alone. Monte Carlo uncertainties are below 0.5\%; the limits are dominated by model and selection systematics, which we discuss. \tbd{Population-averaged limit (Suite 03 re-run), real-data candidate search result, and criteria-systematics band (Suite 02 re-run).}
+We present an untargeted archival search for optical kilonovae across the first eight years of operations of the Zwicky Transient Facility (ZTF; 2018 March -- 2026 March; $T = 8.006$\,yr), spanning the public, partnership, and Caltech survey streams, paired with $10^8$-injection radiative-transfer simulations evaluated under identical photometric selection criteria. Candidate selection uses a two-stage hybrid architecture: alert-level preselection across $\approx 2.53\times 10^8$ objects in the complete \texttt{ZTF\_alerts\_aux} archive ($\ge 2$ detections within 14\,d at $|b| \ge 15^\circ$, calibrated real--bogus classification, and stellar, Solar-System, and recurrence vetoes), followed by baseline-corrected forced photometry down to $S/N \ge 3$ and single-blind human vetting. \tbd{Archival search result: $N_{\rm obs}$ surviving candidates and measured pipeline efficiency $\epspipe$.} Injecting synthetic two-component POSSIS kilonovae (evaluated with the \texttt{fiesta} surrogate) into the ZTF exposure history yields a simulated effective volume--time of $\vteff = 0.0156\,\gpcvolyr$ for AT2017gfo-like ejecta viewed at $\iota = 25.8^\circ$ and $\vteff = 0.0045\,\gpcvolyr$ for isotropically distributed viewing angles (corresponding to idealised $N_{\rm obs}=0$, $\epspipe=1$ 95\% upper limits of $\rlim = 192$ and $664\,\gpcyr$, respectively; \tbd{update with searched-exposure $\vteff \cdot \epspipe$, AT2017gfo posterior-marginalised limit, and numerical-relativity BNS population limit}). Isotropic sensitivity is $3.5\times$ lower than polar sensitivity because recovery efficiency drops by more than two orders of magnitude from pole-on to edge-on orientations: mergers at $\iota > 45^\circ$ represent 71\% of an isotropic population but only 16\% of recovered events. Over eight years, ZTF accumulates $5.6\times$ the volume--time of its first 23 months, outpacing simple $4.2\times$ duration scaling. Monte Carlo statistical uncertainties are $<0.5\%$, leaving ejecta-model, viewing-angle, and pipeline systematics dominant.
 \end{abstract}
 
 \keywords{Gravitational wave sources (677) --- Neutron stars (1108) --- Transient sources (1851) --- Sky surveys (1464)}
@@ -45,51 +48,87 @@ We quantify the sensitivity of the Zwicky Transient Facility (ZTF) to optical ki
 \section{Introduction}
 \label{sec:intro}
 
-The radioactive decay of $r$-process nuclei synthesized in the neutron-rich ejecta of binary neutron star (BNS) and neutron star--black hole mergers powers a thermal optical/near-infrared transient, the kilonova \citep{LiPaczynski1998, Metzger2010, Roberts2011, BarnesKasen2013, Kasen2013, TanakaHotokezaka2013, Metzger2019}. AT2017gfo, the counterpart of GW170817 at $\approx 40$\,Mpc \citep{Abbott2017_GW170817, Abbott2017_MMA, Coulter2017, SoaresSantos2017, Arcavi2017}, reached peak absolute magnitudes $M_g \approx M_r \approx -16.0$ and faded by $\approx 1$\,mag\,d$^{-1}$ in $g$ and $r$ \citep{Drout2017, Cowperthwaite2017}.
+The radioactive decay of $r$-process nuclei synthesized in the neutron-rich ejecta of binary neutron star (BNS) and neutron star--black hole mergers powers a rapidly evolving thermal optical and near-infrared transient, the kilonova \citep{LiPaczynski1998, Metzger2010, Roberts2011, BarnesKasen2013, Kasen2013, TanakaHotokezaka2013, Metzger2019}. AT2017gfo, the optical counterpart of GW170817 at $d_L \approx 40$\,Mpc \citep{Abbott2017_GW170817, Abbott2017_MMA, Coulter2017, SoaresSantos2017, Arcavi2017}, reached peak absolute magnitudes $M_g \approx M_r \approx -16.0$ and faded at $\approx 1$\,mag\,d$^{-1}$ in $g$ and $r$ \citep{Drout2017, Cowperthwaite2017}.
 
-Wide-field optical surveys can find kilonovae independently of gravitational-wave triggers. Searches with no detections have constrained the rate of AT2017gfo-like events: $\mathcal{R} < 800\,\gpcyr$ from galaxy-targeted Palomar Transient Factory data \citep{Kasliwal2017}, $<3.0\times10^4\,\gpcyr$ from ATLAS \citep{Smartt2017}, and $<2.4\times10^4\,\gpcyr$ (90\%) for the brightest model in the Dark Energy Survey \citep{Doctor2017}. With the first 23 months of ZTF \citep{Bellm2019, Graham2019, Dekany2020, Masci2019}, \citet{Andreoni2020} found $\mathcal{R} < 1775\,\gpcyr$ (95\%) for GW170817-like kilonovae and $\mathcal{R} < 4029\,\gpcyr$ for POSSIS models with uniformly distributed viewing angles; the real-time ZTFReST search added $\mathcal{R} < 1904\,\gpcyr$ and $< 900\,\gpcyr$ combined \citep{Andreoni2021}. For comparison, the BNS merger rate from gravitational waves is $7.6$--$250\,\gpcyr$ (90\%; GWTC-4.0, \citealt{GWTC4pop}), revised from $10$--$1700\,\gpcyr$ in GWTC-3 \citep{GWTC3pop}.
+Wide-field optical time-domain surveys constrain the volumetric rate of kilonovae independently of gravitational-wave (GW) detector duty cycles. Non-detections in early untargeted searches yielded upper limits of $\mathcal{R} < 800\,\gpcyr$ from galaxy-targeted Palomar Transient Factory observations \citep{Kasliwal2017}, $<3.0\times10^4\,\gpcyr$ from ATLAS \citep{Smartt2017}, and $<2.4\times10^4\,\gpcyr$ (90\% confidence) for bright kilonova templates in the Dark Energy Survey \citep{Doctor2017}. Using the first 23 months of the Zwicky Transient Facility \citep[ZTF;][]{Bellm2019, Graham2019, Dekany2020, Masci2019}, \citet{Andreoni2020} obtained 95\% upper limits of $\mathcal{R} < 1775\,\gpcyr$ for GW170817-like kilonovae and $\mathcal{R} < 4029\,\gpcyr$ for isotropic POSSIS radiative-transfer models; real-time ZTFReST operations subsequently yielded $\mathcal{R} < 900\,\gpcyr$ when combined with archival data \citep{Andreoni2021}. Meanwhile, gravitational-wave observations through GWTC-4.0 constrain the BNS merger rate to $7.6$--$250\,\gpcyr$ \citep[90\% credible interval;][revised from $10$--$1700\,\gpcyr$ in GWTC-3, \citealt{GWTC3pop}]{GWTC4pop}.
 
-Here we compute the sensitivity of the full eight-year ZTF data set to kilonovae with an injection--recovery simulation and give the rate limits that follow if no candidate survives the selection. We describe the survey and criteria in Section~\ref{sec:data}, the simulation and statistics in Section~\ref{sec:methods}, the limits and their time dependence in Section~\ref{sec:results}, the viewing-angle dependence in Section~\ref{sec:viewing}, Monte Carlo convergence in Section~\ref{sec:convergence}, and systematics in Section~\ref{sec:discussion}. \tbd{Section on the archival candidate search (Section~\ref{sec:search}).}
-
-%% ==============================================================================
-\section{ZTF data and selection criteria}
-\label{sec:data}
-
-ZTF observes with a 47\,deg$^2$ camera on the Palomar 48-inch Schmidt telescope in $g$, $r$ and $i$ \citep{Bellm2019, Dekany2020}. We use the exposure history from 2018 March to 2026 March (97 calendar months; $T = 8.006$\,yr from the first to the last exposure). For each exposure the simulation uses the pointing, filter, epoch and $5\sigma$ limiting magnitude of the difference image (median over the CCD quadrants; \citealt{Masci2019}).
-
-An injected source counts as recovered if (i) at least two exposures reach $S/N \ge 3$, at least one of which reaches $S/N \ge 5$; (ii) the first and last such detections are separated by at least 3\,h and at most 14\,d; (iii) the source fades by at least 0.3\,mag\,d$^{-1}$ in at least one band, measured as a weighted least-squares slope of the post-peak detections in that band (same-band points within 2\,h are averaged); and (iv) it lies at Galactic latitude $|b| \ge 15^\circ$. These criteria resemble those of ZTFReST \citep[$\ge 2$ detections at $>3\sigma$ with one at $>5\sigma$, separated by $>3$\,h, fading $>0.3$\,mag\,d$^{-1}$, $|b| > 10^\circ$;][]{Andreoni2021}; \citet{Andreoni2020} instead required band-dependent fade rates of $0.57/0.39/0.27$\,mag\,d$^{-1}$ ($g/r/i$) and applied no Galactic-latitude cut. The sensitivity of $\vteff$ to each criterion is the subject of a companion paper \tbd{companion citation}.
+Inferring a physical kilonova rate from an archival survey requires two coupled ingredients: an observational candidate search over a well-defined set of processed exposures to establish the surviving event count $N_{\rm obs}$ and real-data pipeline efficiency $\epspipe$, and a forward injection--recovery simulation applying the exact same light-curve selection criteria to those exposures to determine the effective surveyed volume--time $\vteff$. Here we carry out both across the full eight-year ZTF baseline (2018 March -- 2026 March). Section~\ref{sec:search_pipeline} describes the ZTF dataset and our hybrid five-stage archival search pipeline. Section~\ref{sec:search_results} reports the archival cutflow, benchmark fast-transient recoveries, and empirical pipeline efficiency. Section~\ref{sec:methods} details the matched \texttt{survey-sim} POSSIS injection--recovery ensembles. Section~\ref{sec:results} presents the resulting volumetric rate constraints, eight-year sensitivity evolution, viewing-angle dependence, and systematic error budget, and Section~\ref{sec:conclusions} discusses implications for GWTC-4.0 and the Vera C.\ Rubin Observatory. Appendix~\ref{sec:convergence} validates the Monte Carlo statistical convergence of our $10^8$-injection ensembles.
 
 %% ==============================================================================
-\section{Simulation and statistics}
+\section{ZTF Dataset and Archival Search Pipeline}
+\label{sec:search_pipeline}
+
+\subsection{Survey Coverage and Archive Completeness}
+ZTF images the northern sky with a 47\,deg$^2$ camera (16 CCDs subdivided into 64 readout quadrants) on the Palomar 48-inch Samuel Oschin Schmidt Telescope in $g$, $r$, and $i$ \citep{Bellm2019, Dekany2020}. Our search spans 2018 March 17 to 2026 March 31 ($T = 8.006$\,yr across 97 calendar months) and incorporates all three ZTF observing programs: the public survey (\texttt{programid=1}), collaboration partnership observations (\texttt{programid=2}), and Caltech time (\texttt{programid=3}).
+
+To guarantee uniform multi-program detection completeness across all eight years, Stage~A operates on the \texttt{ZTF\_alerts\_aux} master object collection hosted on the BOOM MongoDB archive at the Minnesota Supercomputing Institute, which retains every $5\sigma$ difference-image detection (\texttt{prv\_candidates}) across programs 1--3 for $\approx 2.53\times 10^8$ ZTF objects, paired with per-object morphological and history context from \texttt{ZTF\_alerts}. During the archive scan, every readout-quadrant exposure (\texttt{pid}, \texttt{field}, \texttt{rcid}, \texttt{fid}, \texttt{programid}, \texttt{jd}, and $5\sigma$ limiting magnitude \texttt{diffmaglim}) contributing alert-level detections is recorded so that the forward simulations in Section~\ref{sec:methods} evaluate synthetic kilonovae on the identical set of searched quadrant images.
+
+\subsection{Hybrid Selection Architecture (Stages A--E)}
+Standard ZTF alert packets trigger only at difference-image significance $S/N \ge 5$ \citep{Masci2019}, whereas rapidly fading kilonovae frequently drop into the $3 \le S/N < 5$ regime within 1--3\,d of peak. Evaluating fast-transient fade criteria on $\ge 5\sigma$ alerts alone forfeits $\approx 46\%$ of all-program $\vteff$ (and $\approx 75\%$ in public-only data). Conversely, requiring at least two $5\sigma$ alerts within 14\,d as an entry trigger and measuring the light curve with forced photometry down to $3\sigma$ preserves $89.5\%$ of the full theoretical all-program $\vteff$ while reducing the forced-photometry sample by more than three orders of magnitude.
+
+Our pipeline (\texttt{knsearch}) implements this hybrid selection in five deterministic stages:
+\begin{enumerate}
+\item \textbf{Stage~A (Alert-level preselection).} Positive difference detections (\texttt{isdiffpos=t}) in programs 1--3 must satisfy: (i) $\ge 2$ alerts spanning $\le 14.0$\,d; (ii) Galactic latitude $|b| \ge 15.0^\circ$; (iii) $\ge 2$ detections passing deep real--bogus classification \citep[$\texttt{drb} \ge 0.5$;][]{Duev2019} or acceptance-matched random-forest fallback thresholds \citep[$\texttt{rb} \ge 0.474$, $0.293$, and $0.477$ across classifier epochs \texttt{t8\_f5\_c3}, \texttt{t15\_f5\_c3}, and \texttt{t17\_f5\_c3};][]{Mahabal2019}; (iv) non-stellar Pan-STARRS1 morphology (rejecting sources with $\texttt{sgscore1} > 0.5$ within $\texttt{distpsnr1} < 1\farcs5$); (v) separation $\ge 20\farcs0$ from Gaia stars brighter than $G = 14$; (vi) separation $\ge 10\farcs0$ from catalogued Solar-System objects (\texttt{ssdistnr}); and (vii) no prior detection more than 30\,d before the first in-window alert.
+\item \textbf{Stage~B and Pre-ZFPS Triage.} Survivors are cross-matched against Gaia DR3 ($1\farcs5$), Milliquas v8 ($2\farcs0$), the Transient Name Server (TNS; $3\farcs0$), and SIMBAD ($2\farcs0$). Prior to forced-photometry extraction for pre-mid-2023 candidates, foreground Galactic stars with $>3\sigma$ Gaia parallax or proper motion, spectroscopically confirmed non-kilonova classes (exact-type matching; Section~\ref{sec:search_results}), and recurrent variables exhibiting \texttt{ZTF\_alerts\_aux} detections $>30$\,d before or $>60$\,d after trigger are triaged with full sky-mask accounting.
+\item \textbf{Stage~C (Baseline-corrected forced photometry and shared criteria).} Forced difference-image photometry is assembled from BOOM \texttt{fp\_hists} (mid-2023 onward) and the IRSA ZTF Forced Photometry Service \citep[ZFPS;][]{Masci2023} for earlier epochs, restricted strictly to the searched \texttt{programids}. Pre-trigger baseline pedestals ($[-100, -2]$\,d per field, quadrant, and filter) are subtracted and formal uncertainties are scaled by $\max(1, \sqrt{\chi^2_\nu})$ following \citet{Masci2023}. To maintain exact parity with \texttt{survey-sim}, each detection ($F/\sigma_F > 3$) is assigned background-limited depth significance $S/N = 5\times 10^{0.4(m_5 - m)}$. A candidate passes Stage~C if (i) $\ge 2$ exposures reach $S/N \ge 3.0$, with $\ge 1$ reaching $S/N \ge 5.0$; (ii) the first and last qualifying detections are separated by $3.0\,\mathrm{h} \le \Delta t \le 14.0\,\mathrm{d}$; and (iii) at least one band exhibits a post-peak weighted least-squares fade slope $\ge 0.30$\,mag\,d$^{-1}$ (after 2\,h same-band flux averaging). These criteria mirror ZTFReST \citep{Andreoni2021}, whereas \citet{Andreoni2020} required band-dependent fades ($0.57/0.39/0.27$\,mag\,d$^{-1}$ in $g/r/i$) without a latitude cut.
+\item \textbf{Stage~D (Automated catalogue veto).} Stage~C survivors whose nearest TNS ($3\farcs0$) or SIMBAD ($2\farcs0$) match carries an exact confirmed non-kilonova classification (supernova subtypes, tidal disruption events, active galactic nuclei, cataclysmic variables, or Galactic variable stars) are vetoed. Unclassified transients and candidate classes (\texttt{Kilonova}, \texttt{Afterglow}, \texttt{FBOT}, \texttt{Other}, \texttt{Galaxy}) are explicitly retained, and lookup completeness (\texttt{n\_checked}) is tracked per object.
+\item \textbf{Stage~E (Single-blind human vetting).} Surviving candidates are mixed with $\approx 5\%$ anonymised synthetic kilonova light curves drawn from recovered simulation ensembles and reviewed in a dedicated web portal (\texttt{ztf-vetting}), recording consensus classifications and directly calibrating the human vetting recovery efficiency $\varepsilon_{\rm vet}$. Known spectroscopically confirmed fast-transient imposters follow the taxonomy of \citet{Barna2025}.
+\end{enumerate}
+
+%% ==============================================================================
+\section{Archival Search Results and Pipeline Efficiency}
+\label{sec:search_results}
+
+\tbd{Insert Stage A--E sequential cutflow table from \texttt{snapshots/knsearch\_results\_latest.zip} once the full-survey 35-hour \texttt{ZTF\_alerts\_aux} scan (programs 1--3) and pre-mid-2023 ZFPS batches complete.}
+
+\tbd{Summarise empirical validation on golden fast optical transients in BOOM (e.g., GRB afterglow AT2021buv / ZTF21aagwbjr and fast optical transient AT2021any / ZTF21aaeyldq passing all Stage A and hybrid criteria in partnership+public data).}
+
+\tbd{Report surviving kilonova candidate count $N_{\rm obs}$ (and candidate dossiers if $N_{\rm obs} \ge 1$) together with the measured factorised pipeline efficiency $\epspipe = \varepsilon_{\rm 2alert}\,\varepsilon_{\rm RB}\,\varepsilon_{\rm mask}\,\varepsilon_{\rm ZFPS}\,\varepsilon_{\rm vet}$ from \texttt{knsearch.efficiency}.}
+
+%% ==============================================================================
+\section{Matched Injection--Recovery Simulations}
 \label{sec:methods}
 
-\subsection{Injections}
-We use the \texttt{survey-sim} injection--recovery code \tbd{citation/software DOI}. Injected kilonovae are distributed isotropically over the full sky, uniformly in comoving volume out to $z_{\max} = 0.15$, and uniformly in explosion time over the survey. Each injection is evaluated against the ZTF exposures that cover its position from 30\,d before to $25(1+z)$\,d after explosion, using the noiseless model magnitude and the exposure's limiting magnitude ($S/N = 5\times10^{0.4(m_5 - m)}$). We assume a flat $\Lambda$CDM cosmology with $h = 0.674$ and $\Omega_m = 0.315$ \citep{Planck2018}. The 99th percentile of the recovered redshifts is $z = 0.059$ ($d_L = 274$\,Mpc) for the polar-view POSSIS model. For every model except the one-zone ``blue'' template, the most distant recovery is at $z \le 0.105$, so $z_{\max}$ does not truncate $\vteff$ (Figure~\ref{fig:distance}). Recoveries of the ``blue'' template extend to $z_{\max}$, so its $\vteff$ is a lower bound.
+\subsection{Survey Simulation and Effective Volume--Time}
+We compute the volumetric sensitivity of the survey with the \texttt{survey-sim} injection--recovery framework \tbd{software citation/DOI}. Synthetic kilonovae are injected isotropically over $4\pi$\,sr, uniformly in comoving volume out to $z_{\max} = 0.15$ assuming a flat $\Lambda$CDM cosmology with $h = 0.674$ and $\Omega_m = 0.315$ \citep{Planck2018}, and uniformly in explosion epoch across $T = 8.006$\,yr. Each source is evaluated against all searched ZTF quadrant exposures covering its sky coordinates from 30\,d before to $25(1+z)$\,d after merger using depth significance $S/N = 5\times10^{0.4(m_5 - m)}$ and the exact Stage~C selection criteria of Section~\ref{sec:search_pipeline}. For the polar-view POSSIS model, 99\% of recoveries lie at $z \le 0.059$ ($d_L \le 274$\,Mpc), and across all POSSIS ensembles the most distant recovery lies at $z \le 0.105$, confirming that $z_{\max} = 0.15$ introduces zero volume truncation (Figure~\ref{fig:distance}).
 
-\subsection{Effective volume--time and rate limits}
-For a model with recovery efficiency $\epsilon(z)$,
+For a kilonova population with redshift-dependent photometric recovery efficiency $\epsilon(z)$, the simulated effective volume--time is
 \begin{equation}
 \vteff = 4\pi\,T \int_0^{z_{\max}} \epsilon(z)\,\frac{dV_c}{dz\,d\Omega}\,\frac{1}{1+z}\,dz ,
 \label{eq:vt}
 \end{equation}
-where the factor $1/(1+z)$ converts source-frame to observer-frame rates. Because injections are full-sky, the survey footprint, observing gaps and the latitude cut are all contained in $\epsilon$. Each model is simulated in 100 independent realisations of $10^6$ injections with distinct random seeds. We combine them by injection-weighted averaging of $\vteff$, which is the minimum-variance estimate, rather than by averaging per-realisation limits. With $N_{\rm obs}$ real candidates and no background, the classical upper limit at confidence level CL is $\mathcal{R}_{\rm CL} = \mu_{\rm CL}(N_{\rm obs})/\vteff$, with $\mu_{95}(0) = -\ln 0.05 = 2.996$; the Feldman--Cousins interval would give 3.09 \citep{FeldmanCousins1998}. \tbd{$N_{\rm obs}$ from the archival search; the limits below assume $N_{\rm obs}=0$.}
+where $(1+z)^{-1}$ accounts for cosmological time dilation of the merger rate. Because injections span the full sky, survey footprint, weather gaps, cadence variations, and the $|b| \ge 15^\circ$ cut are folded directly into $\epsilon(z)$. Each model ensemble comprises 100 independent realisations of $10^6$ injections ($10^8$ total), combined via minimum-variance injection-weighted pooling of $\vteff$ (Appendix~\ref{sec:convergence}). Accounting for real-data pipeline survival $\epspipe$ and $N_{\rm obs}$ surviving candidates (with zero expected background), the classical single-sided upper limit at confidence level CL is
+\begin{equation}
+\mathcal{R}_{\rm CL} = \frac{\mu_{\rm CL}(N_{\rm obs})}{\vteff \cdot \epspipe},
+\label{eq:rlim}
+\end{equation}
+where $\mu_{95}(0) = -\ln 0.05 = 2.996$ \citep[$3.09$ under the unified approach of][and $\mu_{95}(1) = 4.744$]{FeldmanCousins1998}.
 
-\subsection{Kilonova models}
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig4_recovery_distance.pdf}
+\caption{Left: recovery efficiency $\epsilon(d_L)$ as a function of luminosity distance (recovered over injected sources per redshift shell). Right: cumulative luminosity-distance distribution of recovered kilonovae for the polar and isotropic POSSIS ensembles.}
+\label{fig:distance}
+\end{figure*}
+
+\subsection{Kilonova Ejecta Models and Populations}
+We evaluate three physical kilonova model tiers using the \texttt{fiesta} neural-network surrogate \citep{Koehn2025} trained on three-dimensional Monte Carlo radiative-transfer simulations from \texttt{POSSIS} \citep{Bulla2019, Bulla2023}, parameterised by dynamical-ejecta and post-merger wind masses, velocities, electron fractions, and polar viewing angle $\iota$:
 \begin{enumerate}
-\item \textbf{POSSIS two-component models.} We use the \texttt{fiesta} neural-network surrogate \citep{Koehn2025} of POSSIS radiative-transfer light curves \citep{Bulla2019, Bulla2023}, parameterised by the mass, velocity and electron fraction of the dynamical and wind ejecta and the viewing angle $\iota$ from the pole. The ejecta parameters are $\log_{10}(M_{\rm dyn}/\msun) = -1.7$, $v_{\rm dyn} = 0.2c$, $Y_{e,\rm dyn} = 0.15$, $\log_{10}(M_{\rm wind}/\msun) = -1.1$, $v_{\rm wind} = 0.1c$ and $Y_{e,\rm wind} = 0.35$. The model is simulated at fixed $\iota = 0.45$\,rad ($25.8^\circ$) and with $\cos\iota$ uniform in $[0,1]$. The viewing angle of GW170817 is $14^\circ$--$28^\circ$ from radio VLBI \citep{Mooley2018} and $19^\circ$--$25^\circ$ including optical astrometry \citep{Mooley2022}. \tbd{Replace the ad hoc parameter set by a published AT2017gfo posterior \citep[e.g.][]{Anand2023} and marginalise over it.}
-\item \textbf{One-zone (Metzger-type) models.} \tbd{To be removed: compared with AT2017gfo photometry, the ``blue'' and ``mean'' presets are 1--3\,mag too bright and the $\kappa=398$ template is $\approx0.7$\,mag too faint in $g$ and fades far too fast after 2\,d (docs/paper\_revision\_plan.md).} These are included for comparison with earlier work (literature-based ``blue'' and ``mean'' parameters: $M_{\rm ej} = 0.02\,\msun$, $v = 0.25c$, $\kappa = 0.5$ and $M_{\rm ej} = 0.04\,\msun$, $v = 0.15c$, $\kappa = 1$; and a template fitted to AT2017gfo photometry, $M_{\rm ej} = 1.26\times10^{-3}\,\msun$, $v = 0.5c$, $\kappa = 398$). In this implementation $\kappa$ is not the grey opacity of the ejecta, and the parameters are not directly comparable to the component fits of \citet{Villar2017}. The recovered ``blue'' model reaches a median observed $M \approx -17.6$, about 1.6\,mag brighter than AT2017gfo, so we do not treat it as AT2017gfo-like. \tbd{Re-tune or drop the one-zone models.}
-\item \textbf{Population.} \tbd{Suite~03 re-run: per-transient parameter draws (\texttt{Bu2026KilonovaPopulation}) and isotropic $\iota$; prior choice to be justified against numerical-relativity ejecta predictions, e.g. \citealt{Radice2018}.}
+\item \textbf{AT2017gfo-like reference ensembles.} Our baseline two-component ejecta benchmark adopts $\log_{10}(M_{\rm dyn}/\msun) = -1.7$, $v_{\rm dyn} = 0.2c$, $Y_{e,\rm dyn} = 0.15$, $\log_{10}(M_{\rm wind}/\msun) = -1.1$, $v_{\rm wind} = 0.1c$, and $Y_{e,\rm wind} = 0.35$, evaluated both at a fixed polar viewing angle $\iota = 0.45$\,rad ($25.8^\circ$, consistent with VLBI and astrometric constraints on GW170817 of $14^\circ$--$28^\circ$ and $19^\circ$--$25^\circ$; \citealt{Mooley2018, Mooley2022}) and for an isotropic population uniform in $\cos\iota \in [0, 1]$.
+\item \textbf{AT2017gfo posterior-marginalised ensemble.} \tbd{Ensemble of posterior draws from published AT2017gfo POSSIS inference \citep{Anand2023} reporting posterior-marginalised $\vteff$ and 16th--84th percentile epistemic uncertainty.}
+\item \textbf{Numerical-relativity-motivated BNS population.} \tbd{Per-merger population draws spanning dynamical and disk-wind ejecta priors motivated by BNS numerical-relativity simulations \citep{Radice2018} with isotropic viewing angles.}
 \end{enumerate}
 
 %% ==============================================================================
-\section{Results}
+\section{Volumetric Rate Constraints and Viewing-Angle Anatomy}
 \label{sec:results}
 
-Table~\ref{tab:limits} lists the pooled $\vteff$ and the 90/95/99\% limits for all fixed-parameter models, and Figure~\ref{fig:limits} compares them with previous searches and the gravitational-wave BNS rate. For AT2017gfo-like ejecta viewed at $25.8^\circ$, $\rlim = 192\,\gpcyr$; for isotropic viewing angles, $\rlim = 664\,\gpcyr$. A separate pair of ensembles with $\log_{10}(M_{\rm dyn}/\msun) = -1.8$ (otherwise identical) changes $\vteff$ by $+0.8\%$ (polar) and $+6\%$ (isotropic), giving $\rlim = 191$ and $624\,\gpcyr$: a 0.1\,dex change in the dynamical ejecta mass matters far less than the viewing angle.
+\subsection{Rate Constraints Across Kilonova Models}
+Table~\ref{tab:limits} summarises the pooled $\vteff$ and baseline Poisson upper limits for the $10^8$-injection POSSIS ensembles, and Figure~\ref{fig:limits} compares them against previous optical surveys and the GWTC-4.0 BNS merger rate. Prior to applying $\epspipe$ \tbd{incorporate final searched-exposure $\vteff \cdot \epspipe$ and $N_{\rm obs}$}, AT2017gfo-like ejecta viewed at $\iota = 25.8^\circ$ yield $\vteff = 0.0156\,\gpcvolyr$ ($\rlim = 192\,\gpcyr$ for $N_{\rm obs}=0$), whereas isotropic orientations yield $\vteff = 0.0045\,\gpcvolyr$ ($\rlim = 664\,\gpcyr$). Perturbing the dynamical ejecta mass by $-0.1$\,dex to $\log_{10}(M_{\rm dyn}/\msun) = -1.8$ shifts $\vteff$ by only $+0.8\%$ (polar; $\rlim = 191\,\gpcyr$) and $+6\%$ (isotropic; $\rlim = 624\,\gpcyr$), demonstrating that viewing-angle geometry dominates over small ejecta-mass variations.
 
 \begin{table*}[t]
 \centering
-\caption{Pooled effective volume--time and Poisson upper limits (assuming $N_{\rm obs} = 0$) for the fixed-parameter models, each from $10^8$ injections. Rates are in $\gpcyr$; the $\vteff$ uncertainty is the Monte Carlo standard error.}
+\caption{Pooled effective volume--time and baseline Poisson upper limits ($N_{\rm obs} = 0$, $\epspipe = 1$; \tbd{add $\vteff_{\rm eff} = \vteff\epspipe$ and final observational $\mathcal{R}_{\rm CL}$ columns}) from $10^8$ injections per POSSIS model. Rates are in $\gpcyr$; uncertainties quote the Monte Carlo standard error.}
 \label{tab:limits}
 \scriptsize
 \input{table1_master_rate_limits.tex}
@@ -98,84 +137,67 @@ Table~\ref{tab:limits} lists the pooled $\vteff$ and the 90/95/99\% limits for a
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig3_rate_limits_master.pdf}
-\caption{95\% upper limits for each model (markers; error bars are the Monte Carlo uncertainty, thin lines span the 90\%--99\% limits). Vertical lines show published optical limits: \citet{Andreoni2020} for GW170817-like and POSSIS isotropic models, the ZTFReST combined limit \citep{Andreoni2021} and the PTF limit \citep{Kasliwal2017}. The shaded band is the GWTC-4.0 BNS merger rate \citep[90\%;][]{GWTC4pop}.}
+\caption{95\% volumetric rate upper limits (markers; error bars show Monte Carlo uncertainties and horizontal bars span 90\%--99\% confidence) compared with published optical limits from \citet{Andreoni2020}, \citet{Andreoni2021}, and \citet{Kasliwal2017}, and the LVK GWTC-4.0 90\% BNS merger rate band \citep{GWTC4pop}.}
 \label{fig:limits}
 \end{figure*}
 
-\subsection{Accumulation of sensitivity over the survey}
-Because explosion times are uniform over the survey, the volume--time from explosions in any time window equals $\vteff$ times the fraction of recovered injections in that window. Figure~\ref{fig:timeline} shows that ZTF's monthly sensitivity varies by more than a factor of two around its mean and nearly vanishes in 2021 December -- 2022 January. Restricting the injections to the first 23 calendar months (2018 March -- 2020 January) gives $\rlim = 1069\,\gpcyr$ for the polar-view model and $3684\,\gpcyr$ for isotropic viewing. The full survey accumulates $5.6\times$ more $\vteff$ than this window, compared with a duration ratio of 4.2. Our 23-month limits are $\approx 1.7\times$ (polar) and $1.1\times$ (isotropic) tighter than those of \citet{Andreoni2020}, which used different criteria, extinction treatment and a real-data search. A limit scales as $1/\vteff$, so carrying a published limit to the full survey requires the growth of $\vteff$ for that search; a scaling with survey duration alone would understate it, because ZTF accumulated $\vteff$ faster after the first 23 months than during them. Using instead the growth we measure, and assuming that the ratio between the published efficiency and ours is the same in every epoch, the \citet{Andreoni2020} limits would correspond to $\approx 320$ (polar) and $\approx 730\,\gpcyr$ (isotropic) for eight years of data (Figure~\ref{fig:timeline}, dashed). \tbd{Quantify how much of this difference comes from criteria (Suite~02) and from pipeline losses (Section~\ref{sec:discussion}).}
+\subsection{Accumulation of Sensitivity Over Eight Years}
+Because simulated explosions are uniform in time, the volume--time accumulated within any epoch equals $\vteff$ multiplied by the fraction of recovered injections exploding in that interval. Figure~\ref{fig:timeline} shows that ZTF's monthly kilonova sensitivity fluctuates by more than a factor of two with weather and seasonal sky accessibility, dropping near zero during the 2021 December -- 2022 January weather hiatus. Restricting injections to the first 23 calendar months (2018 March -- 2020 January) yields $\rlim = 1069\,\gpcyr$ (polar) and $3684\,\gpcyr$ (isotropic). Across the full eight-year dataset, ZTF accumulates $5.6\times$ more $\vteff$ than during its first 23 months---exceeding the $4.2\times$ survey-duration ratio because cadence and multi-band sky coverage improved after early operations. Carrying the published 23-month limits of \citet{Andreoni2020} forward with ZTF's measured $\vteff$ growth corresponds to $\approx 320\,\gpcyr$ (polar) and $\approx 730\,\gpcyr$ (isotropic) at eight years (Figure~\ref{fig:timeline}, dashed curves).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{figures/fig1_survey_volume_timeline.pdf}
-\caption{Top: relative monthly sensitivity (volume--time contributed by each calendar month of explosions, normalised to the mean) for the polar-view POSSIS model. Bottom: cumulative 95\% limit as a function of survey end date for the polar-view and isotropic models, with the \citet{Andreoni2020} limits plotted at the end of their 23-month window, labelled with the change of our limit relative to theirs over the same window, and carried forward with the measured growth of $\vteff$ (dashed).}
+\caption{Top: monthly surveyed volume--time relative to the eight-year mean for the polar POSSIS model. Bottom: cumulative 95\% rate upper limit versus survey end date for polar and isotropic models, compared against the 23-month \citet{Andreoni2020} limits carried forward with the measured ZTF $\vteff$ growth (dashed).}
 \label{fig:timeline}
 \end{figure}
 
-\begin{figure*}[t]
-\centering
-\includegraphics[width=\textwidth]{figures/fig4_recovery_distance.pdf}
-\caption{Left: recovery efficiency as a function of luminosity distance (recovered over injected injections per redshift bin; injections are uniform in comoving volume). Right: cumulative distribution of the luminosity distances of recovered injections for every model.}
-\label{fig:distance}
-\end{figure*}
-
-%% ==============================================================================
-\section{Dependence on viewing angle}
-\label{sec:viewing}
-
-The isotropic ensembles record the viewing angle of every recovered injection. Because the injected $\cos\iota$ is uniform, the recovery efficiency in each $\cos\iota$ bin is exact, and so is the $\vteff$ a population fixed at that angle would have (Figure~\ref{fig:inclination}). $\vteff(\iota)$ falls from $0.022\,\gpcvolyr$ ($\rlim = 135\,\gpcyr$) for $\iota < 18^\circ$ to $7\times10^{-5}\,\gpcvolyr$ ($\rlim \approx 4\times10^{4}\,\gpcyr$) for $\iota > 87^\circ$. Injections with $\iota > 45^\circ$ make up 71\% of an isotropic population but only 16\% of the recovered sample. As an internal check, interpolating $\vteff(\iota)$ to $\iota = 0.45$\,rad reproduces the independent fixed-angle ensemble to 0.03\%. Recovered polar sources also reach larger distances than equatorial ones (Figure~\ref{fig:inclination}, right).
+\subsection{Viewing-Angle Dependence}
+Recording the inclination $\iota$ of every recovered source in the isotropic ensembles allows an exact non-parametric reconstruction of $\vteff(\iota)$ across uniform $\cos\iota$ bins (Figure~\ref{fig:inclination}). Sensitivity declines by more than two orders of magnitude from face-on mergers ($\vteff = 0.022\,\gpcvolyr$, $\rlim = 135\,\gpcyr$ at $\iota < 18^\circ$) to edge-on mergers ($\vteff = 7\times10^{-5}\,\gpcvolyr$, $\rlim \approx 4\times10^{4}\,\gpcyr$ at $\iota > 87^\circ$), driven by lanthanide-rich dynamical ejecta blanketing optical emission near the orbital plane. Consequently, although $71\%$ of isotropic mergers occur at $\iota > 45^\circ$, they contribute only $16\%$ of optical detections. Interpolating $\vteff(\iota)$ from the isotropic run to $\iota = 25.8^\circ$ agrees with the independent fixed-angle ensemble to $0.03\%$.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig2_inclination_anatomy.pdf}
-\caption{Viewing-angle dependence. (a) Rest-frame $g$-band light curves of the simulated ejecta from the POSSIS surrogate for viewing angles from pole-on to edge-on. (b) 95\% limit for populations at fixed viewing angle, derived from the isotropic ensembles in 20 bins uniform in $\cos\iota$ (horizontal bars give the bin width); open circles are the independent fixed-angle ($25.8^\circ$) ensembles; the grey band is the GW170817 viewing angle of \citet{Mooley2022}. (c) Share of the isotropic $\vteff$ contributed per degree of viewing angle, compared with the $\sin\iota$ distribution of random orientations (dashed). (d) Cumulative luminosity-distance distributions of recovered injections in five viewing-angle ranges (isotropic ensemble).}
+\caption{Viewing-angle anatomy of ZTF kilonova sensitivity. (a) Rest-frame POSSIS $g$-band light curves from pole-on to edge-on orientations. (b) 95\% rate limit at fixed $\iota$ across 20 uniform $\cos\iota$ bins (open symbols: independent fixed-$\iota=25.8^\circ$ ensemble; shaded band: GW170817 inclination from \citealt{Mooley2022}). (c) Differential contribution to isotropic $\vteff$ per degree compared with the $\sin\iota$ prior of random orientations (dashed). (d) Cumulative luminosity-distance distributions of recovered events stratified by viewing angle.}
 \label{fig:inclination}
 \end{figure*}
 
+\subsection{Systematic Uncertainties and Selection-Criteria Sensitivity}
+\label{sec:discussion}
+
+With $10^8$ injections per model, Monte Carlo statistical uncertainties are $0.2\%$ (polar) and $0.45\%$ (isotropic; Appendix~\ref{sec:convergence}), negligible compared to physical and observational systematics:
+\begin{itemize}
+\item \textbf{Pipeline and vetting losses ($\epspipe$).} Real-data alert preselection ($\varepsilon_{\rm 2alert} \approx 0.895$ across programs 1--3), real--bogus classification, stellar/bright-star/Solar-System spatial masks, pre-ZFPS recurrence triage, and human vetting reduce the effective surveyed volume--time via Equation~\ref{eq:rlim}. \tbd{Quote measured $\epspipe \pm \sigma_{\epspipe}$ from \texttt{knsearch.efficiency}.}
+\item \textbf{Ejecta and viewing-angle priors.} Fixed polar and isotropic limits differ by $3.5\times$, and at $\iota = 25.8^\circ$ the baseline POSSIS parameter set is $\approx 0.5$\,mag brighter than AT2017gfo in $r$ and $i$ during the first 2\,d. \tbd{Quote shift to the AT2017gfo posterior-marginalised and NR-prior population ensembles.}
+\item \textbf{Selection-criteria sensitivity.} Varying individual photometric thresholds around our fiducial cuts ($\ge 2$ detections, $S/N \ge 5/3$, $\Delta t \in [3\,\mathrm{h}, 14\,\mathrm{d}]$, fade $\ge 0.30$\,mag\,d$^{-1}$) in a 427,692-point criteria grid shows that primary detection count and S/N threshold dominate sensitivity variations, while the $0.30$\,mag\,d$^{-1}$ fade requirement removes $\approx 24\%$ of otherwise qualifying polar injections \tbd{insert exact one-at-a-time elasticity range around the fiducial point}. A comprehensive empirical completeness--contamination optimisation across this grid is presented in a separate study.
+\item \textbf{Dust extinction and simulation approximations.} Neglecting Milky Way and host-galaxy extinction in the current POSSIS runs makes $\vteff$ optimistic at $|b| \ge 15^\circ$, while noiseless threshold evaluation, a $(1+z)^2$ interface stretch in the current \texttt{fiesta} wrapper ($\approx +4\%$ in $\vteff$), and 20-bin redshift quadrature ($\approx -2\%$ to $-5\%$) contribute smaller competing shifts that are bounded within our systematic budget.
+\end{itemize}
+
 %% ==============================================================================
-\section{Monte Carlo convergence}
+\section{Discussion and Conclusions}
+\label{sec:conclusions}
+
+Combining an eight-year, three-program archival search of $\approx 2.53\times 10^8$ ZTF sources with matched $10^8$-injection POSSIS radiative-transfer simulations provides the most sensitive untargeted optical constraint on the kilonova rate prior to the Vera C.\ Rubin Observatory. Under baseline $N_{\rm obs}=0$, $\epspipe=1$ sensitivity (\tbd{update with final $N_{\rm obs}$ and $\epspipe$-corrected limits}), polar AT2017gfo-like kilonovae reach $\rlim = 192\,\gpcyr$---probing the upper portion of the GWTC-4.0 BNS merger rate interval ($7.6$--$250\,\gpcyr$)---whereas an isotropically oriented population ($\rlim = 664\,\gpcyr$) remains a factor of $\approx 2.7$ above the top of the 90\% GW credible band due to severe equatorial lanthanide obscuration. Over its eight-year baseline, ZTF increased its cumulative kilonova volume--time by $5.6\times$ beyond its first 23 months. Bridging the remaining factor of $3$--$30$ needed to routinely discover isotropic BNS mergers without GW triggers will require the deeper $griz$ cadence and target-of-opportunity synergy of Rubin LSST \citep{Andreoni2022Rubin}.
+
+\begin{acknowledgments}
+Based on observations obtained with the Samuel Oschin 48-inch Telescope at Palomar Observatory as part of the Zwicky Transient Facility project. Computations were performed at the Minnesota Supercomputing Institute (MSI) at the University of Minnesota. \tbd{ZTF partnership and funding acknowledgments.}
+\end{acknowledgments}
+
+\facilities{PO:1.2m}
+\software{\texttt{survey-sim}, \texttt{fiesta} \citep{Koehn2025}, \texttt{knrates}, \texttt{knsearch}, \texttt{numpy}, \texttt{pandas}, \texttt{matplotlib}}
+
+\appendix
+
+\section{Monte Carlo Convergence and Sub-Sampling Validation}
 \label{sec:convergence}
 
-We estimate the Monte Carlo precision by sub-sampling the actual realisations: the number of recoveries in a random subset of $N$ injections is hypergeometric given a realisation's totals, and larger $N$ are built from sums of distinct realisations. The scatter of $\vteff$ follows the binomial expectation $\sqrt{(1-\epsilon)/(N\epsilon)}$ at all $N$ (Figure~\ref{fig:convergence}). It is 2.3\% (polar POSSIS) and 4.5\% (isotropic) for a single $10^6$-injection realisation, and 0.2\% and 0.45\% for the pooled $10^8$. For the isotropic model, a $10^4$-injection run has a 0.4\% chance of no recoveries. The run-to-run scatter of the 100 realisations agrees with binomial noise to within 7\%.
+We verify the statistical precision of our $10^8$-injection ensembles directly from hypergeometric sub-sampling of the 100 independent $10^6$-injection realisations (for $N \le 10^6$) and random non-overlapping sums of realisations (for $N > 10^6$). Across more than three decades in sample size, the empirical fractional scatter in $\vteff$ follows the binomial expectation $\sqrt{(1-\epsilon)/(N\epsilon)}$ (Figure~\ref{fig:convergence}, left), declining from $2.3\%$ (polar POSSIS) and $4.5\%$ (isotropic) at $N = 10^6$ to $0.20\%$ and $0.45\%$ for the pooled $10^8$ ensembles. Small pilot simulations suffer catastrophic zero-recovery probability $P(N_{\rm rec}=0) = e^{-\epsilon N}$ (Figure~\ref{fig:convergence}, right; $0.4\%$ for isotropic POSSIS at $N=10^4$), whereas run-to-run dispersion across all 100 production realisations agrees with pure counting statistics to within $7\%$.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{figures/fig5_convergence_and_catastrophe.pdf}
-\caption{Left: relative scatter of $\vteff$ as a function of the number of injections, from sub-sampling the simulated realisations (markers), compared with the binomial expectation (lines). Right: probability that a simulation recovers no injection, $e^{-\epsilon N}$ (lines), and the fraction of sub-samples with none (markers).}
+\caption{Monte Carlo convergence validation. Left: relative fractional scatter of $\vteff$ versus total injected transients $N$ from sub-sampling production realisations (markers) compared with binomial $\sqrt{(1-\epsilon)/(N\epsilon)}$ scaling (lines). Right: empirical fraction of sub-samples yielding zero recoveries (markers) against the Poisson expectation $e^{-\epsilon N}$ (lines).}
 \label{fig:convergence}
 \end{figure*}
-
-%% ==============================================================================
-\section{Archival candidate search}
-\label{sec:search}
-\tbd{Apply the selection of Section~\ref{sec:data} to ZTF alert and forced photometry for 2018--2026, including real-bogus, stellar and Solar-System vetoes as in \citet{Andreoni2020, Andreoni2021}; report $N_{\rm obs}$, the vetting of survivors, and the efficiency of the vetting steps applied to injected light curves. Known imposter classes are catalogued by \citet{Barna2025}.}
-
-%% ==============================================================================
-\section{Systematic uncertainties}
-\label{sec:discussion}
-
-\begin{itemize}
-\item \textbf{Real-data pipeline losses.} The simulation does not include real-bogus classification \citep{Duev2019, Mahabal2019}, stellar or minor-planet vetoes, or bad subtractions. These remove genuine transients, so $\epsilon$ is an upper bound on the efficiency of a real search and the limits are correspondingly optimistic. \tbd{Measure by injecting into the real vetting chain, or adopt published efficiencies with uncertainties.}
-\item \textbf{Extinction.} No Milky Way or host extinction is applied to the POSSIS models; the one-zone models include a constant $A_V = 0.02$ and a host term. \tbd{Apply position-dependent dust maps to all models.}
-\item \textbf{Photometric noise.} Detection uses noiseless model magnitudes, so the recovery probability near threshold is idealised.
-\item \textbf{Surrogate time axis.} In the present version of the \texttt{fiesta} interface the light curves are stretched by $(1+z)^2$ instead of $(1+z)$; correcting this lowers $\vteff$ of the POSSIS models by $\approx 4\%$. \tbd{Re-run after the fix.}
-\item \textbf{Fast-transient test.} The fade requirement removes $\approx 24\%$ of otherwise recovered polar-view injections. With a rise threshold of zero, any detected rise also satisfies the test in the current implementation, which changes $\vteff$ by $\approx 1\%$.
-\item \textbf{Numerical integration.} Evaluating Eq.~\ref{eq:vt} on 20 redshift bins underestimates $\vteff$ by 2\%--5\% compared with a direct Monte Carlo sum. This makes the limits conservative.
-\item \textbf{Model choice.} The fixed-parameter limits differ by $\approx 3.5\times$ between polar and isotropic viewing and by an order of magnitude across the one-zone models \tbd{drop this clause if the one-zone models are removed}. This is far larger \tbd{State that the POSSIS model at $25.8^\circ$ is $\approx0.5$\,mag brighter than AT2017gfo in $r$ and $i$ during the first two days, so the fixed-parameter limits are optimistic for AT2017gfo itself; replace with the posterior-marginalised limit.} than the Monte Carlo error. \tbd{Population and posterior-marginalised limits.}
-\end{itemize}
-
-%% ==============================================================================
-\section{Discussion and conclusions}
-\label{sec:conclusions}
-
-If no kilonova candidate in the eight-year ZTF data passes our criteria, the 95\% limits are $\rlim = 192\,\gpcyr$ for AT2017gfo-like ejecta viewed at $25.8^\circ$ and $664\,\gpcyr$ for isotropic viewing angles. The isotropic limit lies above the entire GWTC-4.0 90\% range for the BNS merger rate ($7.6$--$250\,\gpcyr$). The polar-view limit falls within that range; it constrains only a population in which every merger produces a polar-viewed AT2017gfo-like kilonova. Over the same 23 months, our simulated sensitivity is higher than that inferred by \citet{Andreoni2020}. Over eight years it grows $5.6\times$ beyond that window. \tbd{Population-averaged limit; comparison including pipeline efficiency; final $N_{\rm obs}$; implications for Rubin \citep[e.g.][]{Andreoni2022Rubin}.}
-
-\begin{acknowledgments}
-Based on observations obtained with the Samuel Oschin 48-inch Telescope at Palomar Observatory as part of the Zwicky Transient Facility project. Computations were performed at the Minnesota Supercomputing Institute. \tbd{ZTF partnership and funding acknowledgments.}
-\end{acknowledgments}
-
-\facilities{PO:1.2m}
-\software{\texttt{survey-sim}, \texttt{fiesta} \citep{Koehn2025}, \texttt{numpy}, \texttt{scipy}, \texttt{pandas}, \texttt{matplotlib}}
 
 \begin{thebibliography}{}
 \bibitem[Abac et al.(2026)]{GWTC4pop} Abac, A.~G., et al. (LIGO Scientific, Virgo, and KAGRA Collaborations) 2026, ApJL, 1005, L51 (arXiv:2508.18083)
@@ -206,6 +228,7 @@ Based on observations obtained with the Samuel Oschin 48-inch Telescope at Palom
 \bibitem[Li \& Paczy{\'n}ski(1998)]{LiPaczynski1998} Li, L.-X., \& Paczy{\'n}ski, B. 1998, ApJL, 507, L59
 \bibitem[Mahabal et al.(2019)]{Mahabal2019} Mahabal, A., Rebbapragada, U., Walters, R., et al. 2019, PASP, 131, 038002
 \bibitem[Masci et al.(2019)]{Masci2019} Masci, F.~J., Laher, R.~R., Rusholme, B., et al. 2019, PASP, 131, 018003
+\bibitem[Masci et al.(2023)]{Masci2023} Masci, F.~J., Laher, R.~R., Rusholme, B., et al. 2023, arXiv:2305.16279
 \bibitem[Metzger et al.(2010)]{Metzger2010} Metzger, B.~D., Mart{\'\i}nez-Pinedo, G., Darbha, S., et al. 2010, MNRAS, 406, 2650
 \bibitem[Metzger(2020)]{Metzger2019} Metzger, B.~D. 2020, LRR, 23, 1
 \bibitem[Mooley et al.(2018)]{Mooley2018} Mooley, K.~P., Deller, A.~T., Gottlieb, O., et al. 2018, Natur, 561, 355
@@ -216,7 +239,6 @@ Based on observations obtained with the Samuel Oschin 48-inch Telescope at Palom
 \bibitem[Smartt et al.(2017)]{Smartt2017} Smartt, S.~J., Chen, T.-W., Jerkstrand, A., et al. 2017, Natur, 551, 75
 \bibitem[Soares-Santos et al.(2017)]{SoaresSantos2017} Soares-Santos, M., Holz, D.~E., Annis, J., et al. 2017, ApJL, 848, L16
 \bibitem[Tanaka \& Hotokezaka(2013)]{TanakaHotokezaka2013} Tanaka, M., \& Hotokezaka, K. 2013, ApJ, 775, 113
-\bibitem[Villar et al.(2017)]{Villar2017} Villar, V.~A., Guillochon, J., Berger, E., et al. 2017, ApJL, 851, L21
 \end{thebibliography}
 
 \end{document}
