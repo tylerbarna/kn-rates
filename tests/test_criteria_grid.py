@@ -308,6 +308,78 @@ class TestFastCriteriaFilterAndCandidates(unittest.TestCase):
         cfg_high_fade = dict(cfg, min_fade_rate=2.0)
         self.assertFalse(evaluate_candidate_against_criteria(lc, cfg_high_fade))
 
+    def test_production_chunk_filter_enforces_no_rolling_window_and_wls_rates(self):
+        """Directly test production CandidatePool + evaluate_grid_chunk_counts across every criterion."""
+        import json
+        import tempfile
+        from fast_criteria_filter import CandidatePool, evaluate_grid_chunk_counts
+
+        sources = [
+            # Source A: 2 r-band points 1.0 d apart fading 0.40 mag/d (SNR ~ 10.8, 5.4) -> passes fiducial
+            {
+                "z": 0.04, "t_exp": 60000.0,
+                "photometry_times": [60000.0, 60001.0],
+                "photometry_mags": [19.0, 19.4],
+                "photometry_errs": [0.10, 0.20],
+                "photometry_bands": ["r", "r"],
+            },
+            # Source B: 2 r-band points fading 0.80 mag/d + 1 g-band point at +20.0 d -> span is 20 d > 14 d!
+            # Production must REJECT this at max_timespan_days=14.0 (no rolling sub-window, matching survey_sim).
+            {
+                "z": 0.04, "t_exp": 60010.0,
+                "photometry_times": [60010.0, 60011.0, 60030.0],
+                "photometry_mags": [19.0, 19.8, 20.0],
+                "photometry_errs": [0.10, 0.15, 0.20],
+                "photometry_bands": ["r", "r", "g"],
+            },
+            # Source C: pure rising source (-0.6 mag/d brightening, zero fade)
+            {
+                "z": 0.04, "t_exp": 60040.0,
+                "photometry_times": [60040.0, 60041.0],
+                "photometry_mags": [20.0, 19.4],
+                "photometry_errs": [0.20, 0.10],
+                "photometry_bands": ["g", "g"],
+            },
+            # Source D: pairwise slope on [0, 1] d is 0.80 mag/d, but WLS slope across [0, 1, 5] d is 0.4/14 = 0.029 < 0.30!
+            {
+                "z": 0.04, "t_exp": 60050.0,
+                "photometry_times": [60050.0, 60051.0, 60055.0],
+                "photometry_mags": [19.0, 19.8, 19.4],
+                "photometry_errs": [0.10, 0.10, 0.10],
+                "photometry_bands": ["r", "r", "r"],
+            },
+        ]
+        payload = {
+            "type": "SimulationResult",
+            "n_simulated": 10_000,
+            "n_detected": len(sources),
+            "rate_summaries": [{"n_simulated": 10_000, "n_detected": len(sources), "effective_vt_gpc3_yr": 0.0025}],
+            "detected_sources": sources,
+        }
+        meta = {"loose_criteria": {"min_galactic_lat": 15.0}, "params": {"z_max": 0.15}, "seed": 7}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            f = Path(tmpdir) / "candidates_Bu2026Fixed_sample_000.json"
+            f.write_text(json.dumps(payload))
+            Path(f"{f}.metadata.json").write_text(json.dumps(meta))
+            pool = CandidatePool(f, "Bu2026Fixed")
+
+            base = dict(FIDUCIAL_CRITERIA)  # min_fade_rate=0.30, min_rise_rate=0.0, max_timespan_days=14.0
+            cfgs = [
+                base,                                        # Only Source A passes (B span=20d fails; C fade=0 fails)
+                dict(base, max_timespan_days=28.0),          # Sources A and B both pass
+                dict(base, min_fade_rate=0.50),              # None pass (A fades 0.40 < 0.50)
+                dict(base, min_rise_rate=0.50),              # A (fades >=0.3) and C (rises >=0.5) pass OR branch
+                dict(base, min_rise_rate=99.0),              # Pure fade-only parity: only Source A passes
+                dict(base, min_time_separation_hours=30.0),  # None pass (Source A sep is 24 h)
+            ]
+            counts = evaluate_grid_chunk_counts(cfgs, pool).tolist()
+            self.assertEqual(counts, [1, 2, 0, 2, 1, 0])
+
+            # Mismatched |b| on a position-less pool must raise ValueError instead of returning wrong counts
+            with self.assertRaises(ValueError):
+                evaluate_grid_chunk_counts([dict(base, min_galactic_lat=20.0)], pool)
+
     def test_multi_model_candidate_pool_and_filter(self):
         """Verify end-to-end CandidatePool loading and parallel filtering across all 3 models."""
         import tempfile

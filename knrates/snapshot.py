@@ -129,8 +129,9 @@ def load_snapshot(which: Optional[Union[str, Path]] = "latest") -> Snapshot:
         for name in zf.namelist():
             if name.endswith(".csv"):
                 data = zf.read(name)
-                tables[name[:-4]] = pd.read_csv(io.BytesIO(data), low_memory=False) if data.strip() else pd.DataFrame()
-    for name in ("suite01_runs", "suite07_runs"):
-        if name in tables and "task_id" in tables[name]:
-            tables[name]["task_id"] = tables[name]["task_id"].astype(str)
+                tables[name[:-4]] = (
+                    pd.read_csv(io.BytesIO(data), dtype={"task_id": str}, low_memory=False)
+                    if data.strip()
+                    else pd.DataFrame()
+                )
     return Snapshot(tables, manifest, path)

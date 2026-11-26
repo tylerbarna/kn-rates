@@ -11,18 +11,21 @@ import pytest
 
 from knrates import collect as C
 from knrates import plotting as P
+from knrates import snapshot as S
 from knrates.ensembles import (
     BU2026_SURROGATE_BOUNDS,
     EJECTA_KEYS,
     FADE_ONLY_MIN_RISE_RATE,
     MATCHED_FIDUCIAL_CRITERIA,
     SUITE08_TIERS,
+    _inv_norm_cdf,
     draw_tier_parameters,
     latin_hypercube_unit,
     load_posterior_samples,
     resolve_local_boom_hdf5_paths,
     summarize_ensemble_tiers,
 )
+from knrates.stats import poisson_factor
 
 
 def test_fade_only_parity_constant():
@@ -94,6 +97,13 @@ def test_resolve_local_boom_hdf5_paths(tmp_path: Path):
     assert [Path(p).name for p in paths] == ["ztf_201803.h5", "ztf_202012.h5", "ztf_202603.h5"]
 
 
+def test_inv_norm_cdf_matches_erf_in_tails_and_center():
+    probs = np.array([1e-8, 1e-4, 0.01, 0.02425, 0.16, 0.5, 0.84, 0.97575, 0.99, 1.0 - 1e-4, 1.0 - 1e-8])
+    zs = _inv_norm_cdf(probs)
+    recovered = np.array([0.5 * (1.0 + math.erf(float(z) / math.sqrt(2.0))) for z in zs])
+    np.testing.assert_allclose(recovered, probs, rtol=1e-8, atol=1e-11)
+
+
 def test_summarize_ensemble_tiers_marginal_and_quantiles():
     vt_vals = np.linspace(0.002, 0.006, 21)
     df = pd.DataFrame({
@@ -110,6 +120,28 @@ def test_summarize_ensemble_tiers_marginal_and_quantiles():
     assert row["vt_p16_gpc3_yr"] < row["vt_p50_gpc3_yr"] < row["vt_p84_gpc3_yr"]
     assert row["r95_p16"] < row["r95_p50"] < row["r95_p84"]
     assert row["r95_marginal"] == pytest.approx(-math.log(0.05) / (0.80 * 0.004), rel=1e-4)
+
+    # Unequal n_simulated weights + n_obs > 0 must weight by n_simulated (NOT unweighted mean 0.006!)
+    df_w = pd.DataFrame({
+        "model": ["BNS_NR_Population", "BNS_NR_Population"],
+        "n_simulated": [100_000, 900_000],
+        "n_detected": [100, 180],
+        "vt_gpc3_yr": [0.010, 0.002],
+    })
+    sw = summarize_ensemble_tiers(df_w, epsilon_pipe=0.50, n_obs=2).iloc[0]
+    expected_vt = 0.50 * (0.1 * 0.010 + 0.9 * 0.002)  # 0.0014
+    assert sw["vt_marginal_gpc3_yr"] == pytest.approx(expected_vt, rel=1e-9)
+    assert sw["r95_marginal"] == pytest.approx(poisson_factor(0.95, n_obs=2) / expected_vt, rel=1e-6)
+
+    # Error guards on invalid inputs
+    with pytest.raises(ValueError):
+        summarize_ensemble_tiers(df, epsilon_pipe=0.0)
+    with pytest.raises(ValueError):
+        summarize_ensemble_tiers(df, epsilon_pipe=1.2)
+    with pytest.raises(ValueError):
+        draw_tier_parameters("UnknownTier")
+    with pytest.raises(ValueError):
+        draw_tier_parameters("Bu2026_Polar", task_index=5, n_tasks=5)
 
 
 def test_collect_suite08_and_plotting_styles(tmp_path: Path):
@@ -170,3 +202,8 @@ def test_collect_suite08_and_plotting_styles(tmp_path: Path):
     assert "suite08_runs" in tables
     assert len(tables["suite08_runs"]) == 2
     assert (tables["suite08_runs"]["crit_min_rise_rate"] == 99.0).all()
+
+    # Round-trip through ZIP archive to verify zero-padded string task_id ("000", "001") survives reload intact
+    zpath = C.write_snapshot(tables, manifest, tmp_path / "s08_snap.zip")
+    reloaded = S.load_snapshot(zpath)
+    assert reloaded["suite08_runs"]["task_id"].tolist() == ["000", "001"]

@@ -22,6 +22,22 @@ def test_setup_keeps_only_suite01_possis(ctx):
     assert not any("Metzger" in m or m.startswith("GW170817_") for m in ctx.runs.model.unique())
 
 
+def _assert_rendered_figure(fig) -> None:
+    """Verify a figure actually drew data artists with finite axis bounds (not an empty canvas)."""
+    assert fig is not None
+    visible_axes = [ax for ax in fig.axes if ax.get_visible()]
+    assert len(visible_axes) >= 1
+    total_artists = sum(
+        len(ax.lines) + len(ax.patches) + len(ax.collections) + len(ax.images)
+        for ax in visible_axes
+    )
+    assert total_artists > 0, "Figure contains zero plotted lines, patches, collections, or images"
+    for ax in visible_axes:
+        x0, x1 = ax.get_xlim()
+        y0, y1 = ax.get_ylim()
+        assert x0 != x1 and y0 != y1
+
+
 def test_all_figures_draw(ctx):
     runs, lim, M, snap = ctx.runs, ctx.lim, ctx.models, ctx.snap
     figs = [F.rate_limits(lim, M), F.distance_reach(ctx.zh, runs, M), F.sensitivity_timeline(ctx.tm, runs, M),
@@ -36,7 +52,8 @@ def test_all_figures_draw(ctx):
     s3 = snap["suite03_runs"].rename(columns={"population_type": "model"})
     l3 = summarize_runs(s3, by=("criteria_regime", "model")).rename(columns={"model": "population_type"})
     figs.append(F.population_regimes(l3, sorted(set(l3.criteria_regime)), sorted(set(l3.population_type))))
-    assert all(f is not None for f in figs)
+    for fig in figs:
+        _assert_rendered_figure(fig)
     plt.close("all")
 
 
