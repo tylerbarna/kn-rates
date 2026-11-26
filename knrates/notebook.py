@@ -17,14 +17,57 @@ Typical first cell::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import io
+import json
+import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
+import zipfile
 
 import pandas as pd
 
 from . import analysis as A
 from . import plotting as P
 from .snapshot import REPO_ROOT, Snapshot, load_snapshot
+
+
+def load_search_snapshot(which: Optional[Union[str, Path]] = "auto") -> Optional[Snapshot]:
+    """Load the companion archival-search snapshot (``knsearch_results_latest.zip``) if available.
+
+    Resolution order when ``which == 'auto'``:
+      1. ``$KNRATES_SEARCH_SNAPSHOT`` environment variable (if set);
+      2. ``<kn-rates>/snapshots/knsearch_results_latest.zip`` (local copy);
+      3. ``<kn-rates>/../real-ztf-search/snapshots/knsearch_results_latest.zip`` (sibling checkout).
+
+    Returns ``None`` cleanly when ``which == 'auto'`` and no search snapshot is present on disk, so
+    simulation-only workflows continue to run anywhere.
+    """
+    if which is None or str(which).lower() == "none":
+        return None
+
+    candidates: List[Path] = []
+    if str(which) == "auto":
+        env_p = os.environ.get("KNRATES_SEARCH_SNAPSHOT")
+        if env_p:
+            candidates.append(Path(env_p))
+        candidates.append(REPO_ROOT / "snapshots" / "knsearch_results_latest.zip")
+        candidates.append(REPO_ROOT.parent / "real-ztf-search" / "snapshots" / "knsearch_results_latest.zip")
+        path = next((p for p in candidates if p.exists()), None)
+        if path is None:
+            return None
+    else:
+        path = Path(which)
+        if not path.exists():
+            raise FileNotFoundError(f"search snapshot not found at {path}")
+
+    tables: Dict[str, pd.DataFrame] = {}
+    with zipfile.ZipFile(path) as zf:
+        manifest = json.loads(zf.read("manifest.json"))
+        for name in zf.namelist():
+            if name.endswith(".csv"):
+                data = zf.read(name)
+                tables[name[:-4]] = pd.read_csv(io.BytesIO(data), low_memory=False) if data.strip() else pd.DataFrame()
+    return Snapshot(tables=tables, manifest=manifest, path=path)
 
 
 @dataclass
@@ -36,6 +79,7 @@ class Context:
     src: pd.DataFrame           # recovered sources (inclination, distance, light-curve sampling)
     lim: pd.DataFrame           # pooled limits, one row per model (indexed by model)
     models: List[str]
+    search_snap: Optional[Snapshot] = None
     save_figures: bool = False
     fig_dir: Path = field(default_factory=lambda: REPO_ROOT / "figures")
 
@@ -52,10 +96,11 @@ def _cat(snap: Snapshot, name: str, with07: bool) -> pd.DataFrame:
     return pd.concat([p for p in parts if len(p)], ignore_index=True) if any(len(p) for p in parts) else parts[0]
 
 
-def setup(snapshot: str = "latest", *, style: str = "notebook", labels: str = "working",
+def setup(snapshot: str = "latest", *, search_snapshot: Optional[Union[str, Path]] = "auto",
+          style: str = "notebook", labels: str = "working",
           include_metzger: bool = False, include_suite07: bool = False, save_figures: bool = False,
           fig_dir: Optional[str] = None, quiet: bool = False) -> Context:
-    """Load a snapshot and apply the standard model selection.
+    """Load simulation (+ optional archival search) snapshots and apply the standard model selection.
 
     By default only the Suite 01 POSSIS models are kept: the one-zone Metzger models are dropped
     (``include_metzger``) and the Suite 07 GW170817 parameter set, which differs from Suite 01 only by 0.1 dex in
@@ -72,12 +117,16 @@ def setup(snapshot: str = "latest", *, style: str = "notebook", labels: str = "w
         snap = snap.exclude_models(lambda m: m.startswith("GW170817_"))
     runs = _cat(snap, "runs", include_suite07)
     models = [m for m in P.MODEL_STYLE if m in set(runs.get("model", []))]
+    s_snap = load_search_snapshot(search_snapshot)
     ctx = Context(snap=snap, runs=runs, tm=_cat(snap, "texp_month", include_suite07),
                   zh=_cat(snap, "z_hist", include_suite07), src=_cat(snap, "sources", include_suite07),
                   lim=A.headline_limits(runs, models).set_index("model"), models=models,
-                  save_figures=save_figures, fig_dir=REPO_ROOT / (fig_dir or "figures"))
+                  search_snap=s_snap, save_figures=save_figures,
+                  fig_dir=REPO_ROOT / (fig_dir or "figures"))
     if not quiet:
         print(snap.label)
+        if s_snap is not None:
+            print(s_snap.label)
         print("models:", ", ".join(models))
     return ctx
 

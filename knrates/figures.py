@@ -403,3 +403,56 @@ def table1(lim: pd.DataFrame, runs: pd.DataFrame, models: Sequence[str]):
     tex.columns = ["Model", "Parameters", "$N_{\\rm rec}$", "$\\langle VT\\rangle$ [$10^{-3}$ Gpc$^3$ yr]",
                    "$\\mathcal{R}_{90}$", "$\\mathcal{R}_{95}$", "$\\mathcal{R}_{99}$"]
     return tab, tex, "llrrrrr"
+
+
+# --------------------------------------------------------------------------------------------- archival search (knsearch)
+_STAGE_A_CUT_LABELS = {
+    "all objects": "All objects",
+    "pass_n_alerts_span": r"$\geq 2$ alerts in $\leq 14$ d",
+    "pass_gal_lat": r"$|b| \geq 15^\circ$",
+    "pass_real_bogus": r"Real--bogus ($\geq 2$ pass)",
+    "pass_not_star": r"Not PS1 star ($1.5''$)",
+    "pass_not_bright_star": r"Not Gaia $G<14$ ($20''$)",
+    "pass_not_solar_system": r"Not asteroid ($10''$)",
+    "pass_no_old_history": r"No prior history ($>30$ d)",
+}
+
+
+def stage_a_cutflow(cutflow_df: pd.DataFrame, run_ids: Optional[Sequence[str]] = None):
+    """Sequential object survival across Stage A preselection cuts from ``knsearch_results_latest.zip``."""
+    runs = list(run_ids) if run_ids is not None else sorted(cutflow_df["run_id"].unique())
+    pal = [P.OKABE_ITO[k] for k in ("blue", "vermillion", "green", "purple", "orange", "skyblue", "black", "grey")]
+    fig, ax = plt.subplots(figsize=(P.PAGE_WIDTH, 2.8))
+    for idx, rid in enumerate(runs):
+        sub = cutflow_df[cutflow_df["run_id"] == rid].sort_values("step_index")
+        if sub.empty:
+            continue
+        labels = [_STAGE_A_CUT_LABELS.get(str(c), str(c)) for c in sub["cut"]]
+        ax.plot(range(len(sub)), sub["n_remaining"], marker="o", ms=4, lw=1.2,
+                color=pal[idx % len(pal)], label=rid.replace("msi/", ""))
+        if idx == 0:
+            ax.set_xticks(range(len(sub)), labels, rotation=22, ha="right", fontsize=7)
+    ax.set_yscale("log")
+    ax.set_ylabel("Objects remaining")
+    ax.legend(loc="upper right", ncol=2, fontsize=6.5, frameon=False)
+    return fig
+
+
+def rb_calibration_summary(rb_df: pd.DataFrame):
+    """Acceptance-matched random-forest ``rb`` fallback thresholds across ZTF classifier epochs."""
+    fig, ax = plt.subplots(figsize=(P.COL_WIDTH * 1.35, 2.3))
+    yy = np.arange(len(rb_df))[::-1]
+    for yi, (_, r) in zip(yy, rb_df.iterrows()):
+        lo = float(r["interval_lo"]) if pd.notna(r.get("interval_lo")) else float(r["threshold"])
+        hi = float(r["interval_hi"]) if pd.notna(r.get("interval_hi")) else float(r["threshold"])
+        th = float(r["threshold"])
+        ax.errorbar(
+            th, yi,
+            xerr=[[max(0.0, th - lo)], [max(0.0, hi - th)]],
+            fmt="o", color=P.OKABE_ITO["blue"], ms=5, capsize=2.5,
+        )
+        ax.annotate(f"{th:.3f}", (hi, yi), xytext=(5, 0), textcoords="offset points", va="center", fontsize=7)
+    ax.set_yticks(yy, [f"{r['model']} (ref: {r['reference_model']})" for _, r in rb_df.iterrows()], fontsize=7.5)
+    ax.set_xlim(0.15, 0.90)
+    ax.set_xlabel(r"Calibrated $\mathtt{rb}$ threshold")
+    return fig
