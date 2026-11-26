@@ -4,18 +4,11 @@ Injection–recovery simulations of kilonovae (KNe) in the full Zwicky Transient
 (March 2018 – March 2026) to derive volumetric rate upper limits, using the
 [`survey_sim`](../survey-sim) engine (fiesta POSSIS surrogate — labelled `Bu2026` here — and a one-zone Metzger model).
 
-> **Catching up?** Open `notebooks/00_overview.ipynb` (every headline number, where it comes from, and every open
-> item) and [`docs/decisions.md`](docs/decisions.md) (what was decided and why).
+> **Catching up?** Open [`docs/OPERATOR_GUIDE.md`](docs/OPERATOR_GUIDE.md) for a plain-English, non-agent guide to the repository, [`notebooks/00_overview.ipynb`](notebooks/00_overview.ipynb) for every headline number and open item, and [`docs/decisions.md`](docs/decisions.md) for design rationale.
 >
-> **Background:** [`docs/review_2026-11.md`](docs/review_2026-11.md) — scientific and code review (Nov 2026)
-> listing which results are trustworthy, which suites must be re-run, and what the manuscript draft must change.
-> In short: Suites 01 and 07 are valid fixed-parameter ensembles; Suite 02's filter has been fixed and its candidate ensemble
-> was re-simulated (100 compatible sets per model, Nov 2026); Suite 03 now samples a real population and must be re-run;
-> the former Suites 04–06 did not run simulations and were retired; the limits assume (but the repository does not
-> perform) a real-data search with zero candidates.
+> **Background:** [`docs/review_2026-11.md`](docs/review_2026-11.md) — scientific and code review (Nov 2026). Suites 01 and 07 provide baseline fixed-parameter ensembles; Suite 02 provides the 10-criterion sensitivity sweep; Suite 08 (`analysis_suites/08_matched_ensembles/`) runs searched-exposure, fade-only (`min_rise_rate=99.0`) ensembles matched to the archival search in sibling [`real-ztf-search`](../real-ztf-search), whose public-safe snapshot (`knsearch_results_latest.zip`) is loaded automatically by `knrates.notebook.setup()`.
 
-All numbers quoted anywhere in this project should come from the notebooks, which compute them from the
-results snapshot — nothing in this README is a result.
+All numbers quoted anywhere in this project come from the snapshots via `knrates` and `paper/numbers.tex` — nothing in this README is a hardcoded result.
 
 ---
 
@@ -23,15 +16,18 @@ results snapshot — nothing in this README is a result.
 
 ```
 kn-rates/
-├── knrates/                      # shared analysis package (used by all notebooks)
-│   ├── collect.py                #   builds the results snapshot from results/  (python -m knrates.collect)
+├── knrates/                      # shared analysis package (used by all notebooks & scripts)
+│   ├── criteria.py               #   canonical 10-criterion filter & band_wls_rates (shared with real-ztf-search)
+│   ├── collect.py                #   builds snapshots/knrates_results_latest.zip from results/
 │   ├── snapshot.py               #   loads a snapshot: latest, time-stamped, or live
-│   ├── stats.py                  #   Poisson limits, pooled MC estimators, hypergeometric sub-sampling
-│   ├── analysis.py               #   pooled limits, VT vs. epoch, VT vs. inclination, convergence
+│   ├── stats.py                  #   Poisson limits (N_obs >= 0), pooled MC estimators, Clopper-Pearson
+│   ├── analysis.py               #   pooled limits, VT vs. epoch, VT vs. inclination, cosmology, convergence
+│   ├── ensembles.py              #   Suite 08 5-tier Latin-hypercube draws, HDF5 resolver & hierarchical pooling
+│   ├── macros.py                 #   generates paper/numbers.tex LaTeX macros from snapshots
 │   ├── literature.py             #   published limits/parameters with arXiv sources (verified)
 │   ├── plotting.py               #   AAS-sized publication style, fixed colours per model
 │   ├── figures.py                #   every figure, one function each (used by notebooks and the paper)
-│   └── notebook.py               #   one-call notebook setup (snapshot + model selection + style)
+│   └── notebook.py               #   one-call setup loading both simulation & archival-search snapshots
 ├── snapshots/                    # VERSION-CONTROLLED compiled results (single ZIP per snapshot)
 ├── analysis_suites/
 │   ├── 01_large_scale_rate_limits/   # 100 x 1e6 injections per fiducial model

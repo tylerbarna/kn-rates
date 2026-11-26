@@ -290,11 +290,9 @@ class TestFastCriteriaFilterAndCandidates(unittest.TestCase):
         cfg_high_ndet = dict(cfg, min_detections=4)
         self.assertFalse(evaluate_candidate_against_criteria(lc, cfg_high_ndet))
 
-        # Fails timespan if max_timespan_days is 0.5 days (actual span is 1.0 day)
+        # Fails timespan if max_timespan_days is 0.5 days (actual span is 1.0 day; no rolling sub-window in survey_sim)
         cfg_short_span = dict(cfg, max_timespan_days=0.5)
-        # Detections [0, 1] have span 0.2 days (4.8h) and satisfy min_detections=2, min_prim=1!
-        # Rolling window finds slice [0:2]!
-        self.assertTrue(evaluate_candidate_against_criteria(lc, cfg_short_span))
+        self.assertFalse(evaluate_candidate_against_criteria(lc, cfg_short_span))
 
         # Fails min_time_separation if min_separation is 30 hours (max span is 24h)
         cfg_long_sep = dict(cfg, min_time_separation_hours=30.0)
