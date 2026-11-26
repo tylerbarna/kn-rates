@@ -443,16 +443,22 @@ def rb_calibration_summary(rb_df: pd.DataFrame):
     fig, ax = plt.subplots(figsize=(P.COL_WIDTH * 1.35, 2.3))
     yy = np.arange(len(rb_df))[::-1]
     for yi, (_, r) in zip(yy, rb_df.iterrows()):
-        lo = float(r["interval_lo"]) if pd.notna(r.get("interval_lo")) else float(r["threshold"])
-        hi = float(r["interval_hi"]) if pd.notna(r.get("interval_hi")) else float(r["threshold"])
         th = float(r["threshold"])
-        ax.errorbar(
-            th, yi,
-            xerr=[[max(0.0, th - lo)], [max(0.0, hi - th)]],
-            fmt="o", color=P.OKABE_ITO["blue"], ms=5, capsize=2.5,
-        )
-        ax.annotate(f"{th:.3f}", (hi, yi), xytext=(5, 0), textcoords="offset points", va="center", fontsize=7)
+        is_anchor = str(r.get("reference_model", "")) == "drb>=0.5"
+        lo = float(r["interval_lo"]) if (not is_anchor and pd.notna(r.get("interval_lo"))) else th
+        hi = float(r["interval_hi"]) if (not is_anchor and pd.notna(r.get("interval_hi"))) else th
+        if lo <= th <= hi and hi > lo:
+            ax.errorbar(
+                th, yi,
+                xerr=[[th - lo], [hi - th]],
+                fmt="o", color=P.OKABE_ITO["blue"], ms=5, capsize=2.5,
+            )
+            label_x = hi
+        else:
+            ax.plot(th, yi, "o", color=P.OKABE_ITO["vermillion"], ms=5)
+            label_x = th
+        ax.annotate(f"{th:.3f}", (label_x, yi), xytext=(5, 0), textcoords="offset points", va="center", fontsize=7)
     ax.set_yticks(yy, [f"{r['model']} (ref: {r['reference_model']})" for _, r in rb_df.iterrows()], fontsize=7.5)
-    ax.set_xlim(0.15, 0.90)
+    ax.set_xlim(0.15, 0.70)
     ax.set_xlabel(r"Calibrated $\mathtt{rb}$ threshold")
     return fig

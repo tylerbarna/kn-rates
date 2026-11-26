@@ -43,13 +43,20 @@ def execute_notebook(nb_path: Path, timeout: int = 1800, kernel: str = "python3"
     return ok
 
 
+def default_notebook_targets() -> list[Path]:
+    """Return science and paper notebooks in execution order (excluding ops/ telemetry)."""
+    top = sorted((ROOT / "notebooks").glob("*.ipynb"))
+    comp = sorted((ROOT / "notebooks" / "companion").glob("*.ipynb"))
+    return top + comp
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("notebooks", nargs="*", help="notebook paths (default: notebooks/*.ipynb)")
+    ap.add_argument("notebooks", nargs="*", help="notebook paths (default: notebooks/*.ipynb + notebooks/companion/*.ipynb)")
     ap.add_argument("--timeout", type=int, default=1800, help="per-cell timeout in seconds")
     ap.add_argument("--keep-going", action="store_true", help="continue after a failing notebook")
     args = ap.parse_args(argv)
-    targets = [Path(p) for p in args.notebooks] or sorted((ROOT / "notebooks").glob("*.ipynb"))
+    targets = [Path(p) for p in args.notebooks] or default_notebook_targets()
     failed = []
     for nb in targets:
         if not execute_notebook(nb, args.timeout):

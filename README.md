@@ -87,14 +87,15 @@ reasons are in [`docs/decisions.md`](docs/decisions.md).
 
 | Notebook | Question | Paper |
 |---|---|---|
-| `00_overview` | What is in the snapshot, what the results say, and what is still open | — |
-| `01_limits` | ⟨VT⟩ and rate limits; distance reach | §4, Figs. 3–4, Table 1 |
-| `02_survey_time_and_previous_searches` | Sensitivity over the survey; comparison with Andreoni+2020/2021 | §4.1, Fig. 1 |
-| `03_viewing_angle` | How much the orientation matters | §5, Fig. 2 |
-| `04_systematics` | MC noise, z_max, parameter set (Suite 07), light curves vs. AT2017gfo, criteria, population (Suite 03) | §6, §8, Fig. 5 |
-| `05_criteria_companion` | Response of ⟨VT⟩ to each selection criterion (Suite 02) | companion paper, Fig. 6 |
-| `paper_figures` | Writes `paper/figures/` and Table 1 (`paper/table1_master_rate_limits.{csv,tex}`) | all figures |
-| `telemetry_job_resources` | Slurm telemetry; `ANALYSIS_SCOPE = "numbered" \| "preliminary" \| "all"`, FairShare billing | — |
+| `00_overview` | What is in the simulation + archival-search snapshots, every headline number, and open `\tbd{}` items | — |
+| `01_archival_search_and_efficiency` | Stage A cutflow, RB epoch calibration, golden-object validation, archive coverage, and $\varepsilon_{\mathrm{pipe}}$ | Paper I §§2–3 |
+| `02_limits_and_timeline` | Pooled $\langle VT \rangle$, rate limits, distance reach, 8-yr sensitivity timeline, and Andreoni+2020/2021 comparison | Paper I §§4.1, 5.1–5.2, Figs. 1, 3–4, Table 1 |
+| `03_viewing_angle` | Inclination anatomy $\langle VT \rangle(\iota)$ and fixed-vs.-isotropic cross-check | Paper I §5.3, Fig. 2 |
+| `04_systematics_and_convergence` | $z_{\max}$ boundary, Suite 07 $M_{\mathrm{dyn}}$, AT2017gfo residuals, criteria elasticity, population regimes, and MC convergence | Paper I §5.4, App. A, Fig. 5 |
+| `paper_figures` | Writes Paper I `paper/figures/fig1..5.{pdf,png}`, `paper/table1_master_rate_limits.{csv,tex}`, and `paper/numbers.tex` | Paper I assets |
+| `companion/05_criteria_and_imposters` | Selection-criteria sensitivity surfaces (Suite 02) and empirical background/imposter integration | Paper II, Fig. 6 |
+| `companion/paper2_figures` | Writes Paper II `paper/figures/fig6_criteria_sensitivity.{pdf,png}` | Paper II assets |
+| `ops/telemetry_job_resources` | Slurm telemetry; `ANALYSIS_SCOPE = "numbered" \| "preliminary" \| "all"`, FairShare billing | Operations |
 
 Each figure is drawn by one function in `knrates/figures.py`; `knrates.notebook.setup()` loads the snapshot and
 keeps only the Suite 01 POSSIS models unless `include_metzger` / `include_suite07` are set. Each notebook gives a
@@ -126,7 +127,7 @@ Local smoke test: `python analysis_suites/01_large_scale_rate_limits/run_large_s
 - Harvest (on MSI): `python -m telemetry update` — merges sacct/reportseff/logs into
   `telemetry/job_resource_registry.csv` and, if `sshare` is available, appends a FairShare snapshot to
   `telemetry/fairshare_snapshots.csv` (`python -m telemetry fairshare` for a snapshot only).
-- Analyse (anywhere, CSV only): `notebooks/telemetry_job_resources.ipynb`; set `ANALYSIS_SCOPE`
+- Analyse (anywhere, CSV only): `notebooks/ops/telemetry_job_resources.ipynb`; set `ANALYSIS_SCOPE`
   (`"numbered"` production suites 01–07, `"preliminary"` older exploratory runs, `"all"`), `INCLUDE_OTHER`,
   `DATE_RANGE`, `MEM_PER_CORE_GB` in the first cell. Covers job outcomes, queue waits, efficiency, billed usage
   (max of cores and memory/3.9 GB — an assumption to confirm per partition), wasted and failed allocation,

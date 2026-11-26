@@ -76,18 +76,18 @@ echo "      Synced canonical benchmark to results/rate_limit_benchmark.csv"
 echo "[2/3] Updating results snapshot (snapshots/knrates_results_latest.zip)..."
 bash scripts/update_results_snapshot.sh || echo "[WARN] snapshot update failed; previous snapshot kept"
 
-# 3. Execute Notebook 01 to populate rich boxplots, ECDFs, and scatter plots
-echo "[3/3] Re-executing Notebook 01 to generate populated distribution plots..."
+# 3. Execute Notebook 02 to populate rich boxplots, ECDFs, and scatter plots
+echo "[3/3] Re-executing Notebook 02 to generate populated distribution plots..."
 python -c "
 from pathlib import Path
 import execute_notebooks
-execute_notebooks.execute_notebook(Path('notebooks/01_limits.ipynb'))
+execute_notebooks.execute_notebook(Path('notebooks/02_limits_and_timeline.ipynb'))
 "
 
 echo "=============================================================================="
 echo "SUITE 01 AGGREGATION & DISTRIBUTION RE-EXECUTION COMPLETE"
 echo "Results available at: ${OUTPUT_CSV}"
 echo "Benchmark synced at:  results/rate_limit_benchmark.csv"
-echo "Notebook updated at:  notebooks/01_limits.ipynb"
+echo "Notebook updated at:  notebooks/02_limits_and_timeline.ipynb"
 echo "Finished at:          $(date)"
 echo "=============================================================================="
