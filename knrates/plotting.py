@@ -32,6 +32,11 @@ MODEL_STYLE = {
     "GW170817_Bu2026_Isotropic": dict(label=r"Bu2026, isotropic $\iota$", color=OKABE_ITO["orange"], marker="s"),
     "GW170817_Metzger_Blue": dict(label=r"Metzger blue, $\kappa=0.5$", color=OKABE_ITO["purple"], marker="D"),
     "GW170817_Metzger_Mean": dict(label=r"Metzger mean, $\kappa=1$", color="#8C6D00", marker="v"),
+    "Bu2026_Polar": dict(label=r"Bu2026, $\iota=26^\circ$ (matched)", color=OKABE_ITO["blue"], marker="o"),
+    "Bu2026_Isotropic": dict(label=r"Bu2026, isotropic $\iota$ (matched)", color=OKABE_ITO["vermillion"], marker="s"),
+    "AT2017gfo_Posterior_Polar": dict(label=r"AT2017gfo posterior, polar $\iota$", color=OKABE_ITO["skyblue"], marker="D"),
+    "AT2017gfo_Posterior_Isotropic": dict(label=r"AT2017gfo posterior, isotropic $\iota$", color=OKABE_ITO["orange"], marker="P"),
+    "BNS_NR_Population": dict(label=r"BNS NR population, isotropic $\iota$", color=OKABE_ITO["green"], marker="^"),
 }
 
 # Which analysis suite produced each model (shown only in "working" label mode)
@@ -39,6 +44,9 @@ SUITE_OF = {
     "Bu2026Fixed": "S01", "Bu2026Vary": "S01", "Metzger": "S01",
     "GW170817_Bu2026_FixedView": "S07", "GW170817_Bu2026_Isotropic": "S07",
     "GW170817_Metzger_Blue": "S07", "GW170817_Metzger_Mean": "S07",
+    "Bu2026_Polar": "S08", "Bu2026_Isotropic": "S08",
+    "AT2017gfo_Posterior_Polar": "S08", "AT2017gfo_Posterior_Isotropic": "S08",
+    "BNS_NR_Population": "S08",
 }
 # Physical distinction used in "paper" label mode where two models would otherwise share a label
 # (the S01 and S07 Bu2026 models differ only in dynamical ejecta mass: log10 M_dyn = -1.7 vs -1.8).
@@ -48,8 +56,9 @@ PAPER_TAG = {
     "GW170817_Bu2026_Isotropic": r"$M_{\rm dyn}=0.016\,M_\odot$",
 }
 SUITE_NAME = {
-    "working": {"S01": "Suite 01", "S02": "Suite 02", "S03": "Suite 03", "S07": "Suite 07"},
-    "paper": {"S01": "Baseline parameters", "S02": "", "S03": "", "S07": "GW170817 literature parameters"},
+    "working": {"S01": "Suite 01", "S02": "Suite 02", "S03": "Suite 03", "S07": "Suite 07", "S08": "Suite 08"},
+    "paper": {"S01": "Baseline parameters", "S02": "", "S03": "", "S07": "GW170817 literature parameters",
+              "S08": "Searched-exposure matched ensembles"},
 }
 
 LABEL_MODE = "paper"
@@ -113,6 +122,11 @@ SHORT_LABEL = {
     "GW170817_Bu2026_Isotropic": r"Bu2026 iso.",
     "GW170817_Metzger_Blue": r"Metzger blue",
     "GW170817_Metzger_Mean": r"Metzger mean",
+    "Bu2026_Polar": r"Bu2026 $\iota=26^\circ$",
+    "Bu2026_Isotropic": r"Bu2026 iso.",
+    "AT2017gfo_Posterior_Polar": r"AT2017gfo post. polar",
+    "AT2017gfo_Posterior_Isotropic": r"AT2017gfo post. iso.",
+    "BNS_NR_Population": r"BNS NR pop.",
 }
 
 CRITERION_LABEL = {

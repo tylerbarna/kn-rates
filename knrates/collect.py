@@ -297,7 +297,7 @@ def collect_simulation_suite(ctx: Context, suite_id: str, subdir: str,
 RETIRED_POPULATIONS = {"suite03_runs": {"BroadPrior_FixedView", "BroadPrior_Isotropic"}}
 
 # Bump a suite's version whenever its collector output changes, so cached tables are rebuilt.
-COLLECTOR_VERSIONS = {"suite01": 1, "suite07": 1, "suite03": 2, "suite02": 2, "models": 1}
+COLLECTOR_VERSIONS = {"suite01": 1, "suite07": 1, "suite08": 1, "suite03": 2, "suite02": 2, "models": 1}
 
 
 def _reuse_or_run(ctx: Context, name: str, patterns: Sequence[str],
@@ -337,6 +337,23 @@ def collect_suite07(ctx: Context) -> Dict[str, pd.DataFrame]:
                          lambda: collect_simulation_suite(ctx, "07", "07_gw170817_rate_limits",
                                                           per_source_models=("GW170817_Bu2026_Isotropic",)),
                          "suite07_")
+
+
+@register("08_matched_ensembles/*/*.json")
+def collect_suite08(ctx: Context) -> Dict[str, pd.DataFrame]:
+    """Suite 08: searched-exposure, fade-only matched ensembles across Paper I's five model tiers."""
+    return _reuse_or_run(
+        ctx,
+        "suite08",
+        ["08_matched_ensembles/*/*.json"],
+        lambda: collect_simulation_suite(
+            ctx,
+            "08",
+            "08_matched_ensembles",
+            per_source_models=("Bu2026_Isotropic", "AT2017gfo_Posterior_Isotropic", "BNS_NR_Population"),
+        ),
+        "suite08_",
+    )
 
 
 @register("03_prior_vs_at2017gfo/*")
@@ -515,6 +532,8 @@ REQUIRED_COLUMNS = {
                      "survey_duration_years", "z_max"],
     "suite07_runs": ["model", "task_id", "n_simulated", "n_detected", "efficiency", "vt_gpc3_yr",
                      "survey_duration_years", "z_max"],
+    "suite08_runs": ["model", "task_id", "n_simulated", "n_detected", "efficiency", "vt_gpc3_yr",
+                     "survey_duration_years", "z_max"],
     "suite03_runs": ["criteria_regime", "population_type", "n_simulated", "n_detected", "vt_gpc3_yr"],
     "suite02_fiducial": ["model", "overall_efficiency", "effective_vt_gpc3_yr"],
 }
@@ -590,7 +609,7 @@ def validate_tables(tables: Dict[str, pd.DataFrame], previous=None) -> Tuple[Dic
             errors.append(f"suite02_fiducial: expected exactly one fiducial row per model, got {counts.to_dict()}")
     # Regression guard: the number of realisations per model must not shrink
     if previous is not None:
-        for name in ("suite01_runs", "suite07_runs", "suite03_runs"):
+        for name in ("suite01_runs", "suite07_runs", "suite08_runs", "suite03_runs"):
             if name in previous.tables and name in tables:
                 key = "model" if "model" in tables[name] else "population_type"
                 old = previous.tables[name].groupby(key).size()

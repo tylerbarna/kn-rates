@@ -35,9 +35,10 @@ kn-rates/
 ├── snapshots/                    # VERSION-CONTROLLED compiled results (single ZIP per snapshot)
 ├── analysis_suites/
 │   ├── 01_large_scale_rate_limits/   # 100 x 1e6 injections per fiducial model
-│   ├── 02_granular_criteria_sweep/   # simulate-once, filter-many criteria sweep (see review: needs fixes)
-│   ├── 03_prior_vs_at2017gfo/        # criteria regimes x populations (BroadPrior needs redesign)
-│   └── 07_gw170817_rate_limits/      # 100 x 1e6 injections per GW170817-informed model
+│   ├── 02_granular_criteria_sweep/   # simulate-once, filter-many criteria sweep
+│   ├── 03_prior_vs_at2017gfo/        # criteria regimes x populations
+│   ├── 07_gw170817_rate_limits/      # 100 x 1e6 injections per GW170817-informed model
+│   └── 08_matched_ensembles/         # WP-5 searched-exposure, fade-only matched ensembles (5 Paper I tiers)
 ├── notebooks/                    # analysis notebooks, ordered by the paper's argument (start at 00_overview)
 ├── scripts/                      # Slurm submission / aggregation scripts (MSI)
 ├── telemetry/                    # Slurm job telemetry, classification, FairShare accounting
@@ -117,6 +118,7 @@ bash scripts/submit_suite01_rate_limits.sh      # Suite 01 ensemble + aggregatio
 bash scripts/submit_suite07_rate_limits.sh      # Suite 07 ensemble + aggregation (+ snapshot)
 bash scripts/submit_fast_criteria_sweep.sh --fiducial   # Suite 02 candidates + filter (+ snapshot)
 sbatch scripts/03_run_prior_vs_at2017gfo_comparison.sh  # Suite 03 (+ snapshot)
+EXPOSURE_DIR=../real-ztf-search/results/ztf_boom_searched sbatch scripts/08_run_matched_ensembles.sh  # Suite 08 (WP-5)
 ./scripts/submit_all_suites.sh                  # everything with dependencies
 ```
 
