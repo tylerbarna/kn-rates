@@ -2,6 +2,7 @@
 
 Sub-modules
 -----------
+``knrates.criteria``    Canonical photometric selection criteria (shared with ``real-ztf-search``).
 ``knrates.stats``       Poisson upper limits and pooled Monte Carlo estimators.
 ``knrates.collect``     Builds the version-controlled results snapshot from ``results/``
                         (run as ``python -m knrates.collect``).

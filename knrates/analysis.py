@@ -12,7 +12,10 @@ from typing import Iterable, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from .criteria import FIDUCIAL_CRITERIA
 from .stats import LN20, binned_efficiency, hypergeom_subsample_counts, rate_upper_limit, summarize_runs
+
+_trapezoid = getattr(np, "trapezoid", getattr(np, "trapz", None))
 
 MJD_UNIX_EPOCH = 40587.0
 
@@ -169,7 +172,7 @@ def comoving_distance_mpc(z, h0: float = H0_SURVEY_SIM, om: float = OM_SURVEY_SI
     for i, zi in enumerate(z):
         zz = np.linspace(0.0, zi, 513)
         e = np.sqrt(om * (1 + zz) ** 3 + (1 - om))
-        out[i] = 299792.458 / h0 * np.trapezoid(1.0 / e, zz)
+        out[i] = 299792.458 / h0 * _trapezoid(1.0 / e, zz)
     return out
 
 
@@ -217,11 +220,7 @@ def cumulative_vt_vs_redshift(z_hist: pd.DataFrame, runs: pd.DataFrame, model: s
 
 # ----------------------------------------------------------------------------------------------------------------
 # Quantities shared by the streamlined notebooks (notebooks/0N_*) and the paper notebook.
-
-#: Detection criteria of the Suite 01/07 runs (the Suite 02 fiducial point).
-FIDUCIAL_CRITERIA = dict(snr_threshold=5.0, snr_threshold_secondary=3.0, min_detections=2, min_detections_primary=1,
-                         max_timespan_days=14.0, min_time_separation_hours=3.0, min_rise_rate=0.0,
-                         min_fade_rate=0.3, min_galactic_lat=15.0)
+# FIDUCIAL_CRITERIA is imported from knrates.criteria (single source of truth).
 
 #: Andreoni et al. (2020) used "the first 23 months" of ZTF without exact dates; we adopt these calendar months.
 ANDREONI_WINDOW = ("2018-03", "2020-01")

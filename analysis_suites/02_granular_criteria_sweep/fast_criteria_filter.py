@@ -234,51 +234,11 @@ SPANS = (2.0, 7.0, 14.0, 28.0)
 LATS = (0.0, 5.0, 10.0, 15.0, 20.0)
 PRIM_MAP = {3.5: 0, 4.0: 1, 4.5: 2, 5.0: 3, 5.5: 4, 6.0: 5}
 
-
-def band_wls_rates(pts, dedup_days: float = 2.0 / 24.0, min_seg_span: float = 0.01):
-    """Per-band rise/fade rates mirroring survey_sim's fast-transient test.
-
-    For each band: flux-average points closer than ``dedup_days``, split at the brightest
-    point and fit weighted least-squares slopes (sigma = 1.0857/SNR) to the pre-peak (rise)
-    and post-peak (fade) segments (>= 2 points spanning > ``min_seg_span`` d).
-    Returns (max fade slope [mag/d, >0 = fading], max rise rate [mag/d, >0 = brightening]).
-    """
-    by_band: Dict[str, List[Tuple[float, float, float]]] = {}
-    for p in pts:
-        by_band.setdefault(p[3], []).append((p[0], p[1], p[2]))
-    best_fade, best_rise = 0.0, 0.0
-    for rows in by_band.values():
-        rows.sort()
-        binned = []  # (t, mag, snr)
-        k = 0
-        while k < len(rows):
-            grp = [rows[k]]
-            while k + 1 < len(rows) and rows[k + 1][0] - grp[0][0] <= dedup_days:
-                k += 1
-                grp.append(rows[k])
-            fl = np.array([10 ** (-0.4 * g[2]) for g in grp])
-            sn = np.array([g[1] for g in grp])
-            t = float(np.mean([g[0] for g in grp]))
-            binned.append((t, float(-2.5 * np.log10(fl.mean())), float(np.sqrt(np.sum(sn ** 2)))))
-            k += 1
-        if len(binned) < 2:
-            continue
-        ipk = int(np.argmin([b[1] for b in binned]))
-        for seg, is_fade in ((binned[ipk:], True), (binned[:ipk + 1], False)):
-            if len(seg) < 2 or seg[-1][0] - seg[0][0] <= min_seg_span:
-                continue
-            t = np.array([s_[0] for s_ in seg]); m = np.array([s_[1] for s_ in seg])
-            w = (np.array([s_[2] for s_ in seg]) / 1.0857) ** 2
-            tw = np.sum(w * t) / np.sum(w); mw = np.sum(w * m) / np.sum(w)
-            den = np.sum(w * (t - tw) ** 2)
-            if den <= 0:
-                continue
-            slope = float(np.sum(w * (t - tw) * (m - mw)) / den)
-            if is_fade:
-                best_fade = max(best_fade, slope)
-            else:
-                best_rise = max(best_rise, -slope)
-    return best_fade, best_rise
+# Import canonical band_wls_rates from knrates.criteria (falls back only if run outside repo tree).
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from knrates.criteria import band_wls_rates  # noqa: E402
 
 
 def pareto_prune_sub_windows(
