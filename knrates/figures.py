@@ -462,3 +462,153 @@ def rb_calibration_summary(rb_df: pd.DataFrame):
     ax.set_xlim(0.15, 0.70)
     ax.set_xlabel(r"Calibrated $\mathtt{rb}$ threshold")
     return fig
+
+
+# ----------------------------------------------------------------------- companion paper II (suite 09 imposters)
+_REGIME_SHORT = {
+    "No_Fade": "No fade",
+    "Slow_Fade_01": "Fade 0.1",
+    "Fiducial_PureFade": "Fiducial\n(pure fade)",
+    "Fiducial_Rise0_Suite01": "Fiducial\n(rise=0)",
+    "Fast_Fade_05": "Fade 0.5",
+    "VeryFast_Fade_08": "Fade 0.8",
+    "AlertOnly_SNR5": r"Alert $5\sigma$",
+    "ThreeDet_Fade03": r"$N_{\min}=3$",
+    "Loose_NoFade": "Loose",
+    "Relaxed_Fade01": "Relaxed",
+    "Moderate_Fade02": "Mod. 0.2",
+    "Fiducial": "Fiducial",
+    "ZTFReST_2Prim": "2-alert+FP",
+    "Andreoni2020_Alert5": r"2$\times 5\sigma$ 7d",
+    "ShortSpan7d_Fade04": "7d f0.4",
+    "Strict_Fade05": "Strict f0.5",
+}
+
+
+def wls_slope_systematic(df_9a: pd.DataFrame):
+    """Noisy-vs.-noiseless WLS fade-slope ratio and pure-fade vs. ``min_rise_rate=0`` validation (Paper II Fig. 7)."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(P.PAGE_WIDTH, 2.55), gridspec_kw={"width_ratios": [1.55, 1.0]})
+    regimes = [r for r in df_9a["regime"].unique() if r != "Fiducial_Rise0_Suite01"]
+    xx = np.arange(len(regimes))
+    for m in ("Bu2026Fixed", "Bu2026Vary"):
+        sub = df_9a[df_9a["model"] == m].set_index("regime").reindex(regimes)
+        if sub.empty:
+            continue
+        st = P.style(m)
+        ax1.plot(xx, sub["noisy_over_noiseless_ratio"], marker=st["marker"], color=st["color"], lw=1.2, label=_short(m))
+    ax1.axhline(1.0, color="0.5", ls=":", lw=0.9)
+    ax1.set_xticks(xx, [_REGIME_SHORT.get(r, r) for r in regimes], rotation=22, ha="right", fontsize=6.8)
+    ax1.set_ylabel(r"$\langle VT\rangle_{\rm noisy} / \langle VT\rangle_{\rm noiseless}$")
+    ax1.set_title("(a) Photometric-scatter WLS slope bias", fontsize=8.5)
+    ax1.legend(loc="lower left", fontsize=6.5, frameon=False)
+
+    # Panel (b): Fiducial pure-fade (min_rise_rate=99) vs Suite 01 rise=0, noiseless vs noisy
+    models = [m for m in ("Bu2026Fixed", "Bu2026Vary") if m in set(df_9a["model"])]
+    ym = np.arange(len(models))
+    w = 0.24
+    bars = [
+        ("Engine pure fade", "Fiducial_PureFade", "engine_direct_noiseless_n", P.OKABE_ITO["blue"]),
+        ("Engine rise=0 (S01)", "Fiducial_Rise0_Suite01", "engine_direct_noiseless_n", P.OKABE_ITO["skyblue"]),
+        ("Filter noisy (S02)", "Fiducial_PureFade", "n_pass_noisy", P.OKABE_ITO["vermillion"]),
+    ]
+    for j, (lab, reg, col_n, col_c) in enumerate(bars):
+        vals = []
+        for m in models:
+            r_pf = df_9a[(df_9a["model"] == m) & (df_9a["regime"] == "Fiducial_PureFade")].iloc[0]
+            r_tg = df_9a[(df_9a["model"] == m) & (df_9a["regime"] == reg)].iloc[0]
+            base = float(r_pf["n_pass_noiseless"])
+            v = float(r_tg[col_n]) if pd.notna(r_tg[col_n]) else float(r_tg["n_pass_noiseless"])
+            vals.append(v / base if base > 0 else np.nan)
+        ax2.bar(ym + (j - 1) * w, vals, width=w, color=col_c, label=lab)
+    ax2.axhline(1.0, color="0.5", ls=":", lw=0.9)
+    ax2.set_xticks(ym, [_short(m) for m in models], fontsize=7.5)
+    ax2.set_ylim(0.70, 1.15)
+    ax2.set_ylabel("Counts / noiseless pure-fade filter")
+    ax2.set_title(r"(b) Fiducial parity & $\mathtt{min\_rise\_rate}=0$", fontsize=8.5)
+    ax2.legend(loc="lower right", fontsize=6.0, frameon=False)
+    return fig
+
+
+def imposter_frontier_and_colors(
+    frontier_df: pd.DataFrame,
+    color_df: pd.DataFrame,
+    *,
+    signal_model: str = "Bu2026Vary",
+    model_variant: str = "hybrid_fiesta",
+):
+    """Contaminant yields, ``d(g-r)/dt`` color separation, and 2D Completeness-Purity Pareto frontier (Paper II Fig. 8)."""
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(P.PAGE_WIDTH, 2.75))
+
+    # Panel (a): Expected 8-yr contaminant yields vs signal across regimes (no color gate)
+    sub_f = frontier_df[
+        (frontier_df["signal_model"] == signal_model)
+        & (frontier_df["model_variant"] == model_variant)
+        & (frontier_df["color_gate"] == "none")
+    ].copy()
+    reg_order = [r for r in (
+        "Loose_NoFade", "Relaxed_Fade01", "Moderate_Fade02", "Fiducial",
+        "ZTFReST_2Prim", "ThreeDet_Fade03", "ShortSpan7d_Fade04", "Strict_Fade05",
+    ) if r in set(sub_f["regime"])]
+    sub_f = sub_f.set_index("regime").reindex(reg_order).reset_index()
+    xx = np.arange(len(sub_f))
+    y_imp = sub_f["n_imposters_expected"].to_numpy(float)
+    y_lo = np.maximum(0.0, y_imp - sub_f["n_imposters_lo"].to_numpy(float))
+    y_hi = np.maximum(0.0, sub_f["n_imposters_hi"].to_numpy(float) - y_imp)
+    ax1.errorbar(xx, np.maximum(y_imp, 1e-2), yerr=[y_lo, y_hi], fmt="s-", color=P.OKABE_ITO["vermillion"],
+                 ms=3.8, lw=1.1, capsize=2, label="Extragalactic imposters")
+    ax1.plot(xx, np.maximum(sub_f["n_signal_expected"].to_numpy(float), 1e-2), "o--",
+             color=P.OKABE_ITO["blue"], ms=3.8, lw=1.1, label=r"KN ($\mathcal{R}=100$)")
+    ax1.set_yscale("log")
+    ax1.set_xticks(xx, [_REGIME_SHORT.get(r, r) for r in sub_f["regime"]], rotation=32, ha="right", fontsize=6.3)
+    ax1.set_ylabel("Expected 8-yr ZTF yield (generic log)")
+    ax1.set_title("(a) Yield vs. cut strictness", fontsize=8.3)
+    ax1.legend(loc="upper right", fontsize=5.8, frameon=False)
+
+    # Panel (b): d(g-r)/dt color cooling slopes at Fiducial
+    cdf = color_df.copy()
+    # Keep fiesta engine where available, else parametric
+    cdf["prio"] = np.where(cdf["engine"] == "fiesta", 0, 1)
+    cdf = cdf.sort_values(["prio", "median_dgr_dt"], ascending=[True, False]).drop_duplicates("transient_class")
+    cdf = cdf[cdf["n_with_gr_slope"] >= 1].sort_values("median_dgr_dt")
+    yy = np.arange(len(cdf))
+    for yi, (_, r) in zip(yy, cdf.iterrows()):
+        is_kn = str(r["transient_class"]).startswith("Bu2026")
+        col = P.OKABE_ITO["blue"] if is_kn else P.OKABE_ITO["grey"]
+        med = float(r["median_dgr_dt"])
+        lo_e = max(0.0, med - float(r["p16_dgr_dt"])) if pd.notna(r["p16_dgr_dt"]) else 0.0
+        hi_e = max(0.0, float(r["p84_dgr_dt"]) - med) if pd.notna(r["p84_dgr_dt"]) else 0.0
+        ax2.errorbar(med, yi, xerr=[[lo_e], [hi_e]], fmt="o" if is_kn else "s", color=col, ms=4, lw=1.0, capsize=2)
+    ax2.axvline(0.15, color=P.OKABE_ITO["green"], ls="--", lw=0.9, label=r"$+0.15$ mag d$^{-1}$")
+    ax2.set_yticks(yy, [str(t).replace("Bu2026Fixed", r"KN $\iota=26^\circ$").replace("Bu2026Vary", "KN iso.")
+                        for t in cdf["transient_class"]], fontsize=6.3)
+    ax2.set_xlabel(r"$d(g-r)/dt$ [mag d$^{-1}$]")
+    ax2.set_title("(b) Color reddening rate", fontsize=8.3)
+    ax2.legend(loc="lower right", fontsize=5.8, frameon=False)
+
+    # Panel (c): 2D Completeness-Purity Pareto frontier across regimes x color gates
+    all_f = frontier_df[
+        (frontier_df["signal_model"] == signal_model)
+        & (frontier_df["model_variant"] == model_variant)
+    ].copy()
+    gate_style = {
+        "none": ("o", P.OKABE_ITO["grey"], "No color gate"),
+        "veto_flat_blue": ("^", P.OKABE_ITO["orange"], "Veto flat/blue"),
+        "require_reddening_015": ("s", P.OKABE_ITO["green"], r"Reddening $\geq 0.15$"),
+        "require_reddening_025": ("D", P.OKABE_ITO["purple"], r"Reddening $\geq 0.25$"),
+    }
+    for gname, (mk, col, lab) in gate_style.items():
+        g = all_f[all_f["color_gate"] == gname]
+        if g.empty:
+            continue
+        ax3.scatter(g["completeness_vs_fiducial"], 100.0 * g["purity"], marker=mk, s=18, color=col, alpha=0.85, label=lab)
+    p_opt = all_f[all_f["pareto_optimal"]].sort_values("completeness_vs_fiducial")
+    if not p_opt.empty:
+        ax3.plot(p_opt["completeness_vs_fiducial"], 100.0 * p_opt["purity"], "k-", lw=1.1, zorder=4, label="Pareto frontier")
+    ax3.axvline(1.0, color="0.6", ls=":", lw=0.8)
+    ax3.set_yscale("log")
+    P.plain_log(ax3, "y")
+    ax3.set_xlabel(r"Completeness $\langle VT\rangle / \langle VT\rangle_{\rm fid}$")
+    ax3.set_ylabel(r"Unvetted purity [%] ($\mathcal{R}_{\rm KN}=100$)")
+    ax3.set_title("(c) Completeness--purity frontier", fontsize=8.3)
+    ax3.legend(loc="upper right", fontsize=5.3, frameon=True)
+    return fig
