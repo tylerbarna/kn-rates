@@ -237,9 +237,9 @@ class TestSuite07AggregationAndComparison(unittest.TestCase):
             generate_markdown_report(metrics, report_file)
             self.assertTrue(report_file.exists())
             text = report_file.read_text()
-            self.assertIn("Suite 07: Fixed-Parameter GW170817", text)
+            self.assertIn("Suite 07 (GW170817 Fixed)", text)
             self.assertIn("GW170817_Bu2026_FixedView", text)
-            self.assertIn("Viewing Angle Suppression", text)
+            self.assertIn("Viewing-Angle Suppression", text)
 
 
 if __name__ == "__main__":

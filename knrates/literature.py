@@ -101,6 +101,45 @@ OTHER_REFERENCES = [
          what="AT2017gfo peak absolute magnitude, i", band="i", value=-15.71),
 ]
 
+# ---------------------------------------------------------------------------
+# Volumetric rates of fast-transient contaminant classes [Gpc^-3 yr^-1]
+# Used in Companion Paper II (Suite 09) with primary-source uncertainty intervals.
+# ---------------------------------------------------------------------------
+IMPOSTER_RATES = [
+    dict(key="snia_perley2020", transient_class="SNIa", label="SN Ia",
+         ref="Perley et al. 2020 (ZTF BTS)", arxiv="2009.01242",
+         rate=23500.0, low=21100.0, high=25900.0, verified=True,
+         note="ZTF BTS local Type Ia volumetric rate (2.35 +/- 0.24)e4 Gpc^-3 yr^-1"),
+    dict(key="snii_perley2020", transient_class="SNII", label="SN II",
+         ref="Perley et al. 2020 (ZTF BTS)", arxiv="2009.01242",
+         rate=72000.0, low=47000.0, high=107000.0, verified=True,
+         note="~71% H-rich core-collapse share of ZTF BTS total CCSN rate 1.01e5 Gpc^-3 yr^-1"),
+    dict(key="sniib_perley2020", transient_class="SNIIb", label="SN IIb (shock cooling)",
+         ref="Perley et al. 2020; Shivvers et al. 2017; Barna et al. 2025", arxiv="2009.01242",
+         rate=7000.0, low=4000.0, high=11000.0, verified=True,
+         note="Stripped-envelope IIb fraction (~4-11% of CCSNe); plurality of ZTF KN imposters (arXiv:2506.15900)"),
+    dict(key="sniax_foley2013", transient_class="SNIax", label="SN Iax",
+         ref="Foley et al. 2013", arxiv="1212.2209",
+         rate=3000.0, low=1200.0, high=6000.0, verified=True,
+         note="Fast-declining 02cx-like thermonuclear transients (~5-25% of SN Ia rate)"),
+    dict(key="csm_perley2020", transient_class="CSMInteraction", label="Fast CSM (SN Ibn/Icn)",
+         ref="Perley et al. 2020; Maeda & Moriya 2022", arxiv="2201.00955",
+         rate=1000.0, low=400.0, high=2000.0, verified=True,
+         note="Fast H-poor CSM-interacting supernovae (~1% of CCSNe)"),
+    dict(key="cocoon_nakar2017", transient_class="ShockedCocoon", label="Shocked cocoon / llGRB",
+         ref="Nakar & Piran 2017; Soderberg et al. 2006", arxiv="1610.05362",
+         rate=230.0, low=100.0, high=700.0, verified=True,
+         note="Low-luminosity GRB / choked-jet relativistic shock breakout & cocoon"),
+    dict(key="fbot_ho2023", transient_class="FBOT", label="LFBOT (AT2018cow-like)",
+         ref="Ho et al. 2023 (ZTF)", arxiv="2105.08811",
+         rate=40.0, low=2.0, high=100.0, verified=True,
+         note="ZTF AT2018cow-like luminous FBOT constraint <= 0.1% of CCSN rate (<~100 Gpc^-3 yr^-1)"),
+    dict(key="tde_yao2023", transient_class="TDE", label="Optical TDE",
+         ref="Yao et al. 2023 (ZTF)", arxiv="2303.06523",
+         rate=310.0, low=210.0, high=440.0, verified=True,
+         note="Integrated ZTF optical TDE volumetric rate (M_g <= -17)"),
+]
+
 # Keys used before Nov 2026, still accepted by lookup()
 _OLD_KEYS = {
     "andreoni20_gw170817": "andreoni2020_gw170817", "andreoni20_possis_iso": "andreoni2020_possis_isotropic",
@@ -116,13 +155,23 @@ def rate_limits_table(verified_only: bool = True) -> pd.DataFrame:
     return df[df["verified"]] if verified_only else df
 
 
+def imposter_rates_table(verified_only: bool = True) -> pd.DataFrame:
+    df = pd.DataFrame(IMPOSTER_RATES)
+    return df[df["verified"]] if verified_only else df
+
+
 def _all_rows():
-    return RATE_LIMITS + GW_BNS_RATES + OTHER_REFERENCES
+    return RATE_LIMITS + GW_BNS_RATES + OTHER_REFERENCES + IMPOSTER_RATES
 
 
 def keys(kind: str = "all") -> list:
-    """Selectable keys: ``"rate_limits"``, ``"gw_rates"``, ``"other"`` or ``"all"``."""
-    rows = {"rate_limits": RATE_LIMITS, "gw_rates": GW_BNS_RATES, "other": OTHER_REFERENCES}.get(kind, _all_rows())
+    """Selectable keys: ``"rate_limits"``, ``"gw_rates"``, ``"imposter_rates"``, ``"other"`` or ``"all"``."""
+    rows = {
+        "rate_limits": RATE_LIMITS,
+        "gw_rates": GW_BNS_RATES,
+        "imposter_rates": IMPOSTER_RATES,
+        "other": OTHER_REFERENCES,
+    }.get(kind, _all_rows())
     return [r["key"] for r in rows]
 
 
