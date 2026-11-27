@@ -1,0 +1,9 @@
+{
+  "suite": "09_imposter_contamination",
+  "exposure_source": "local_mac_generic_ztf_boom_exploratory",
+  "note": "Exploratory local ZTF exposure store (not restricted searched_images.parquet); do not overwrite Suite 01/08 MSI rate limits.",
+  "n_study9a_per_model": 200000,
+  "scale_9b": 1.0,
+  "seed": 20261126,
+  "elapsed_seconds": 1213.78
+}
